@@ -75,6 +75,9 @@
 #define GENERALEXCEPT	  1
 
 
+/* Phase 1: Additional constants */
+#define MAXPROC = 20;
+
 /* operations */
 #define	MIN(A,B)		((A) < (B) ? A : B)
 #define MAX(A,B)		((A) < (B) ? B : A)

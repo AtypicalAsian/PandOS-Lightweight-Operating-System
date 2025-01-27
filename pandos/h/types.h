@@ -9,9 +9,8 @@
 
 #include "../h/const.h"
 
+
 typedef signed int cpu_t;
-
-
 typedef unsigned int memaddr;
 
 
@@ -56,6 +55,25 @@ typedef struct passupvector {
     unsigned int exception_stackPtr;
 } passupvector_t;
 
+/* Process Control Block (PCB) type */
+typedef struct pcb_t {
+    /* Process queue fields */
+    struct pcb_t *p_next;  /* Pointer to next entry */
+    struct pcb_t *p_prev;  /* Pointer to previous entry */
+
+    /* Process tree fields */
+    struct pcb_t *p_prnt;  /* Pointer to parent process */
+    struct pcb_t *p_child; /* Pointer to first child process */
+    struct pcb_t *p_sib;   /* Pointer to sibling process */
+
+    /* Process status information */
+    state_t p_s;           /* Processor state */
+    cpu_t p_time;          /* CPU time used by the process */
+    int *p_semAdd;         /* Pointer to semaphore on which the process is blocked */
+
+    /* Support layer information */
+    // support_t *p_supportStruct; /* Pointer to support structure */
+} pcb_t, *pcb_PTR;
 
 #define STATEREGNUM	31
 typedef struct state_t {

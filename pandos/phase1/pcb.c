@@ -11,12 +11,12 @@ Written by: Nicolas & Tran
 
 static pcb_PTR pcbFree_h; /* ptr for head of PCB Free List */
 
-//================================================
-//initPcbs
-//Initialize the pcbFree as a linked list that contains all elements of the static array (pool) of MAXPROC pcbs
-//PARAMETERS: None
-//RETURN: none 
-//================================================
+/**************************************************************************** 
+ *  initPcbs
+ *  Initialize the pcbFree as a linked list that contains all elements of the static array (pool) of MAXPROC pcbs
+ *  params: None
+ *  return: none 
+ *****************************************************************************/
 void initPcbs() {
 	static pcb_t pcb_pool[MAXPROC];         //Pool of PCBs from which processes can be allocated
 	pcbFree_h = NULL;                       //List is initially empty
@@ -27,12 +27,12 @@ void initPcbs() {
 }
 
 
-//================================================
-//freePcb
-//Add the pcb pointed to by pointer p to the pcbFree list. 
-//PARAMETERS: pointer to a pcb struct
-//RETURN: none 
-//================================================
+/**************************************************************************** 
+ *  freePcb
+ *  Add the pcb pointed to by pointer p to the pcbFree list. 
+ *  params: pointer to a pcb struct
+ *  return: none 
+ *****************************************************************************/
 void freePcb(pcb_PTR p){
     if (pcbFree_h == NULL){                //If pcbFree list is empty
 		(*p).p_prev = NULL;
@@ -46,12 +46,14 @@ void freePcb(pcb_PTR p){
 		pcbFree_h = p;
 	}
 }
-//================================================
-//allocPcb
-//Remove an element from pcbFree linked list and intialize values for all pcb struct fields
-//PARAMETERS: none
-//RETURN: pointer to the pcb removed from the pcbFree linked list 
-//================================================
+
+/**************************************************************************** 
+ *  allocPcb
+ *  Remove an element from pcbFree linked list and intialize values for all pcb struct fields
+ *  params: none
+ *  return: pointer to the pcb removed from the pcbFree linked list 
+ *****************************************************************************/
+
 pcb_PTR allocPcb(){
    if (pcbFree_h == NULL) return NULL;
    pcb_PTR freed_pcb_ptr = pcbFree_h;           //remove from head of linked list

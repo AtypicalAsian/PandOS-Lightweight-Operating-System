@@ -102,6 +102,9 @@ typedef struct pcb_t {
     struct pcb_t *p_prnt;  /* Pointer to parent process */
     struct pcb_t *p_child; /* Pointer to first child process */
     struct pcb_t *p_sib;   /* Pointer to sibling process */
+	struct pcb_t *p_lsib;  /* Pointer to left sibling (for doubly linked list)*/
+	struct pcb_t *p_rsib;  /* Pointer to right sibling (for doubly linked list)*/
+	
 
     /* Process status information */
     state_t p_s;           /* Processor state */

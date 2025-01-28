@@ -226,6 +226,86 @@ pcb_PTR headProcQ (pcb_PTR tp){
 
 
 /**************************************************************************** 
-                            TREES
+                            PROCESS TREES
+        Represent pcbs organized as trees
 
 ****************************************************************************/
+
+
+/**************************************************************************** 
+ *  emptyChild
+ *  params: pointer to a pcb in the tree
+ *  return: TRUE if the pcb pointed to by p has no children. FALSE otherwise
+ *****************************************************************************/
+int emptyChild (pcb_PTR p){
+    if (p->p_child == NULL) return 1;
+    else return 0;
+}
+
+/**************************************************************************** 
+ *  insertChild
+ *  params: pointer to a child pcb and a parent pcb
+ *  return: none. Make pcb pointed to by p a child of pcb pointed to by prnt
+ *****************************************************************************/
+void insertChild (pcb_PTR prnt, pcb_PTR p){
+    /*Curr parent node has no children*/
+    if (emptyChild(prnt)){
+        prnt->p_child = p;                              /*Make p first node in childrent linked list of prnt*/
+        p->p_rsib = NULL;
+        p->p_lsib = NULL;
+        p->p_prnt = prnt;
+        /*p->p_sib = NULL;*/  /*If singly linked list*/
+    }
+    /*Curr parent already has children linked list populated*/
+    else{
+        /* Add new child to head of DLL */
+        pcb_PTR currChildHead = prnt->p_child;
+        prnt->p_child = p;
+        p->p_lsib = NULL;
+        p->p_rsib = currChildHead;
+        p->p_prnt = prnt;
+        currChildHead->p_lsib = p;
+    }
+    return;
+}
+
+/**************************************************************************** 
+ *  removeChild
+ *  params: pointer to a pcb in the tree
+ *  return: remove first child of pcb pointed to by p and return pointer to removed pcb
+ *****************************************************************************/
+pcb_PTR removeChild (pcb_PTR p){
+    /*If curr pcb has no children*/
+    if (emptyChild(p)) return NULL;
+
+    /*If only one child in children list */
+    else if ((p->p_child)->p_rsib == NULL){
+        pcb_PTR curr_child = p->p_child;
+        curr_child->p_lsib = NULL;
+        curr_child->p_rsib = NULL;
+        curr_child->p_prnt = NULL;
+        p->p_child = NULL;
+        return curr_child;
+    }
+
+    /*If >1 child in children list */
+    else{
+        pcb_PTR curr_child = p->p_child;
+        pcb_PTR curr_child_sibling = curr_child->p_rsib;
+        p->p_child = curr_child_sibling;
+        curr_child_sibling->p_lsib = NULL;
+        curr_child->p_rsib = NULL;
+        curr_child->p_prnt = NULL;
+        return curr_child;
+    }
+}
+
+
+/**************************************************************************** 
+ *  outChild
+ *  params: pointer to a pcb in the tree
+ *  return: disconnect pcb pointed to by p from its parent and return the removed pcb
+ *****************************************************************************/
+pcb_PTR outChild (pcb_PTR p){
+    return p;
+}

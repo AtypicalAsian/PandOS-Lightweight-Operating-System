@@ -15,7 +15,7 @@
 #include "../h/const.h"
 #include "../h/types.h"
 
-// #include "/usr/include/umps3/umps/libumps.h"
+#include "/usr/include/umps3/umps/libumps.h"
 #include "../h/pcb.h"
 #include "../h/asl.h"
 

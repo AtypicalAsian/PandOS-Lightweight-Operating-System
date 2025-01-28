@@ -9,11 +9,12 @@ Written by: Nicolas & Tran
 #include "../h/const.h"
 #include "../h/types.h"
 
-static pcb_PTR pcbFree_h; /* ptr for head of PCB Free List */
+static pcb_PTR pcbFree_h;
 
 /**************************************************************************** 
  *  initPcbs
- *  Initialize the pcbFree as a linked list that contains all elements of the static array (pool) of MAXPROC pcbs
+ *  Initialize the pcbFree as a non-circular linked list that contains all elements of the static array (pool) of MAXPROC pcbs
+ *    --> pcbFree act as a pool of free (unused) pcbs available for allocation when a new process is created
  *  params: None
  *  return: none 
  *****************************************************************************/
@@ -90,4 +91,121 @@ pcb_PTR allocPcb(){
    //p_supportStruct = NULL; ???? HAVE NOT DECLARED THIS AND UNSURE ABOUT INIT VALUE */
 
     return freed_pcb_ptr;
+}
+
+
+
+/**************************************************************************** 
+                            PROCESS QUEUES
+    double, circularly linked list with a tail pointer instead of a 
+    head pointer. Used to organize PCBs based on their state or scheduling requirements.
+
+****************************************************************************/
+
+
+/**************************************************************************** 
+ *  mkEmptyProcQ
+ *  Initialize empty process queue with null pointer
+ *  params: none
+ *  return: tail pointer for new process queue
+ *****************************************************************************/
+pcb_PTR mkEmptyProcQ(){
+    return NULL;
+}
+
+/**************************************************************************** 
+ *  emptyProcQ
+ *  check if process queue is currently empty
+ *  params: tail pointer (tp) of process queue
+ *  return: True if process queue is empty. False otherwise
+ *****************************************************************************/
+int emptyProcQ (pcb_PTR tp){
+    return tp == NULL;
+}
+
+
+/**************************************************************************** 
+ *  insertProcQ
+ *  Insert the pcb pointed to by p into the process queue
+ *  params: pointer to tail pointer of process queue, pcb pointer p
+ *  return: none
+ *****************************************************************************/
+void insertProcQ (pcb_PTR *tp, pcb_PTR p){
+    //If process queue empty --> new pcb becomes single node in circular DLL
+    if (emptyProcQ(*tp)){
+        *tp = p;            //p is new tail pointer
+        p->p_next = p;      //update next and prev to point to itself
+        p->p_prev = p;
+    }
+
+    else{
+        //p becomes new tail, update current tail and associated next, prev pointers
+        pcb_PTR currHead = (*tp)->p_next;       //current head of circular DLL
+        p->p_next = currHead;
+        p->p_prev = *tp;
+        currHead->p_prev = p;
+        (*tp)->p_next = p;
+        *tp = p;
+    }
+}
+
+
+
+/**************************************************************************** 
+ *  removeProcQ
+ *  remove the head from the circular DLL (process queue)
+ *  params: pointer to tail pointer of process queue
+ *  return: pointer to removed element. Otherwise, NULL if list is empty
+ *****************************************************************************/
+pcb_PTR removeProcQ (pcb_PTR *tp){
+    if (emptyProcQ(*tp)) return NULL;
+    else{
+        pcb_PTR removedHead = (*tp)->p_next;
+        //If queue only has 1 pcb
+        if(removedHead == *tp) *tp = NULL;
+        else{
+            (*tp)->p_next = removedHead->p_next;
+            removedHead->p_next->p_prev = *tp;
+        }
+        removedHead->p_next = NULL;
+        removedHead->p_prev = NULL;
+        return removedHead;
+    }
+}
+
+
+/**************************************************************************** 
+ *  outProcQ
+ *  params: pointer to tail pointer of process queue, pcb pointer
+ *  return: pointer to pcb p after it's removed from the queue. If not found, return NULL
+ *****************************************************************************/
+pcb_PTR outProcQ (pcb_PTR *tp, pcb_PTR p){
+    if (emptyProcQ(*tp)) return NULL;
+
+    pcb_PTR curr = (*tp)->p_next;           //start at head
+    pcb_PTR prev = *tp;                     //trailing pointer starting from tail
+
+
+    //Loop through the list with curr,prev pointers until we find p, or until we circle back to the head (complete one loop)
+    do {
+        if (curr == p){
+            //Disconnect node from queue + update associated pointers
+            (...)
+        }
+        prev = curr;
+        curr = curr->p_next;
+    } while (curr != (*tp)->p_next);
+    return NULL;
+}
+
+
+/**************************************************************************** 
+ *  headProcQ
+ *  Return the head of the circular DLL process queue
+ *  params: pointer to tail of process queue
+ *  return: pointer to first pcb in process queue. Otherwise, NULL if queue is empty
+ *****************************************************************************/
+pcb_PTR headProcQ (pcb_PTR tp){
+    if (emptyProcQ(tp)) return NULL;
+    return tp->p_next;
 }

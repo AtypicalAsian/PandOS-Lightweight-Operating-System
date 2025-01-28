@@ -23,7 +23,7 @@ void initPcbs() {
 	pcbFree_h = NULL;                       /*List is initially empty*/
     int i;
 	for(i = 0; i < MAXPROC; i++){
-		//add each pcb to pcbFree list
+		/*add each pcb to pcbFree list*/
 		freePcb(&(pcb_pool[i]));
 	}
 }

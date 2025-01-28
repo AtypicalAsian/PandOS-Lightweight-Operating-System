@@ -197,7 +197,8 @@ pcb_PTR outProcQ (pcb_PTR *tp, pcb_PTR p){
 
             /*if curr is the tail*/
             if (curr == *tp){
-                *tp = (curr == prev) ? NULL : prev;
+                if (curr == prev) {*tp = NULL;}     /*if only one node in process queue*/
+                else {*tp = prev;}                  /*update tail to previous pcb node*/
             }
 
             curr->p_next = NULL;
@@ -221,3 +222,10 @@ pcb_PTR headProcQ (pcb_PTR tp){
     if (emptyProcQ(tp)) return NULL;
     return tp->p_next;
 }
+
+
+
+/**************************************************************************** 
+                            TREES
+
+****************************************************************************/

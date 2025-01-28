@@ -308,5 +308,8 @@ pcb_PTR removeChild (pcb_PTR p){
  *  return: disconnect pcb pointed to by p from its parent and return the removed pcb
  *****************************************************************************/
 pcb_PTR outChild (pcb_PTR p){
+    if (p->p_prnt == NULL) return NULL;
+    pcb_t *currentHead;
+    currentHead = (p->p_prnt)->p_child;
     return p;
 }

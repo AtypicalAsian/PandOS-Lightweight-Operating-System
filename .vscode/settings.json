@@ -1,5 +1,6 @@
 {
   "files.associations": {
-    "asl.h": "c"
+    "asl.h": "c",
+    "pcb.h": "c"
   }
 }

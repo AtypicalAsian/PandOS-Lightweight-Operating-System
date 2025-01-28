@@ -71,6 +71,18 @@ typedef struct context_t {
 } context_t;
 
 
+
+#define STATEREGNUM	31
+typedef struct state_t {
+	unsigned int	s_entryHI;
+	unsigned int	s_cause;
+	unsigned int	s_status;
+	unsigned int 	s_pc;
+	int	 			s_reg[STATEREGNUM];
+
+} state_t, *state_PTR;
+
+
 typedef struct support_t {
 	int				sup_asid;				/* process Id (asid) */
 	state_t			sup_exceptState[2];		/* stored except states */
@@ -99,16 +111,6 @@ typedef struct pcb_t {
     /* Support layer information */
     support_t *p_supportStruct; /* Pointer to support structure */
 } pcb_t, *pcb_PTR;
-
-#define STATEREGNUM	31
-typedef struct state_t {
-	unsigned int	s_entryHI;
-	unsigned int	s_cause;
-	unsigned int	s_status;
-	unsigned int 	s_pc;
-	int	 			s_reg[STATEREGNUM];
-
-} state_t, *state_PTR;
 
 #define	s_at	s_reg[0]
 #define	s_v0	s_reg[1]

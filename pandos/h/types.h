@@ -55,6 +55,31 @@ typedef struct passupvector {
     unsigned int exception_stackPtr;
 } passupvector_t;
 
+
+/* single page table entry */
+typedef struct pte_entry_t {
+	unsigned int entryHI;
+	unsigned int entryLO;
+} pte_entry_t;
+
+/* process context type */
+typedef struct context_t {
+	/* process context fields */
+	unsigned int 	c_stackPtr,	
+					c_status,	
+					c_pc;		
+} context_t;
+
+
+typedef struct support_t {
+	int				sup_asid;				/* process Id (asid) */
+	state_t			sup_exceptState[2];		/* stored except states */
+	context_t		sup_exceptContext[2];	/* pass up contexts */
+	pte_entry_t		sup_privatePgTbl[32];	
+	int				sup_stackTLB[500];		
+	int				sup_stackGen[500];		
+} support_t;
+
 /* Process Control Block (PCB) type */
 typedef struct pcb_t {
     /* Process queue fields */
@@ -72,7 +97,7 @@ typedef struct pcb_t {
     int *p_semAdd;         /* Pointer to semaphore on which the process is blocked */
 
     /* Support layer information */
-    // support_t *p_supportStruct; /* Pointer to support structure */
+    support_t *p_supportStruct; /* Pointer to support structure */
 } pcb_t, *pcb_PTR;
 
 #define STATEREGNUM	31

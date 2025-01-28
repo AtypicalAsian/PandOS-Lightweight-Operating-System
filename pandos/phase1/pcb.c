@@ -9,7 +9,7 @@ Written by: Nicolas & Tran
 #include "../h/const.h"
 #include "../h/types.h"
 
-static pcb_PTR pcbFree_h;
+HIDDEN pcb_PTR pcbFree_h;
 
 /**************************************************************************** 
  *  initPcbs

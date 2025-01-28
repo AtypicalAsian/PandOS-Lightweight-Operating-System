@@ -195,7 +195,7 @@ pcb_PTR outProcQ (pcb_PTR *tp, pcb_PTR p){
             prev->p_next = curr->p_next;
             curr->p_next->p_prev = prev;
 
-            //if curr is the tail
+            /*if curr is the tail*/
             if (curr == *tp){
                 *tp = (curr == prev) ? NULL : prev;
             }

@@ -308,8 +308,29 @@ pcb_PTR removeChild (pcb_PTR p){
  *  return: disconnect pcb pointed to by p from its parent and return the removed pcb
  *****************************************************************************/
 pcb_PTR outChild (pcb_PTR p){
+    /*pcb has no parent*/
     if (p->p_prnt == NULL) return NULL;
-    pcb_t *currentHead;
-    currentHead = (p->p_prnt)->p_child;
+
+    /* Case 1: p is the head in linked list */
+    if (p->p_lsib == NULL) {
+        (p->p_prnt)->p_child = p->p_rsib;
+        if (p->p_rsib != NULL) {
+            /* Update the new first child's previous sibling pointer */
+            p->p_rsib->p_lsib = NULL;
+        }
+    }
+
+    /* Case 2: p is in the middle or last position of the linked list */
+    else{
+        p->p_lsib->p_rsib = p->p_rsib;
+        if (p->p_rsib != NULL){
+            p->p_rsib->p_lsib = p->p_lsib;
+        }
+    }
+
+    /* Detach p from the child list */
+    p->p_prnt = NULL;
+    p->p_lsib = NULL;
+    p->p_rsib = NULL;
     return p;
 }

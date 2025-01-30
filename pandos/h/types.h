@@ -115,6 +115,12 @@ typedef struct pcb_t {
     support_t *p_supportStruct; /* Pointer to support structure */
 } pcb_t, *pcb_PTR;
 
+typedef struct semd_t {
+	struct	semd_t	*s_next;	/* next element on the ASL */
+	int				*s_semAdd;	/* pointer to the semaphore*/
+	pcb_t			*s_procQ;	/* process queue */
+} semd_t;
+
 #define	s_at	s_reg[0]
 #define	s_v0	s_reg[1]
 #define s_v1	s_reg[2]

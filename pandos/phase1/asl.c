@@ -70,11 +70,63 @@ void initASL(){
 }
 
 int insertBlocked(int *semAdd, pcb_PTR p){
-    return -1;
+    // find semAdd in active list first
+    semd_PTR prev_ptr = semd_h;
+    semd_PTR curr_ptr = semd_h->s_next;
+
+    while ((curr_ptr != NULL) && (curr_ptr->s_semAdd < semAdd)) {
+        prev_ptr = curr_ptr;
+        curr_ptr = curr_ptr->s_next;
+    }
+
+    // if semAdd found, insert p into the corresponding procQ 
+    if (curr_ptr->s_semAdd == semAdd) {
+        insertProcQ(&(curr_ptr->s_procQ),p);
+        p->p_semAdd = semAdd;
+        return FALSE;
+    }
+
+    // check semdFree list
+    if (semdFree_h == NULL) return TRUE;
+
+    // create new sem_ptr from free list & insert p
+    semd_PTR new_semd = semdFree_h;
+    semdFree_h = semdFree_h->s_next;
+
+    new_semd->s_semAdd = semAdd;
+    new_semd->s_procQ = mkEmptyProcQ();
+    insertProcQ(&(new_semd->s_procQ), p);
+    p->p_semAdd = semAdd;
+    
+    prev_ptr->s_next = new_semd;
+    new_semd->s_next = curr_ptr;
+    return FALSE; 
 }
 
 pcb_PTR removeBlocked(int *semAdd){
-    return *semAdd;
+    semd_PTR prev_ptr = semd_h;
+    semd_PTR curr_ptr = semd_h->s_next;
+
+    // traverse the ASL to find the semaphore
+    while ((curr_ptr != NULL) && (curr_ptr->s_semAdd < semAdd)) {
+        prev_ptr = curr_ptr;
+        curr_ptr = curr_ptr->s_next;
+    }
+
+    if (curr_ptr == NULL || curr_ptr->s_semAdd != semAdd) return NULL;
+
+     // remove the first PCB from the process queue
+    pcb_PTR headProcQ = removeProcQ(&(curr_ptr->s_procQ));
+    headProcQ->p_semAdd = NULL;
+
+    // if the process queue becomes empty, remove semaphore from ASL
+    if (emptyProcQ(headProcQ)) {
+        prev_ptr->s_next = curr_ptr->s_next;
+        curr_ptr->s_next = semdFree_h;
+        semdFree_h = curr_ptr;
+    }
+
+    return headProcQ;
 }
 
 pcb_PTR outBlocked(pcb_PTR p){

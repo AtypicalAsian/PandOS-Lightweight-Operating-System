@@ -119,7 +119,7 @@ typedef struct semd_t {
 	struct	semd_t	*s_next;	/* next element on the ASL */
 	int				*s_semAdd;	/* pointer to the semaphore*/
 	pcb_t			*s_procQ;	/* process queue */
-} semd_t;
+} semd_t, *semd_PTR;
 
 #define	s_at	s_reg[0]
 #define	s_v0	s_reg[1]

@@ -61,11 +61,11 @@ void initASL(){
     /*Init active semaphore list with dummy nodes*/
     /*Init dummy nodes with smallest and largest memory address in 32-bit address to maintain sorted ASL*/
     dummy_tail->s_next = NULL;
-    dummy_tail->s_semAdd = (int*) 0x0FFFFFFF; // Largest possible address
+    dummy_tail->s_semAdd = (int*) 0x0FFFFFFF; /* Largest possible address */
     dummy_head->s_next = dummy_tail;
-    dummy_head->s_semAdd = (int*) 0x00000000; // Smallest possible address
+    dummy_head->s_semAdd = (int*) 0x00000000; /* Smallest possible address */
 
-    // Set head of active semaphore list (ASL)
+    /* Set head of active semaphore list (ASL) */
     semd_h = dummy_head;
 }
 

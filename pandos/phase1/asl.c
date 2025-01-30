@@ -130,9 +130,9 @@ pcb_PTR removeBlocked(int *semAdd) {
     headProcQ->p_semAdd = NULL;
 
     /* If the process queue becomes empty, remove semaphore from ASL */
-    if (emptyProcQ(curr_ptr->s_procQ)) {  // Corrected argument
-        prev_ptr->s_next = curr_ptr->s_next; // Unlink semaphore from ASL
-        freeSemaphore(curr_ptr); // Return semaphore descriptor to the free list
+    if (emptyProcQ(curr_ptr->s_procQ)) {  
+        prev_ptr->s_next = curr_ptr->s_next; 
+        freeSemaphore(curr_ptr); 
     }
 
     return headProcQ;

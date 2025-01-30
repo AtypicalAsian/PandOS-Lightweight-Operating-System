@@ -247,6 +247,8 @@ void main() {
 	for (i = 0; i < 10; i++) 
 		freePcb(procp[i]);
 
+
+	/* check ASL */
 	initASL();
 	addokbuf("Initialized active semaphore list   \n");
 
@@ -284,6 +286,7 @@ void main() {
 	}
 	if (removeBlocked(&sem[11]) != NULL)
 		adderrbuf("removeBlocked: removed nonexistent blocked proc   ");
-	addokbuf("insertBlocked and removeBlocked ok   \n);
+	addokbuf("insertBlocked and removeBlocked ok   \n");
+
 }
 

@@ -9,7 +9,7 @@ ACTIVE SEMAPHORE LIST IMPLEMENTATION
 #include "../h/const.h"
 #include "../h/types.h"
 #include "../h/asl.h"
-#include "pcb.h"
+#include "../h/pcb.h"
 
 HIDDEN semd_PTR semd_h;             /*ptr to head of active semaphore list (ASL)*/
 HIDDEN semd_PTR semdFree_h;         /*ptr to head of free semaphore list*/

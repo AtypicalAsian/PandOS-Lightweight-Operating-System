@@ -17,8 +17,8 @@ HIDDEN semd_PTR semdFree_h;         /*ptr to head of free semaphore list*/
 
 /**************************************************************************** 
  *  freeSemaphore
- *  
- *  params: 
+ *  Add a semaphore to the head of the free semaphore list
+ *  params: ptr to a sempahore descriptor struct
  *  return: none 
  *****************************************************************************/
 void freeSemaphore(semd_PTR sempahore){

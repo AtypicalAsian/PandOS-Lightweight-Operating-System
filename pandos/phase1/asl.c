@@ -34,14 +34,14 @@ void freeSemaphore(semd_PTR sempahore){
  *  return: none 
  *****************************************************************************/
 void initASL(){
-    static semd_t semdTable[MAXPROC+2];
+    static semd_t semdTable[MAXPROC_SEM];
 
 
     /************ Init Free Semaphore List ************/
     semdFree_h = NULL;
 
     int i;
-    for (i=0;i<MAXPROC+2;i++){
+    for (i=0;i<MAXPROC_SEM;i++){
         freeSemaphore(&semdTable[i]);
     }
 

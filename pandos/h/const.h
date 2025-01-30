@@ -77,6 +77,7 @@
 
 /* Phase 1: Additional constants */
 #define MAXPROC 20
+#define MAXPROC_SEM 22
 
 /* operations */
 #define	MIN(A,B)		((A) < (B) ? A : B)

@@ -44,16 +44,22 @@ The Queue Manager implements the following key features:
 To compile the project:
 
 1. Navigate to the correct phase folder using the `cd` command:
-   `bash`
-   `cd pandos/phase1`
+   ```bash
+   $ cd pandos/phase1
+   ```
 2. Run the make command to compile the project:
-   `make`
+   ```bash
+   $ cd make
+   ```
    This will generate the necessary binary files for the current phase.
 
 ## Testing
 
 To test the current phase, open the µMPS3 emulator by running the following command:
-``umps3`
+
+```bash
+   $ umps3
+```
 
 Then, create a custom machine configuration and set the path to the machine configuration file as the directory of the current phase. Power on the machine and run the test program. The test program reports its progress by, writing messages to TERMINAL0. Messages are also stored in 2 memory buffers: okbuf (for success or general message) and errbuf (for error messages). At the conclusion of the test, a final message will be displayed by µMPS3 emulator:
 

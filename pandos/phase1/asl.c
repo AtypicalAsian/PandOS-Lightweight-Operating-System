@@ -16,9 +16,9 @@ HIDDEN semd_PTR semdFree_h;         /*ptr to head of free semaphore list*/
 
 
 /**************************************************************************** 
- *  freeSemaphore
- *  Add a semaphore to the head of the free semaphore list
- *  params: ptr to a sempahore descriptor struct
+ *  freeSemaphore 
+ *  Add a semaphore to the head of the free semaphore list 
+ *  params: ptr to a sempahore descriptor struct 
  *  return: none 
  *****************************************************************************/
 void freeSemaphore(semd_PTR sempahore){
@@ -70,6 +70,16 @@ void initASL(){
 
 }
 
+
+/**************************************************************************** 
+ *  insertBlocked
+ *  Insert the pcb pointed to by p at the tail of the process queue associated 
+ *  with the semaphore whose physical address is semAdd and set the 
+ *  semaphore address of p to semAdd.
+ *  params: pointer p to a pcb, memory address semAdd
+ *  return: TRUE if a new semaphore descriptor needs to be allocated. Otherwise,
+ *  FALSE in all other cases
+ *****************************************************************************/
 int insertBlocked(int *semAdd, pcb_PTR p) {
     if (p == NULL) return TRUE;
 
@@ -109,6 +119,14 @@ int insertBlocked(int *semAdd, pcb_PTR p) {
     return FALSE; 
 }
 
+
+/**************************************************************************** 
+ *  removeBlocked
+ *  Remove the first (head) pcb from the process queue of the semaphore descriptor, set 
+ * that pcb’s address to NULL
+ *  params: memory address semAdd of a semaphore descriptor
+ *  return: pointer to removed pcb. Otherwise, return NULL
+ *****************************************************************************/
 pcb_PTR removeBlocked(int *semAdd) {
     semd_PTR prev_ptr = semd_h;
     semd_PTR curr_ptr = semd_h->s_next;
@@ -139,11 +157,24 @@ pcb_PTR removeBlocked(int *semAdd) {
     return headProcQ;
 }
 
+
+/**************************************************************************** 
+ *  outBlocked
+ *  Remove the pcb pointed to by p from the process queue associated with p’s 
+ *  semaphore (p→ p semAdd) on the ASL.
+ *  params: pointer p to a pcb
+ *  return: pointer to the removed pcb. Otherwise, return NULL
+ *****************************************************************************/
 pcb_PTR outBlocked(pcb_PTR p){
     return p;
 }
 
-
+/**************************************************************************** 
+ *  headBlocked
+ *  params: memory address semAdd of a semaphore descriptor
+ *  return: pointer to pcb at the head of process queue associated with semaphore
+ *          at semAdd. Otherwise, return NULL
+ *****************************************************************************/
 pcb_PTR headBlocked(int *semAdd){
     return semAdd;
 }

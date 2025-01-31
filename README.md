@@ -39,10 +39,24 @@ The Queue Manager implements the following key features:
 1. **µMPS3 Emulator**: Required to run PandOS.
 2. **MIPS Cross-Compiler**: Included with µMPS3 for compiling the source code.
 
-### Compilation
+## Compilation
 
-More info to be added
+To compile the project:
 
-### Testing
+1. Navigate to the correct phase folder using the `cd` command:
+   `bash`
+   `cd pandos/phase1`
+2. Run the make command to compile the project:
+   `make`
+   This will generate the necessary binary files for the current phase.
 
-More info to be added
+## Testing
+
+To test the current phase, open the µMPS3 emulator by running the following command:
+``umps3`
+
+Then, create a custom machine configuration and set the path to the machine configuration file as the directory of the current phase. Power on the machine and run the test program. The test program reports its progress by, writing messages to TERMINAL0. Messages are also stored in 2 memory buffers: okbuf (for success or general message) and errbuf (for error messages). At the conclusion of the test, a final message will be displayed by µMPS3 emulator:
+
+1. System Halted → Indicates successful termination.
+2. Kernel Panic → Indicates unsuccessful termination.
+   The final message will be shown in the emulator, and the program will then enter an infinite loop.

@@ -165,8 +165,40 @@ pcb_PTR removeBlocked(int *semAdd) {
  *  params: pointer p to a pcb
  *  return: pointer to the removed pcb. Otherwise, return NULL
  *****************************************************************************/
-pcb_PTR outBlocked(pcb_PTR p){
-    return p;
+pcb_PTR outBlocked(pcb_PTR p) {
+    /* Check if p is NULL */
+    if (p == NULL || p->p_semAdd == NULL) return NULL;
+
+    int *semAdd = p->p_semAdd;
+
+    semd_PTR prev_ptr = semd_h;
+    semd_PTR curr_ptr = semd_h->s_next;
+
+    /* Traverse the ASL to find the semaphore */
+    while ((curr_ptr != NULL) && (curr_ptr->s_semAdd < semAdd)) {
+        prev_ptr = curr_ptr;
+        curr_ptr = curr_ptr->s_next;
+    }
+
+    /* If semAdd is not found, return NULL */
+    if (curr_ptr == NULL || curr_ptr->s_semAdd != semAdd) return NULL;
+
+    /* Remove the process from the semaphore's queue */
+    pcb_PTR removed_pcb = outProcQ(&(curr_ptr->s_procQ), p);
+    
+    /* If p was not found in the queue, return NULL */
+    if (removed_pcb == NULL) return NULL;
+
+    /* Clear the semaphore address in the PCB */
+    removed_pcb->p_semAdd = NULL;
+
+    /* If the process queue becomes empty, remove semaphore from ASL */
+    if (emptyProcQ(curr_ptr->s_procQ)) {
+        prev_ptr->s_next = curr_ptr->s_next; 
+        freeSemaphore(curr_ptr); 
+    }
+
+    return removed_pcb;
 }
 
 /**************************************************************************** 
@@ -176,6 +208,21 @@ pcb_PTR outBlocked(pcb_PTR p){
  *          at semAdd. Otherwise, return NULL
  *****************************************************************************/
 pcb_PTR headBlocked(int *semAdd){
-    return semAdd;
+    if (semAdd == NULL) return NULL;
+
+    semd_PTR curr = semd_h;             /*pointer to head of ASL*/
+    while (curr != NULL && curr->s_semAdd < semAdd){
+        curr = curr->s_next;
+    }
+
+    /*semaphore not found in current active semaphore list*/
+    if (curr == NULL || curr->s_semAdd != semAdd){
+        return NULL;
+    }
+    
+    /*found semaphore (at semAdd), return head of process queue asscoiated with it*/
+    else{
+        return headProcQ(curr->s_procQ);
+    }
 }
 

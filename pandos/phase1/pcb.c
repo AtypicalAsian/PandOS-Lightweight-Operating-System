@@ -3,7 +3,15 @@ CS372 - Operating Systems
 Dr. Mikey Goldweber
 Written by: Nicolas & Tran
 
-PROCESS CONTROL BLOCK QUEUE/TREE IMPLEMENTATION
+This module manages Process Control Blocks (PCBs), handling their allocation,  
+deallocation, and organization within process queues and hierarchical process trees.  
+ 
+Data Structures:  
+    - PCB Free List: A linked list of available PCBs.  
+    - Process Queues: Doubly linked lists for managing active processes.  
+    - Process Tree: A parent-child structure representing process hierarchy.  
+ PCBs are allocated from a free list, organized into queues, and linked in a tree
+ structure to support process management operations. 
 ****************************************************************************/
 
 #include "../h/pcb.h"

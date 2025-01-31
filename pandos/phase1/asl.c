@@ -3,7 +3,15 @@ CS372 - Operating Systems
 Dr. Mikey Goldweber
 Written by: Nicolas & Tran
 
-ACTIVE SEMAPHORE LIST IMPLEMENTATION
+ This module manages the creation and release of semaphore descriptors  
+ in two linked lists: the Active Semaphore List (ASL) and the semdFree list.  
+ The ASL keeps track of semaphores that currently have at least one process  
+ waiting in their associated queue, while the semdFree list stores available  
+ semaphore descriptors that are not in use.  
+ 
+ Both lists are implemented as NULL-terminated, singly linked lists.  
+ Additionally, they function like a stack, where semaphores are added  
+ and removed from the front of the list.  
 ****************************************************************************/
 
 #include "../h/const.h"
@@ -61,9 +69,9 @@ void initASL(){
     /* Init active semaphore list with dummy nodes */
     /* Init dummy nodes with smallest and largest memory address in 32-bit address to maintain sorted ASL */
     dummy_tail->s_next = NULL;
-    dummy_tail->s_semAdd = (int*) 0x0FFFFFFF; /*Largest possible address*/
+    dummy_tail->s_semAdd = (int*) LARGEST_ADDR; /*Largest possible address*/
     dummy_head->s_next = dummy_tail;
-    dummy_head->s_semAdd = (int*) 0x00000000; /*Smallest possible address*/
+    dummy_head->s_semAdd = (int*) SMALLEST_ADDR; /*Smallest possible address*/
 
     /* Set head of active semaphore list (ASL) */
     semd_h = dummy_head;

@@ -12,7 +12,7 @@ PROCESS CONTROL BLOCK QUEUE/TREE IMPLEMENTATION
 
 HIDDEN pcb_PTR pcbFree_h;
 
-/**************************************************************************** 
+/****************************************************************************  
  *  initPcbs
  *  Initialize the pcbFree as a non-circular linked list that contains all elements of the static array (pool) of MAXPROC pcbs
  *    --> pcbFree act as a pool of free (unused) pcbs available for allocation when a new process is created
@@ -20,15 +20,14 @@ HIDDEN pcb_PTR pcbFree_h;
  *  return: none 
  *****************************************************************************/
 void initPcbs() {
-	static pcb_t pcb_pool[MAXPROC];         /*Pool of PCBs from which processes can be allocated*/
-	pcbFree_h = NULL;                       /*List is initially empty*/
+    static pcb_t pcb_pool[MAXPROC];         /* Pool of PCBs from which processes can be allocated */
+    pcbFree_h = NULL;                       /* List is initially empty */
     int i;
-	for(i = 0; i < MAXPROC; i++){
-		/*add each pcb to pcbFree list*/
-		freePcb(&(pcb_pool[i]));
-	}
+    for (i = 0; i < MAXPROC; i++) {
+        /* Add each pcb to pcbFree list */
+        freePcb(&pcb_pool[i]);
+    }
 }
-
 
 /**************************************************************************** 
  *  freePcb
@@ -36,66 +35,63 @@ void initPcbs() {
  *  params: pointer to a pcb struct
  *  return: none 
  *****************************************************************************/
-void freePcb(pcb_PTR p){
-    if (pcbFree_h == NULL){                /*If pcbFree list is empty*/
-		(*p).p_prev = NULL;
-        (*p).p_next = NULL;
-		pcbFree_h = p;
-	}
-	else{                                 /*Otherwise, if there are items in pcbFree list*/
-        (*p).p_prev = NULL;
-		(*p).p_next = pcbFree_h;
-		(*pcbFree_h).p_prev = p;
-		pcbFree_h = p;
-	}
+void freePcb(pcb_PTR p) {
+    if (pcbFree_h == NULL) {                /* If pcbFree list is empty */
+        p->p_prev = NULL;
+        p->p_next = NULL;
+        pcbFree_h = p;
+    } else {                                 /* Otherwise, if there are items in pcbFree list */
+        p->p_prev = NULL;
+        p->p_next = pcbFree_h;
+        pcbFree_h->p_prev = p;
+        pcbFree_h = p;
+    }
 }
 
 /**************************************************************************** 
  *  allocPcb
- *  Remove an element from pcbFree linked list and intialize values for all pcb struct fields
+ *  Remove an element from pcbFree linked list and initialize values for all pcb struct fields
  *  params: none
  *  return: pointer to the pcb removed from the pcbFree linked list 
  *****************************************************************************/
+pcb_PTR allocPcb() {
+    if (pcbFree_h == NULL) return NULL;
+    pcb_PTR freed_pcb_ptr = pcbFree_h;           /* Remove from head of linked list */
 
-pcb_PTR allocPcb(){
-   if (pcbFree_h == NULL) return NULL;
-   pcb_PTR freed_pcb_ptr = pcbFree_h;           /*remove from head of linked list*/
+    /* If pcbFree only has one free pcb left */
+    if (freed_pcb_ptr->p_next == NULL) {
+        pcbFree_h = NULL;
+    } else {
+        /* Detach next and prev pointers + update new head of freePcb linked list */
+        freed_pcb_ptr->p_next->p_prev = NULL;
+        freed_pcb_ptr->p_prev = NULL;
+        pcbFree_h = freed_pcb_ptr->p_next;
+    }
 
-   /*if pcbFree only has one free pcb left*/
-   if ((*freed_pcb_ptr).p_next == NULL) pcbFree_h = NULL;
+    /* Initialize values for all pcb struct fields of newly freed pcb */
 
-   else{
-    /*detach next and prev pointers + update new head of freePcb linked list*/
-    ((*freed_pcb_ptr).p_next)->p_prev = NULL;
-    (*freed_pcb_ptr).p_prev = NULL;
-    pcbFree_h = (*freed_pcb_ptr).p_next;
-   }
+    /* Process queue fields */
+    freed_pcb_ptr->p_prev = NULL;
+    freed_pcb_ptr->p_next = NULL;
 
-   /*intialize values for all pcb struct fields of newly freed pcb*/
-   
-   /*Process queue fields*/
-   (*freed_pcb_ptr).p_prev = NULL;
-   (*freed_pcb_ptr).p_next = NULL;
+    /* Process tree fields */
+    freed_pcb_ptr->p_child = NULL;
+    freed_pcb_ptr->p_sib = NULL;
+    freed_pcb_ptr->p_prnt = NULL;
 
-   /*Process tree fields*/
-   (*freed_pcb_ptr).p_child = NULL;
-   (*freed_pcb_ptr).p_sib = NULL;
-   (*freed_pcb_ptr).p_prnt = NULL;
+    /* Process status info */
+    int i;
+    for (i = 0; i < STATEREGNUM; i++) {
+        freed_pcb_ptr->p_s.s_reg[i] = 0;
+    }
+    freed_pcb_ptr->p_time = 0;
+    freed_pcb_ptr->p_semAdd = NULL;
 
-   /*Process status info*/
-   int i;
-   for (i = 0; i < STATEREGNUM; i++){
-		freed_pcb_ptr->p_s.s_reg[i] = 0;
-	}
-   (*freed_pcb_ptr).p_time = 0;
-   (*freed_pcb_ptr).p_semAdd = NULL;
-
-   /*Support layer info*/
-   /*p_supportStruct = NULL; ???? HAVE NOT DECLARED THIS AND UNSURE ABOUT INIT VALUE */
+    /* Support layer info */
+    /* p_supportStruct = NULL; ???? HAVE NOT DECLARED THIS AND UNSURE ABOUT INIT VALUE */
 
     return freed_pcb_ptr;
 }
-
 
 
 /**************************************************************************** 

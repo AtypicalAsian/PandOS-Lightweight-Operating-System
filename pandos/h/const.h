@@ -78,6 +78,8 @@
 /* Phase 1: Additional constants */
 #define MAXPROC 20
 #define MAXPROC_SEM 22
+#define SMALLEST_ADDR 0x00000000
+#define LARGEST_ADDR  0x0FFFFFFF
 
 /* operations */
 #define	MIN(A,B)		((A) < (B) ? A : B)

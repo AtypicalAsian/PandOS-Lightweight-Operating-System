@@ -3,8 +3,8 @@ CS372 - Operating Systems
 Dr. Mikey Goldweber
 Written by: Nicolas & Tran
 
-This module manages Process Control Blocks (PCBs), handling their allocation,  
-deallocation, and organization within process queues and hierarchical process trees.  
+This module manages Process Control Blocks (PCBs), handling their allocation, 
+deallocation, and organization as process queues and hierarchical process trees.   
  
 Data Structures:  
     - PCB Free List: A linked list of available PCBs.  
@@ -24,6 +24,7 @@ HIDDEN pcb_PTR pcbFree_h;
  *  initPcbs
  *  Initialize the pcbFree as a non-circular linked list that contains all elements of the static array (pool) of MAXPROC pcbs
  *    --> pcbFree act as a pool of free (unused) pcbs available for allocation when a new process is created
+ *  This method will be called only once during data structure initialization
  *  params: None
  *  return: none 
  *****************************************************************************/
@@ -39,7 +40,7 @@ void initPcbs() {
 
 /**************************************************************************** 
  *  freePcb
- *  Add the pcb pointed to by pointer p to the pcbFree list. 
+ *  Insert the pcb pointed to by pointer p to the pcbFree list. 
  *  params: pointer to a pcb struct
  *  return: none 
  *****************************************************************************/
@@ -58,9 +59,10 @@ void freePcb(pcb_PTR p) {
 
 /**************************************************************************** 
  *  allocPcb
- *  Remove an element from pcbFree linked list and initialize values for all pcb struct fields
+ *  Remove an element from pcbFree linked list and intialize values for all pcb struct fields
  *  params: none
- *  return: pointer to the pcb removed from the pcbFree linked list 
+ *  return: pointer to the pcb removed from the pcbFree linked list. Otherwise,
+*       return NULL if the pcbFree list is empty.
  *****************************************************************************/
 pcb_PTR allocPcb() {
     if (pcbFree_h == NULL) return NULL;
@@ -104,17 +106,16 @@ pcb_PTR allocPcb() {
 
 /**************************************************************************** 
                             PROCESS QUEUES
-    double, circularly linked list with a tail pointer instead of a 
-    head pointer. Used to organize PCBs based on their state or scheduling requirements.
-
+    Double, circularly linked list used to organize PCBs based on 
+    their state or scheduling requirements.
 ****************************************************************************/
 
 
 /**************************************************************************** 
  *  mkEmptyProcQ
- *  Initialize empty process queue with null pointer
+ *  Initialize a variable to be tail pointer to a process queue
  *  params: none
- *  return: tail pointer for new process queue
+ *  return: pointer to the tail of an empty process queue
  *****************************************************************************/
 pcb_PTR mkEmptyProcQ(){
     return NULL;
@@ -124,7 +125,7 @@ pcb_PTR mkEmptyProcQ(){
  *  emptyProcQ
  *  check if process queue is currently empty
  *  params: tail pointer (tp) of process queue
- *  return: True if process queue is empty. False otherwise
+ *  return: True if process queue whose tail is pointed to by tp is empty. False otherwise
  *****************************************************************************/
 int emptyProcQ (pcb_PTR tp){
     return tp == NULL;
@@ -133,7 +134,7 @@ int emptyProcQ (pcb_PTR tp){
 
 /**************************************************************************** 
  *  insertProcQ
- *  Insert the pcb pointed to by p into the process queue
+ *  Insert the pcb pointed to by p into the process queue whose tail is pointed to by tp
  *  params: pointer to tail pointer of process queue, pcb pointer p
  *  return: none
  *****************************************************************************/
@@ -160,9 +161,10 @@ void insertProcQ (pcb_PTR *tp, pcb_PTR p){
 
 /**************************************************************************** 
  *  removeProcQ
- *  remove the head from the circular DLL (process queue)
+ *  remove the first (i.e. head) element from the process queue whose 
+ *  tail-pointer is pointed to by tp.
  *  params: pointer to tail pointer of process queue
- *  return: pointer to removed element. Otherwise, NULL if list is empty
+ *  return: pointer to removed element. Otherwise, NULL if process queue is empty
  *****************************************************************************/
 pcb_PTR removeProcQ (pcb_PTR *tp){
     if (emptyProcQ(*tp)) return NULL;
@@ -183,6 +185,8 @@ pcb_PTR removeProcQ (pcb_PTR *tp){
 
 /**************************************************************************** 
  *  outProcQ
+ *  Remove the pcb pointed to by p from the process queue whose tailpointer 
+ *  is pointed to by tp. Update the process queue’s tail pointer if necessary.
  *  params: pointer to tail pointer of process queue, pcb pointer
  *  return: pointer to pcb p after it's removed from the queue. If not found, return NULL
  *****************************************************************************/
@@ -219,7 +223,7 @@ pcb_PTR outProcQ (pcb_PTR *tp, pcb_PTR p){
 
 /**************************************************************************** 
  *  headProcQ
- *  Return the head of the circular DLL process queue
+ *  Return a pointer to the first pcb from the process queue whose tail is pointed to by tp.
  *  params: pointer to tail of process queue
  *  return: pointer to first pcb in process queue. Otherwise, NULL if queue is empty
  *****************************************************************************/
@@ -276,8 +280,9 @@ void insertChild (pcb_PTR prnt, pcb_PTR p){
 
 /**************************************************************************** 
  *  removeChild
- *  params: pointer to a pcb in the tree
- *  return: remove first child of pcb pointed to by p and return pointer to removed pcb
+ *  Make the first child of the pcb pointed to by p no longer a child of p
+ *  params: pointer p to a pcb in the tree
+ *  return: pointer to removed pcb, NULL if initially there were no children of p
  *****************************************************************************/
 pcb_PTR removeChild (pcb_PTR p){
     /*If curr pcb has no children*/
@@ -308,8 +313,10 @@ pcb_PTR removeChild (pcb_PTR p){
 
 /**************************************************************************** 
  *  outChild
+ *  Make the pcb pointed to by p no longer the child of its parent
  *  params: pointer to a pcb in the tree
  *  return: disconnect pcb pointed to by p from its parent and return the removed pcb
+ *          return NULL if pcb pointed to by p has no parent
  *****************************************************************************/
 pcb_PTR outChild (pcb_PTR p){
     /*pcb has no parent*/

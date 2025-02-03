@@ -95,20 +95,20 @@ void initASL(){
 semd_PTR search_semp(int *semAdd) {
     if (semd_h == NULL) return NULL;  /* ASL is empty */
 
-    semd_PTR previous = NULL;
-    semd_PTR current = semd_h;  
+    semd_PTR prev = NULL;
+    semd_PTR curr = semd_h;  
 
     /* Traverse the ASL to find the correct position */
-    while (current != NULL && current->s_semAdd < semAdd) {
-        /* Stop if we reach the tail dummy node */
-        if (current->s_semAdd == (int*) LARGEST_ADDR) {
-            return previous;
+    while (curr != NULL && curr->s_semAdd < semAdd) {
+        /* Stop at tail dummy node */
+        if (curr->s_semAdd == (int*) LARGEST_ADDR) {
+            return prev;
         }
-        previous = current;
-        current = current->s_next;
+        prev = curr;
+        curr = curr->s_next;
     }
 
-    return previous;  /* Return the node that precedes the target position */
+    return prev;  /* Return the node that precedes the target position */
 }
 
 

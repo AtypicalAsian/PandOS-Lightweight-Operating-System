@@ -96,7 +96,7 @@ pcb_PTR allocPcb() {
     freed_pcb_ptr->p_semAdd = NULL;
 
     /* Support layer info */
-    /* p_supportStruct = NULL; ???? HAVE NOT DECLARED THIS AND UNSURE ABOUT INIT VALUE */
+    freed_pcb_ptr->p_supportStruct = NULL;
 
     return freed_pcb_ptr;
 }

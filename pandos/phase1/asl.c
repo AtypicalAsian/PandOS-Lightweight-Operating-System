@@ -86,7 +86,6 @@ void initASL(){
  *  
  *  params:  
  *      - int *semAdd: The memory address of the semaphore descriptor.  
- *  
  *  returns:  
  *      - Pointer to the preceding semaphore descriptor if found.  
  *      - If ASL is empty, returns NULL.  

@@ -80,7 +80,7 @@ void initASL(){
 }
 
 /****************************************************************************  
- *  findSemaphorePrev  
+ *  search_semp  
  *  Searches the ASL for the semaphore descriptor whose address directly  
  *  precedes where semAdd should belong.  
  *  
@@ -92,18 +92,23 @@ void initASL(){
  *      - If ASL is empty, returns NULL.  
  ****************************************************************************/  
  
-semd_PTR findSemaphorePrev(int *semAdd) {
+semd_PTR search_semp(int *semAdd) {
     if (semd_h == NULL) return NULL;  /* ASL is empty */
 
-    semd_PTR prev = NULL;
-    semd_PTR curr = semd_h;
+    semd_PTR previous = NULL;
+    semd_PTR current = semd_h;  
 
-    while (curr->s_next != NULL && curr->s_next->s_semAdd < semAdd) {
-        prev = curr;
-        curr = curr->s_next;
+    /* Traverse the ASL to find the correct position */
+    while (current != NULL && current->s_semAdd < semAdd) {
+        /* Stop if we reach the tail dummy node */
+        if (current->s_semAdd == (int*) LARGEST_ADDR) {
+            return previous;
+        }
+        previous = current;
+        current = current->s_next;
     }
 
-    return curr;  /* Return the previous node */
+    return previous;  /* Return the node that precedes the target position */
 }
 
 
@@ -125,7 +130,7 @@ int insertBlocked(int *semAdd, pcb_PTR p) {
     if (p == NULL) return TRUE;  
 
     /* Find the position in the ASL */
-    semd_PTR prev_ptr = findSemaphorePrev(semAdd);
+    semd_PTR prev_ptr = search_semp(semAdd);
     semd_PTR curr_ptr;
     
     if (prev_ptr != NULL) {
@@ -181,7 +186,7 @@ int insertBlocked(int *semAdd, pcb_PTR p) {
  *  return: pointer to removed pcb. Otherwise, return NULL
  *****************************************************************************/
 pcb_PTR removeBlocked(int *semAdd) {
-    semd_PTR prev_ptr = findSemaphorePrev(semAdd);
+    semd_PTR prev_ptr = search_semp(semAdd);
     semd_PTR curr_ptr;
 
     if (prev_ptr != NULL) {
@@ -226,7 +231,7 @@ pcb_PTR outBlocked(pcb_PTR p) {
 
     int *semAdd = p->p_semAdd;
 
-    semd_PTR prev_ptr = findSemaphorePrev(semAdd);
+    semd_PTR prev_ptr = search_semp(semAdd);
     semd_PTR curr_ptr;
 
     if (prev_ptr != NULL) {
@@ -269,7 +274,7 @@ pcb_PTR outBlocked(pcb_PTR p) {
 pcb_PTR headBlocked(int *semAdd) {
     if (semAdd == NULL) return NULL;
 
-    semd_PTR curr_ptr = findSemaphorePrev(semAdd);
+    semd_PTR curr_ptr = search_semp(semAdd);
 
     if (curr_ptr != NULL) {
         curr_ptr = curr_ptr->s_next;

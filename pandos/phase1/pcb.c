@@ -12,6 +12,9 @@ Data Structures:
     - Process Tree: A parent-child structure representing process hierarchy.  
  PCBs are allocated from a free list, organized into queues, and linked in a tree
  structure to support process management operations. 
+
+To view version history and changes:
+    - Remote GitHub Repo: https://github.com/AtypicalAsian/CS372-OS-Project
 ****************************************************************************/
 
 #include "../h/pcb.h"

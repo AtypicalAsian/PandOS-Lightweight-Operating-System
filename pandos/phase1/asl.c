@@ -12,6 +12,9 @@ Written by: Nicolas & Tran
  Both lists are implemented as NULL-terminated, singly linked lists.  
  Additionally, they function like a stack, where semaphores are added  
  and removed from the front of the list.  
+
+To view version history and changes:
+    - Remote GitHub Repo: https://github.com/AtypicalAsian/CS372-OS-Project
 ****************************************************************************/
 
 #include "../h/const.h"

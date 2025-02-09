@@ -1,4 +1,4 @@
-# PandOS CS372 Project
+# Documentation
 
 ## Overview
 

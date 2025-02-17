@@ -14,6 +14,6 @@ To view version history and changes:
 #include "/usr/include/umps3/umps/libumps.h"
 
 
-// #include "../h/scheduler.h"
-// #include "../h/exceptions.h"
-// #include "../h/interrupts.h"
+#include "../h/scheduler.h"
+#include "../h/exceptions.h"
+#include "../h/interrupts.h"

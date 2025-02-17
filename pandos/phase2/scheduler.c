@@ -16,3 +16,7 @@ To view version history and changes:
 #include "../h/pcb.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
+#include "../h/scheduler.h"
+#include "../h/interrupts.h"
+#include "../h/initial.h"
+

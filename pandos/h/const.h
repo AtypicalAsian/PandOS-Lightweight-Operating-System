@@ -81,6 +81,12 @@
 #define SMALLEST_ADDR 0x00000000
 #define LARGEST_ADDR  0x0FFFFFFF
 
+/* Phase 2: Additional constants */
+
+/* Related to the Pseudo-Clock: This is the max number of external (sub)devices in UMPS3, plus one additional semaphore */
+#define MAXDEVICECNT	49
+
+
 /* operations */
 #define	MIN(A,B)		((A) < (B) ? A : B)
 #define MAX(A,B)		((A) < (B) ? B : A)

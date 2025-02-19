@@ -33,7 +33,7 @@ To view version history and changes:
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../h/pcb.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
@@ -47,19 +47,20 @@ int procCnt; /*integer indicating the number of started, but not yet terminated 
 int softBlockCnt; /*This integer is the number of started, but not terminated processes that in are the “blocked” state due to an I/O or timer request.*/
 pcb_PTR ReadyQueue; /*Tail pointer to a queue of pcbs that are in the “ready” state.*/
 pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. the current executing process.*/
+int deviceSemaphores[MAXDEVICECNT]; /*Integer array of device semaphores that is associated with external (sub) devices, plus one semd for the Pseudo-clock*/
 // cpu_t start_tod;
 // state_PTR savedExceptState;
-// int deviceSemaphores[MAXDEVICECNT];
+
 
 
 /**************************************************************************** 
  * METHOD DECLARATIONS
  *****************************************************************************/
-
- extern void test(); /*Function to help debug the Nucleus, defined in the test file for this module*/
- HIDDEN void generalExceptionHandler(); /* hidden function that is responsible for handling general exceptions */
+ HIDDEN void exception_handler(); /* hidden function that is responsible for handling general exceptions */
  extern void uTLB_RefillHandler(); /*this function is a placeholder function not implemented in Phase 2 and whose code is provided. This function implementation will be replaced when the support level is implemented*/
 
+
+ extern void test(); /*Function to help debug the Nucleus, defined in the test file for this module*/
 
 /**************************************************************************** 
  * METHOD IMPLEMENTATIONS
@@ -74,8 +75,8 @@ pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. 
  * return: 
 
  *****************************************************************************/
- void generalExceptionHandler(){
-    
+ void exception_handler(){
+
     /**************************************************************************** 
      * BIG PICTURE
      * 1. Retrieves the saved processor state from BIOSDATAPAGE to analyze the exception.
@@ -92,8 +93,8 @@ pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. 
     int exceptionReason; /* the exception code */
     state_t *oldState; /* the saved exception state for Processor 0 */
 
-    *oldState = (state_t *) BIOSDATAPAGE; /*BIOSDATAPAGE stores the saved processor state at the moment of an exception. We let oldState point to this saved state to analyze the cause of the exception*/
-    exceptionReason = ((oldState->s_cause) & GETEXCEPCODE) >> CAUSESHIFT; /*s_cause contains the cause register, which stores the reason for the exception. The exception code is extracted by masking and shifting the relevant bits.*/
+    oldState = (state_t *) BIOSDATAPAGE; /*BIOSDATAPAGE stores the saved processor state at the moment of an exception. We let oldState point to this saved state to analyze the cause of the exception*/
+    exceptionReason = ((oldState->s_cause) & GETEXCPCODE) >> CAUSESHIFT; /*s_cause contains the cause register, which stores the reason for the exception. The exception code is extracted by masking and shifting the relevant bits.*/
 
     return -1;
  }
@@ -119,52 +120,88 @@ pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. 
 
     /**************************************************************************** 
      * BIG PICTURE
-     * 1. Declare Global Data Variables (proccess count, soft-b count, readyQ, currProc, device semaphores)
      * 
-     * 2. Set Up Exception Handling - Populate Processor 0 Pass-Up Vector
+     * 1. Set Up Exception Handling - Populate Processor 0 Pass-Up Vector
      * - Set the Nucleus TLB-Refill event handler address
-     * - Set Stack Pointer for Nucleus TLB-Refill event handler to top of Nucleus stack page (0x2000.1000)
+     * - Set Stack Pointer for Nucleus TLB-Refill event handler to top of Nucleus stack page (0x20001000)
      * - Set the Nucleus exception handler address to the address of your Level 3 Nucleus function that is to be the entry point for exception (and interrupt) handling
      * - Set Stack Pointer for Nucleus exception handler to top of Nucleus stack page: 0x2000.1000
      * 
-     * 3. Initialize Level 2 data structures
+     * 2. Initialize Level 2 data structures
      * - Calls initPcbs() to set up the Process Control Block (PCB) free list.
      * - Calls initASL() to set up the Active Semaphore List (ASL).
      * 
-     * 4. Initialize all Nucleus maintained variables: Process Count (0), Soft-block Count (0), Ready Queue (mkEmptyProcQ()), and Current Process (NULL), device semaphores (all set to zero at first)
+     * 3. Initialize all Nucleus maintained variables: Process Count (0), Soft-block Count (0), Ready Queue (mkEmptyProcQ()), and Current Process (NULL), device semaphores (all set to zero at first)
      * 
-     * 5. Configure System Timer (Load the system-wide Interval Timer with 100 milliseconds)
+     * 4. Configure System Timer (Load the system-wide Interval Timer with 100 milliseconds)
      * 
-     * 6. Create and Launch the First Process
+     * 5. Create and Launch the First Process
      * - Allocates a new process (PCB).
      * - Initializes its stack pointer, program counter (PC), and status register (enables interrupts & kernel mode).
      * - Inserts the process into the Ready Queue and increments procCnt.
      * - Calls switchProcess() to begin execution.
      * 
-     * 7. If no PCB is available, the system calls PANIC() to halt execution. 
+     * 6. If no PCB is available, the system calls PANIC() to halt execution. 
 
     *****************************************************************************/
 
-    passupvector_t *procVec; /* a pointer to the Process 0 Pass Up Vector to be initialized */
-    pcb_PTR p; /* a pointer to the intial process in the ready queue to in order for the scheduler to begin execution. */
-	memaddr ramtop; /* the address of the last RAM frame */
-	devregarea_t *temp; /* device register area that we can we use to determine the last RAM frame */
+    /*1. Set Up Exception Handling*/
+    
+    pcb_PTR p; /* a pointer to the first process in the ready queue to be created so that the scheduler can begin execution */
+    passupvector_t *proc0_passup_vec; /*Pointer to Processor 0 Pass-Up Vector */
+    memaddr ramtop; /* the address of the last RAM frame */
+    devregarea_t *dra; /* device register area that used to determine RAM size */
+
+    /*ADD COMMENTS HERE + DEFINE CONSTANTS in const.h---------------------------------------------*/
+    proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;
+    proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;
+    proc0_passup_vec->tlb_refll_stackPtr = 0x20001000;
+    proc0_passup_vec->execption_handler = (memaddr) exception_handler;
+    proc0_passup_vec->exception_stackPtr = 0x20001000;
 
 
-    ReadyQueue = mkEmptyProcQ();
-    procCnt = INITIALPROCCNT;
-    softBlockCnt = INITIALSFTBLKCNT;
-    currProc = NULL; 
-
-    // int i;
-    // for (i=0; i < MAXDEVICECNT; i++){
-    //     /*init device semaphores*/
-    // }
-
-    initPcbs();
-    initASL();
+    /*2. Initialize Level 2 data structures*/
+    initPcbs(); /*Set up the Process Control Block (PCB) free list.*/
+    initASL(); /*Set up the Active Semaphore List (ASL).*/
 
 
+    /*3. Initialize nucleus maintained variables*/
 
-    return -1;
+    /*Initialize device semaphores*/
+    for (int i = 0; i < MAXDEVICECNT; i++) {
+        deviceSemaphores[i] = INITDEVICESEM;
+    }
+    ReadyQueue = mkEmptyProcQ();  /*Initialize the Ready Queue*/
+    currProc = NULL;  /*No process is running initially */
+    procCnt = INITPROCCNT;  /*No active processes yet*/
+    softBlockCnt = INITSBLOCKCNT;  /*No soft-blocked processes*/
+
+    /*4. Configure System Timer (Load the system-wide Interval Timer with 100 milliseconds)*/
+    LDIT(INITTIMER);  /*Set interval timer to 100ms*/
+
+    /*5. Create and Launch the First Process*/
+    p = allocPcb();
+    
+    if (p != NULL){
+        dra = (devregarea_t *) RAMBASEADDR;
+        ramtop = dra->rambase + dra->ramsize;  
+
+        /*Initialize the process state*/
+        p->p_s.s_sp = ramtop; /*Stack pointer set to top of RAM*/
+        p->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
+        p->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
+        /*p->p_s.s_status = ? interrupts & kernel mode*/
+
+        /*Add process to Ready Queue & update process count */
+        insertProcQ(&ReadyQueue, p);  
+        procCnt++;  
+
+        /*Start execution with the scheduler*/  
+        switchProcess();  
+        return 0;  
+    }
+
+    /*7. If no PCB is available, the system calls PANIC() to halt execution*/
+    PANIC();
+    return 0;
  }

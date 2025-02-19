@@ -86,6 +86,23 @@
 /* Related to the Pseudo-Clock: This is the max number of external (sub)devices in UMPS3, plus one additional semaphore */
 #define MAXDEVICECNT	49
 
+/*interval timer intialized to 100ms in main() of initial.c*/
+#define INITTIMER       100000
+
+/*Initial values for process count, softBlockCount, device semaphores, accumulated time for a process that has been created*/
+#define INITSBLOCKCNT   0   /*initial soft block count*/
+#define INITPROCCNT     0   /*initial process count*/
+#define INITACCTIME     0   /*initial accumulated time for a process that has been created*/
+#define INITDEVICESEM   0   /*initial value for device semaphore*/
+
+
+/*Status Register Consts (associated with Processor State)*/
+
+
+/*Cause Register Constansts (used in exception_handler in initial.c)*/
+#define CAUSESHIFT      2       /**/
+#define GETEXCPCODE     0x0000007C /*set Cause register bits to 0 except for ExcCode field*/
+
 
 /* operations */
 #define	MIN(A,B)		((A) < (B) ? A : B)

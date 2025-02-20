@@ -1,0 +1,3 @@
+#define ENABLE_INTERRUPTS 0x01
+#define DISABLE_PLT  0x02
+#define SCHED_TIME_SLICE 5

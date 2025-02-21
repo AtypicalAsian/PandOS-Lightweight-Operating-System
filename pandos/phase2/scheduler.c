@@ -20,3 +20,6 @@ To view version history and changes:
 #include "../h/interrupts.h"
 #include "../h/initial.h"
 
+void switchProcess(){
+    return -1;
+}

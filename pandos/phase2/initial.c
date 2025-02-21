@@ -48,8 +48,8 @@ int softBlockCnt; /*This integer is the number of started, but not terminated pr
 pcb_PTR ReadyQueue; /*Tail pointer to a queue of pcbs that are in the “ready” state.*/
 pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. the current executing process.*/
 int deviceSemaphores[MAXDEVICECNT]; /*Integer array of device semaphores that is associated with external (sub) devices, plus one semd for the Pseudo-clock*/
-// cpu_t start_tod;
-// state_PTR savedExceptState;
+state_PTR savedExceptState; /*ptr to saved exception state*/
+cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) clock when a process starts running. Used to calculate difference between current time of day value and the start time when the process is interrupted*/
 
 
 
@@ -72,7 +72,7 @@ int deviceSemaphores[MAXDEVICECNT]; /*Integer array of device semaphores that is
  * exception handler.
  * 
  * params: None
- * return: 
+ * return: None
 
  *****************************************************************************/
  void exception_handler(){
@@ -90,13 +90,28 @@ int deviceSemaphores[MAXDEVICECNT]; /*Integer array of device semaphores that is
     *****************************************************************************/
     
     
-    int exceptionReason; /* the exception code */
-    state_t *oldState; /* the saved exception state for Processor 0 */
+    int exception_code; /* Stores the extracted exception type */  
+    state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
 
-    oldState = (state_t *) BIOSDATAPAGE; /*BIOSDATAPAGE stores the saved processor state at the moment of an exception. We let oldState point to this saved state to analyze the cause of the exception*/
-    exceptionReason = ((oldState->s_cause) & GETEXCPCODE) >> CAUSESHIFT; /*s_cause contains the cause register, which stores the reason for the exception. The exception code is extracted by masking and shifting the relevant bits.*/
+    saved_state = (state_t *) BIOSDATAPAGE;  /* Retrieve the saved processor state from BIOS data page */
+    exception_code = ((saved_state->s_cause) & GETEXCPCODE) >> CAUSESHIFT; /* Extract exception code from the cause register */
 
-    return -1;
+    if (exception_code == INTCONST) {  
+        /* Case 1: Exception Code 0 - Device Interrupt */
+        intTrapH();  /* call the Nucleus' device interrupt handler function */
+    }  
+    else if (exception_code >= 1 && exception_code <= 3) {  
+        /* Case 2: Exception Codes 1-3 - TLB Exceptions */
+        tlbTrapH();  /* call the Nucleus' TLB exception handler function */
+    }  
+    else if (exception_code == SYSCONST) {  
+        /* Case 3: Exception Code 8 - System Calls */
+        sysTrapH();  /* call the Nucleus' SYSCALL exception handler function */
+    }  
+    else {  
+        /* Case 4: All Other Exceptions - Program Traps */
+        pgmTrapH();  /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
+    }
  }
 
 
@@ -113,7 +128,7 @@ int deviceSemaphores[MAXDEVICECNT]; /*Integer array of device semaphores that is
  * its task is complete.
  * 
  * params: None
- * return: 
+ * return: None
 
  *****************************************************************************/
  int main(){
@@ -147,17 +162,17 @@ int deviceSemaphores[MAXDEVICECNT]; /*Integer array of device semaphores that is
 
     /*1. Set Up Exception Handling*/
     
-    pcb_PTR p; /* a pointer to the first process in the ready queue to be created so that the scheduler can begin execution */
+    pcb_PTR first_proc; /* a pointer to the first process in the ready queue to be created so that the scheduler can begin execution */
     passupvector_t *proc0_passup_vec; /*Pointer to Processor 0 Pass-Up Vector */
     memaddr ramtop; /* the address of the last RAM frame */
     devregarea_t *dra; /* device register area that used to determine RAM size */
 
     /*ADD COMMENTS HERE + DEFINE CONSTANTS in const.h---------------------------------------------*/
-    proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;
-    proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;
-    proc0_passup_vec->tlb_refll_stackPtr = 0x20001000;
-    proc0_passup_vec->execption_handler = (memaddr) exception_handler;
-    proc0_passup_vec->exception_stackPtr = 0x20001000;
+    proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer to the address (0x0FFFF900) defined in const.h*/
+    proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
+    proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page: */
+    proc0_passup_vec->execption_handler = (memaddr) exception_handler;      /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
+    proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
 
 
     /*2. Initialize Level 2 data structures*/
@@ -180,28 +195,37 @@ int deviceSemaphores[MAXDEVICECNT]; /*Integer array of device semaphores that is
     LDIT(INITTIMER);  /*Set interval timer to 100ms*/
 
     /*5. Create and Launch the First Process*/
-    p = allocPcb();
+    /**************************************************************************** 
+     * In particular this process will have interrupts enabled, the processor Local Timer enabled, kernel-mode on, the SP set to RAMTOP, and its PC set to the address of test. 
+     * The remaining pcb fields as follows:
+     *      Set all the Process Tree fields to NULL.
+     *      Set the accumulated time field (p time) to zero.
+     *      Set the blocking semaphore address (p semAdd) to NULL.
+     *      Set the Support Structure pointer (p supportStruct) to NULL.
+
+    *****************************************************************************/
+    first_proc = allocPcb();    /*allocate a PCB for the first process*/
     
-    if (p != NULL){
-        dra = (devregarea_t *) RAMBASEADDR;
-        ramtop = dra->rambase + dra->ramsize;  
+    if (first_proc != NULL){
+        dra = (devregarea_t *) RAMBASEADDR;     /*Set the base address of the device register area */
+        ramtop = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
 
         /*Initialize the process state*/
-        p->p_s.s_sp = ramtop; /*Stack pointer set to top of RAM*/
-        p->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
-        p->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
-        /*p->p_s.s_status = ? interrupts & kernel mode*/
+        first_proc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;   /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
+        first_proc->p_s.s_sp = ramtop; /*Stack pointer set to top of RAM*/
+        first_proc->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
+        first_proc->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
 
         /*Add process to Ready Queue & update process count */
-        insertProcQ(&ReadyQueue, p);  
-        procCnt++;  
+        insertProcQ(&ReadyQueue, first_proc);       /*insert first process into ready queue*/
+        procCnt++;                                  /*increase the total process count to 1*/
 
         /*Start execution with the scheduler*/  
         switchProcess();  
-        return 0;  
+        return (0);  
     }
 
     /*7. If no PCB is available, the system calls PANIC() to halt execution*/
     PANIC();
-    return 0;
+    return (0);
  }

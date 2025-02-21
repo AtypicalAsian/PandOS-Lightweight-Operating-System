@@ -86,6 +86,9 @@
 /* Related to the Pseudo-Clock: This is the max number of external (sub)devices in UMPS3, plus one additional semaphore */
 #define MAXDEVICECNT	49
 
+/*Address of top of the Nucleus stack page. Stack will start at this address and expand downward as data is pushed onto it*/
+#define TOPSTKPAGE   0x20001000
+
 /*interval timer intialized to 100ms in main() of initial.c*/
 #define INITTIMER       100000
 
@@ -96,12 +99,19 @@
 #define INITDEVICESEM   0   /*initial value for device semaphore*/
 
 
-/*Status Register Consts (associated with Processor State)*/
+/* Status Register Bitmask Constants (Processor State) */
+#define STATUS_ALL_OFF   0x00000000  /* Clears all bits in the Status register (useful for initializing or bitwise-OR operations) */
+#define STATUS_IE_ENABLE 0x00000004  /* Enables global interrupts (IEp, bit 2 = 1) after LDST */
+#define STATUS_PLT_ON    0x08000000  /* Enables the Processor Local Timer (PLT) (TE, bit 27 = 1) */
+#define STATUS_INT_ON    0x0000FF00  /* Enables all external interrupts by setting the Interrupt Mask bits */
 
 
 /*Cause Register Constansts (used in exception_handler in initial.c)*/
 #define CAUSESHIFT      2       /**/
 #define GETEXCPCODE     0x0000007C /*set Cause register bits to 0 except for ExcCode field*/
+#define INTCONST		0			/* exception code signaling an interrupt occurred */
+#define TLBCONST		3			/* upper bound on the exception codes that signal a TLB exception occurred */
+#define SYSCONST		8			/* exception code signaling a SYSCALL occurred */
 
 
 /* operations */

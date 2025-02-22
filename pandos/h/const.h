@@ -97,7 +97,7 @@
 
 
 /*Status Register Consts (associated with Processor State)*/
-
+#define SCHED_TIME_SLICE 5
 
 /*Cause Register Constansts (used in exception_handler in initial.c)*/
 #define CAUSESHIFT      2       /**/

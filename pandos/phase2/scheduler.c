@@ -43,7 +43,10 @@ void switchProcess() {
             HALT();
         } else if (softBlockCnt > 0) {
             /* There are blocked processes, enter Wait State */
-            setSTATUS(ENABLE_INTERRUPTS | DISABLE_PLT);  /* ??? getSTATUS first, then invoke Bit Manipulation */
+            unsigned int status = getSTATUS(); /* Get current status */
+            status |= (1 << 0);  /* Enable Global Interrupts (IEc = 1) */
+            status |= (1 << 27); /* Enable Local Timer (TE = 1) */
+            setSTATUS(status);  
             WAIT();
         } else {
             /* Deadlock condition -> PANIC */

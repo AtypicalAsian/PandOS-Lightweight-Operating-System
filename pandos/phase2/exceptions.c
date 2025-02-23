@@ -120,3 +120,12 @@ void terminateProcess(pcb_PTR proc) {
         switchProcess();  /* Switch to a new process using Scheduler() for context switch */
     }
 }
+
+void waitOp(int *sem) {
+    (*sem)--;  /* Decrement the semaphore */ 
+
+    if (*sem < 0) {  /* If the semaphore is negative, block the process */
+        insertBlocked(sem, currProc);
+        switchProcess();  /* Call the scheduler to run another process */
+    }
+}

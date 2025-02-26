@@ -56,7 +56,7 @@ void copyState(state_PTR src, state_PTR dst){
 }
 
 /**************************************************************************** 
- * 
+ * switchProcess()
  * params: 
  * return: None
 

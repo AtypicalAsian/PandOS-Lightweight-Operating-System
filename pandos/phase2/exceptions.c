@@ -22,8 +22,8 @@ To view version history and changes:
 
 /*function prototypes*/
 HIDDEN void blockCurr(int *sem);
-/* HIDDEN void createProcess(state_PTR stateSYS, support_t *suppStruct); */ 
-/* HIDDEN void terminateProcess(pcb_PTR proc); */
+HIDDEN void createProcess(state_PTR stateSYS, support_t *suppStruct);  
+HIDDEN void terminateProcess(pcb_PTR proc); 
 HIDDEN void waitOp(int *sem);
 HIDDEN void signalOp(int *sem);
 HIDDEN void waitForIO(int lineNum, int deviceNum, int readBool);
@@ -126,4 +126,34 @@ void signalOp(int *sem) {
             insertProcQ(&ReadyQueue,p);
         }
     }
+}
+
+void waitForIO(int lineNum, int deviceNum, int readBool) {
+    /*devAddrBase = ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) (for memory address w. device's device register, not I/O device ???)*/ 
+    
+    /*
+    BIG PICTURE: 
+    - Many I/O devices can cause a process to be blocked while waiting for I/O to complete.
+    - Each interrupt line (3–7) has up to 8 devices, requiring us to compute `semIndex` to find the correct semaphore.
+    - Terminal devices (line 7) have two independent sub-devices: read (input) and write (output), requiring an extra adjustment in `semIndex`.
+    - When a process requests I/O, it performs a P operation on `deviceSemaphores[semIndex]`, potentially blocking the process.
+    - If blocked, the process is inserted into the Active Semaphore List (ASL) and the system switches to another process.
+    - Once the I/O completes, an interrupt will trigger a V operation, unblocking the process.
+    - The process resumes and retrieves the device’s status from `deviceStatus[semIndex]`.
+    */
+    int semIndex = (lineNum - 3) * 8 + deviceNum;
+
+    if (lineNum == 7) {
+        semIndex = semIndex * 2 + (readBool ? 0 : 1);
+    }
+
+    int *deviceSem = &deviceSemaphores[semIndex];
+
+    if (*deviceSem < 0) {
+        currProc->p_semAdd = deviceSem;
+        insertBlocked(deviceSem,currProc);
+        switchProcess();
+    }
+
+    currProc->p_s.s_v0 = deviceStatus[semIndex];
 }

@@ -98,6 +98,8 @@
 #define INITACCTIME     0   /*initial accumulated time for a process that has been created*/
 #define INITDEVICESEM   0   /*initial value for device semaphore*/
 
+#define SCHED_TIME_SLICE 5  /*time slice for scheduler set to default 5ms*/
+
 
 /* Status Register Bitmask Constants (Processor State) */
 #define STATUS_ALL_OFF   0x00000000  /* Clears all bits in the Status register (useful for initializing or bitwise-OR operations) */
@@ -105,6 +107,8 @@
 #define STATUS_PLT_ON    0x08000000  /* Enables the Processor Local Timer (PLT) (TE, bit 27 = 1) */
 #define STATUS_INT_ON    0x0000FF00  /* Enables all external interrupts by setting the Interrupt Mask bits */
 
+
+#define LARGETIME        0xFFFFFFFF
 
 /*Cause Register Constansts (used in exception_handler in initial.c)*/
 #define CAUSESHIFT      2       /**/

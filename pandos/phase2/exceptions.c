@@ -45,13 +45,13 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
     */
     pcb_PTR newProc = allocPcb(); 
     if (newProc == NULL) {
-        currProc->p_s.s_v0 = -1;
+        currProc->p_s.s_v0 = NULL_PTR_ERROR;
         return;
     }
     
-    newProc->p_s = *stateSYS; 
+    newProc->p_s = *stateSYS; /* need deep copy ??? */
     newProc->p_supportStruct = suppStruct; 
-    newProc->p_time = 0; 
+    newProc->p_time = INITIAL_TIME; 
     newProc->p_semAdd = NULL; 
      
     insertChild(currProc, newProc); 
@@ -59,7 +59,7 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
     
     procCnt++;
  
-    currProc->p_s.s_v0 = 0;
+    currProc->p_s.s_v0 = READY;
 }
 
 void terminateProcess(pcb_PTR proc) {

@@ -25,6 +25,7 @@
 #define	FALSE			    0
 #define HIDDEN			  static
 #define EOS				    '\0'
+#define NULL_PTR_ERROR -1
 
 #define NULL 			    ((void *)0xFFFFFFFF)
 
@@ -113,5 +114,8 @@
 
 /* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
+
+/* Add time constants */
+#define INITIAL_TIME 0
 
 #endif

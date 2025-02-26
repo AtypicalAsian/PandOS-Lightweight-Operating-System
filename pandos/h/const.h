@@ -103,7 +103,6 @@
 #define CAUSESHIFT      2       /**/
 #define GETEXCPCODE     0x0000007C /*set Cause register bits to 0 except for ExcCode field*/
 
-
 /* operations */
 #define	MIN(A,B)		((A) < (B) ? A : B)
 #define MAX(A,B)		((A) < (B) ? B : A)

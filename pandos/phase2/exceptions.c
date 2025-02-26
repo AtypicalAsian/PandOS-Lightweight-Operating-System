@@ -141,7 +141,7 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
     - Once the I/O completes, an interrupt will trigger a V operation, unblocking the process.
     - The process resumes and retrieves the device’s status from `deviceStatus[semIndex]`.
     */
-    int semIndex = (lineNum - 3) * 8 + deviceNum;
+    int semIndex = (lineNum - 3) * DEVPERINT + deviceNum;
 
     if (lineNum == 7) {
         semIndex = semIndex * 2 + (readBool ? 0 : 1);

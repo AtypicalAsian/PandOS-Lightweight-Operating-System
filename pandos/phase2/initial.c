@@ -164,13 +164,13 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
     
     pcb_PTR first_proc; /* a pointer to the first process in the ready queue to be created so that the scheduler can begin execution */
     passupvector_t *proc0_passup_vec; /*Pointer to Processor 0 Pass-Up Vector */
-    memaddr ramtop; /* the address of the last RAM frame */
+    memaddr topRAM; /* the address of the last RAM frame */
     devregarea_t *dra; /* device register area that used to determine RAM size */
 
-    /*ADD COMMENTS HERE + DEFINE CONSTANTS in const.h---------------------------------------------*/
+    /*Initialize passUp vector fields*/
     proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer to the address (0x0FFFF900) defined in const.h*/
     proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
-    proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page: */
+    proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
     proc0_passup_vec->execption_handler = (memaddr) exception_handler;      /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
     proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
 
@@ -208,11 +208,11 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
     
     if (first_proc != NULL){
         dra = (devregarea_t *) RAMBASEADDR;     /*Set the base address of the device register area */
-        ramtop = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
+        topRAM = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
 
         /*Initialize the process state*/
         first_proc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;   /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
-        first_proc->p_s.s_sp = ramtop; /*Stack pointer set to top of RAM*/
+        first_proc->p_s.s_sp = topRAM; /*Stack pointer set to top of RAM*/
         first_proc->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
         first_proc->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
 

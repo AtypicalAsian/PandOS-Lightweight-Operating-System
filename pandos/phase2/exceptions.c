@@ -13,7 +13,7 @@ To view version history and changes:
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../h/pcb.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
@@ -25,14 +25,15 @@ To view version history and changes:
 HIDDEN void blockCurrProc(int *sem);
 HIDDEN void createProcess(state_PTR stateSYS, support_t *suppStruct);
 HIDDEN void terminateProcess(pcb_PTR proc);
-HIDDEN void waitOp(int *sem);
-HIDDEN void signalOp(int *sem);
+HIDDEN void passeren(int *sem);
+HIDDEN void verhogen(int *sem);
 HIDDEN void waitForIO(int lineNum, int deviceNum, int readBool);
 HIDDEN void getCPUTime();
 HIDDEN void waitForPClock();
 HIDDEN void getSupportData();
 
 cpu_t curr_time;    /*stores the current time in the TOD clock*/
+int syscallNo;
 
 
 /**************************************************************************** 
@@ -76,7 +77,7 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
         currProc->p_s.s_v0 = NULL_PTR_ERROR;
     }
     
-    copyState(stateSYS, &(newProc->p_s))        /*perform deep copy of processor state - 31 general and 4 control registers*/
+    copyState(stateSYS, &(newProc->p_s));        /*perform deep copy of processor state - 31 general and 4 control registers*/
     newProc->p_supportStruct = suppStruct;      
     newProc->p_time = INITIAL_TIME; 
     newProc->p_semAdd = NULL; 
@@ -214,7 +215,7 @@ void verhogen(int *sem) {
     int semIndex = (lineNum - OFFSET) * DEVPERINT + deviceNum;
 
     if (lineNum == LINENUM7 && readBool != TRUE) {
-        index += DEVPERINT;
+        semIndex += DEVPERINT;
     }
 
     (deviceSemaphores[semIndex])--;
@@ -222,7 +223,7 @@ void verhogen(int *sem) {
     softBlockCnt++;
     switchProcess();
 
-
+ }
 
 /**************************************************************************** 
  * getCPUTime() - SYS6
@@ -299,13 +300,13 @@ void sysTrapHandler(){
 
     /*Retrieve saved processor state (located at start of the BIOS Data Page) & extract the syscall number to find out which type of exception was raised*/
     savedExceptState = (state_PTR) BIOSDATAPAGE;  
-    sysNum = savedExceptState->s_a0;  
+    syscallNo = savedExceptState->s_a0;  
 
     /*Increment PC by 4 avoid infinite loops*/
     savedExceptState->s_pc += 4;
 
     /*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
-    if (sysNum < SYS1NUM || sysNum > SYS8NUM) {  
+    if (syscallNo < SYS1 || syscallNo > SYS8) {  
         pgmTrapH();  /* Invalid syscall, treat as Program Trap */
         return;
     }    
@@ -323,38 +324,38 @@ void sysTrapHandler(){
     updateCurrPcb(currProc);  
 
     /* Execute the appropriate syscall based on sysNum */
-    switch (sysNum) {  
-        case SYS1NUM:  
+    switch (syscallNo) {  
+        case SYS1:  
             createProcess((state_PTR) currProc->p_s.s_a1, (support_t *) currProc->p_s.s_a2);  
             break;  
 
-        case SYS2NUM:  
+        case SYS2:  
             terminateProcess(currProc);  
             currProc = NULL;  
             switchProcess();  
             break;  
 
-        case SYS3NUM:  
+        case SYS3:  
             passeren((int *) currProc->p_s.s_a1);  
             break;  
 
-        case SYS4NUM:  
+        case SYS4:  
             verhogen((int *) currProc->p_s.s_a1);  
             break;  
 
-        case SYS5NUM:  
+        case SYS5:  
             waitForIO(currProc->p_s.s_a1, currProc->p_s.s_a2, currProc->p_s.s_a3);  
             break;  
 
-        case SYS6NUM:  
+        case SYS6:  
             getCPUTime();  
             break;  
 
-        case SYS7NUM:  
+        case SYS7:  
             waitForClock();  
             break;  
 
-        case SYS8NUM:  
+        case SYS8:  
             getSupportData();  
             break;  
     }  

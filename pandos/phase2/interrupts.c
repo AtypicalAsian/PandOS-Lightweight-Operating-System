@@ -21,7 +21,7 @@ To view version history and changes:
 HIDDEN void nontimerInterruptHandler();
 HIDDEN void pdltInterruptHandler();
 
-void nontimerInterruptHandler(state_t stateSYS) {
+void nontimerInterruptHandler(state_t *stateSYS) {
     /* 
     BIG PICTURE: 
     1. Find the pending interrupts from Cause Register (Processor 0, given its address is 0x0FFF.F000)

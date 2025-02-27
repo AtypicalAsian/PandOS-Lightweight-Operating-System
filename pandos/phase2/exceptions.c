@@ -76,7 +76,7 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
         currProc->p_s.s_v0 = NULL_PTR_ERROR;
     }
     
-    copyState(stateSYS, &(newProc->p_s))        /*perform deep copy of processor state - 31 general and 4 control registers*/
+    copyState(stateSYS, &(newProc->p_s));        /*perform deep copy of processor state - 31 general and 4 control registers*/
     newProc->p_supportStruct = suppStruct;      
     newProc->p_time = INITIAL_TIME; 
     newProc->p_semAdd = NULL; 

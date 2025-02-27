@@ -198,7 +198,7 @@ void verhogen(int *sem) {
  * return: None
 
  *****************************************************************************/
- void waitForIO(int lineNum, int deviceNum, int readBool) {
+void waitForIO(int lineNum, int deviceNum, int readBool) {
     /*devAddrBase = ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) (for memory address w. device's device register, not I/O device ???)*/ 
     
     /*
@@ -221,7 +221,7 @@ void verhogen(int *sem) {
     blockCurrProc(&deviceSemaphores[semIndex]);
     softBlockCnt++;
     switchProcess();
-
+}
 
 
 /**************************************************************************** 

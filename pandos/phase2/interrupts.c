@@ -69,8 +69,12 @@ void nontimerInterruptHandler(state_PTR procState) {
 
     /* Set ACK status for terminal device to signal the controller about a pending interrupt */
     if (deviceStatus == TRANSTATUS || deviceStatus == RECVSTATUS) {
-        deviceStatus = ACK;
+        /* We set deviceAddrBase, not deviceStatus since it's memory-mapped register */
+        *deviceAddrBase = ACK;
     }
+
+    /* After the interrupt, set it back to RESET state ??? */
+    *deviceAddrBase = RESET;
 
     int semIndex = (lineNum - OFFSET) * DEVPERINT + deviceNum;
     verhogen(&deviceSemaphores[semIndex]);

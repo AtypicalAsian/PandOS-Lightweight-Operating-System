@@ -102,18 +102,18 @@ void switchProcess() {
     if (emptyProcQ(ReadyQueue)) {
         /*no process started*/
         if (procCnt == 0){
-            HALT()
+            HALT();
         }
         if ((softBlockCnt > INITSBLOCKCNT) && (procCnt > INITPROCCNT)){
             /*enable interrupts for status register to enter Wait State (execute wait instruction)*/
             /*first we clear all bits in the status register, then enables global interrupts, then enable external interrupts by performing a bitwise OR*/
-            setSTATUS(STATUS_ALL_OFF | STATUS_IE_ENABLE |  STATUS_INT_ON)
+            setSTATUS(STATUS_ALL_OFF | STATUS_IE_ENABLE |  STATUS_INT_ON);
             setTIMER(LARGETIME);
             WAIT();
         }
         /*Else, when procCnt > 0 and softBlockCnt==0 -> deadlock happens*/
         else{
-            PANIC()
+            PANIC();
         }
     }
 

@@ -126,6 +126,21 @@
 #define USER_MODE         0x1  // Value when in user mode
 #define KERNEL_MODE       0x0  // Value when in kernel mode
 
+
+#define SYS1              1
+#define SYS2              2
+#define SYS3              3
+#define SYS4              4
+#define SYS5              5
+#define SYS6              6
+#define SYS7              7
+#define SYS8              8
+
+
+
+
+
+
 /**/
 #define LARGETIME        0xFFFFFFFF
 #define INITIAL_TIME     0

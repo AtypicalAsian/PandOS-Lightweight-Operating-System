@@ -106,7 +106,7 @@ void terminateProcess(pcb_PTR proc) {
     }  
 
     /* Remove the process from its current state (Running, Blocked, or Ready) */
-    if (proc == currentProc) {  
+    if (proc == currProc) {  
         /* If the process is currently running, detach it from its parent */
         outChild(proc);  
     }  
@@ -266,27 +266,99 @@ void getSupportData(){
 
 
 /**************************************************************************** 
-* exceptionHandlerSwitch()
+ * exceptionHandlerSwitch()
  * params:
  * return: None
 
  *****************************************************************************/
 void exceptionHandlerSwitch(int exceptionCode){
     /*If current process has a support structure -> pass up exception to the exception handler */
-
-
+    if (currProc->p_supportStruct != NULL){
+        copyState(savedExceptState, &(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
+        STCK(curr_time);
+        currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+        LDCXT(currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_stackPtr, currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_status,currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_pc);
+    }
     /*Else, if no support structure -> terminate the current process and its children*/
+    else{
+        terminateProcess(currProc);
+        currProc = NULL;
+        switchProcess();
+    }
 }
 
 
 /**************************************************************************** 
-* sysTrapHandler()
+ * sysTrapHandler()
+ * Entrypoint to exceptions.c module
  * params:
  * return: None
 
  *****************************************************************************/
 void sysTrapHandler(){
-    return -1;
+
+    /*Retrieve saved processor state (located at start of the BIOS Data Page) & extract the syscall number to find out which type of exception was raised*/
+    savedExceptState = (state_PTR) BIOSDATAPAGE;  
+    sysNum = savedExceptState->s_a0;  
+
+    /*Increment PC by 4 avoid infinite loops*/
+    savedExceptState->s_pc += 4;
+
+    /*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
+    if (sysNum < SYS1NUM || sysNum > SYS8NUM) {  
+        pgmTrapH();  /* Invalid syscall, treat as Program Trap */
+        return;
+    }    
+
+    /*Edge case: If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
+
+    /*DOUBLE CHECK CONDITION*/
+    if (((savedExceptState->s_status >> STATUS_KUc_SHIFT) & STATUS_KUc_MASK) == USER_MODE) {
+        savedExceptState->s_cause |= RESINSTRCODE;  /* Set exception cause to Reserved Instruction */
+        pgmTrapH();  /* Handle it as a Program Trap */
+        return;
+    }
+
+    /*save processor state into cur */
+    updateCurrPcb(currProc);  
+
+    /* Execute the appropriate syscall based on sysNum */
+    switch (sysNum) {  
+        case SYS1NUM:  
+            createProcess((state_PTR) currProc->p_s.s_a1, (support_t *) currProc->p_s.s_a2);  
+            break;  
+
+        case SYS2NUM:  
+            terminateProcess(currProc);  
+            currProc = NULL;  
+            switchProcess();  
+            break;  
+
+        case SYS3NUM:  
+            passeren((int *) currProc->p_s.s_a1);  
+            break;  
+
+        case SYS4NUM:  
+            verhogen((int *) currProc->p_s.s_a1);  
+            break;  
+
+        case SYS5NUM:  
+            waitForIO(currProc->p_s.s_a1, currProc->p_s.s_a2, currProc->p_s.s_a3);  
+            break;  
+
+        case SYS6NUM:  
+            getCPUTime();  
+            break;  
+
+        case SYS7NUM:  
+            waitForClock();  
+            break;  
+
+        case SYS8NUM:  
+            getSupportData();  
+            break;  
+    }  
+
 }
 
 

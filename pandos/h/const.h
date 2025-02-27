@@ -116,6 +116,15 @@
 #define STATUS_IE_ENABLE 0x00000004  /* Enables global interrupts (IEp, bit 2 = 1) after LDST */
 #define STATUS_PLT_ON    0x08000000  /* Enables the Processor Local Timer (PLT) (TE, bit 27 = 1) */
 #define STATUS_INT_ON    0x0000FF00  /* Enables all external interrupts by setting the Interrupt Mask bits */
+#define STATUS_USERPON	 0x00000008	/* constant for setting the user-mode on after LDST (i.e., KUp (bit 3) = 1) */
+
+#define	RESINSTRCODE	 0xFFFFFF28
+
+
+#define STATUS_KUc_SHIFT  1  // KUc bit is bit 1 in the Status register
+#define STATUS_KUc_MASK   0x1  // Mask for extracting the bit (0000...0001)
+#define USER_MODE         0x1  // Value when in user mode
+#define KERNEL_MODE       0x0  // Value when in kernel mode
 
 /**/
 #define LARGETIME        0xFFFFFFFF

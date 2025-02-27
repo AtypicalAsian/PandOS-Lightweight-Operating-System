@@ -107,8 +107,21 @@
 #define STATUS_PLT_ON    0x08000000  /* Enables the Processor Local Timer (PLT) (TE, bit 27 = 1) */
 #define STATUS_INT_ON    0x0000FF00  /* Enables all external interrupts by setting the Interrupt Mask bits */
 
-
+/**/
 #define LARGETIME        0xFFFFFFFF
+#define INITIAL_TIME     0
+
+#define NULL_PTR_ERROR   -1
+#define READY            0
+
+
+#define SEM4BLOCKED     0
+#define OFFSET          3
+
+#define INDEXCLOCK      (MAXDEVICECNT - 1)
+
+
+#define LINENUM7        7
 
 /*Cause Register Constansts (used in exception_handler in initial.c)*/
 #define CAUSESHIFT      2       /**/

@@ -55,6 +55,24 @@ void copyState(state_PTR src, state_PTR dst){
 
 }
 
+
+/**************************************************************************** 
+ * Helper function
+ * 
+ * params: 
+ *      - src: pointer to processor state to be copied
+ *      - dst: pointer to procssor state to copy to
+ * return: None
+
+ *****************************************************************************/
+void swContext(pcb_PTR curr_proccess){
+    currProc = curr_proccess;
+    STCK(time_of_day_start);
+    LDST(&(curr_proccess->p_s));
+}
+
+
+
 /**************************************************************************** 
  * switchProcess()
  * params: 

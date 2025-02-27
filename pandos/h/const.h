@@ -40,6 +40,16 @@
 #define DEVREGLEN		  4		  /* device register field length in bytes, and regs per dev */	
 #define DEVREGSIZE	  16 		/* device register size in bytes */
 
+/* Constants for the different device numbers an interrupt may occur on */
+#define	DEV0			0				/* constant representing device 0 */
+#define	DEV1			1				/* constant representing device 1 */
+#define	DEV2			2				/* constant representing device 2 */
+#define	DEV3			3				/* constant representing device 3 */
+#define	DEV4			4				/* constant representing device 4 */
+#define	DEV5			5				/* constant representing device 5 */
+#define	DEV6			6				/* constant representing device 6 */
+#define	DEV7			7				/* constant representing device 7 */
+
 /* device register field number for non-terminal devices */
 #define STATUS			  0
 #define COMMAND			  1

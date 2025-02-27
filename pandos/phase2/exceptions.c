@@ -92,6 +92,47 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
     swContext(currProc);
 }
 
+/**************************************************************************** 
+ * terminateProcess() - SYS2
+ * params:
+ * return: None
+
+ *****************************************************************************/
+void terminateProcess(pcb_PTR proc) {  
+    /* Recursively terminate all child processes */
+    while (!emptyChild(proc)) {  
+        pcb_PTR child = removeChild(proc);  
+        terminateProcess(child);  
+    }  
+
+    /* Remove the process from its current state (Running, Blocked, or Ready) */
+    if (proc == currentProc) {  
+        /* If the process is currently running, detach it from its parent */
+        outChild(proc);  
+    }  
+    else if (proc->p_semAdd != NULL) {  
+        /* If the process is blocked, remove it from the ASL */
+        outBlocked(proc);  
+
+        /* If the process was NOT blocked on a device semaphore, increment the semaphore */
+        if (proc->p_semAdd < &deviceSemaphores[DEV0] || proc->p_semAdd > &deviceSemaphores[INDEXCLOCK]) {  
+            (*(proc->p_semAdd))++;  
+        }  
+        else {  
+            softBlockCnt--;  /* Decrease soft-blocked process count */
+        }  
+    }  
+    else {  
+        /* Otherwise, the process was in the Ready Queue, so remove it */
+        outProcQ(&ReadyQueue, proc);  
+    }  
+
+    /* Free the process and update system counters */
+    freePcb(proc);  
+    procCnt--;  
+}
+
+
 
 /**************************************************************************** 
  * passeren() - SYS3
@@ -157,8 +198,6 @@ void verhogen(int *sem) {
  * return: None
 
  *****************************************************************************/
-
-
  void waitForIO(int lineNum, int deviceNum, int readBool) {
     /*devAddrBase = ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) (for memory address w. device's device register, not I/O device ???)*/ 
     
@@ -224,3 +263,51 @@ void getSupportData(){
     currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
     swContext(currProc);
 }
+
+
+/**************************************************************************** 
+* exceptionHandlerSwitch()
+ * params:
+ * return: None
+
+ *****************************************************************************/
+void exceptionHandlerSwitch(int exceptionCode){
+    /*If current process has a support structure -> pass up exception to the exception handler */
+
+
+    /*Else, if no support structure -> terminate the current process and its children*/
+}
+
+
+/**************************************************************************** 
+* sysTrapHandler()
+ * params:
+ * return: None
+
+ *****************************************************************************/
+void sysTrapHandler(){
+    return -1;
+}
+
+
+/**************************************************************************** 
+* tlbTrapHanlder()
+ * params:
+ * return: None
+
+ *****************************************************************************/
+void tlbTrapHanlder(){
+    exceptionHandlerSwitch(PGFAULTEXCEPT);
+}
+
+/**************************************************************************** 
+* prgmTrapHandler()
+ * params:
+ * return: None
+
+ *****************************************************************************/
+void prgmTrapHandler(){
+    exceptionHandlerSwitch(PGFAULTEXCEPT);
+}
+
+

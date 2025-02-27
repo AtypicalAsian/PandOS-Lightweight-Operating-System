@@ -102,15 +102,15 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
     }  
     else if (exception_code >= 1 && exception_code <= 3) {  
         /* Case 2: Exception Codes 1-3 - TLB Exceptions */
-        tlbTrapH();  /* call the Nucleus' TLB exception handler function */
+        tlbTrapHanlder();  /* call the Nucleus' TLB exception handler function */
     }  
     else if (exception_code == SYSCONST) {  
         /* Case 3: Exception Code 8 - System Calls */
-        sysTrapH();  /* call the Nucleus' SYSCALL exception handler function */
+        sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
     }  
     else {  
         /* Case 4: All Other Exceptions - Program Traps */
-        pgmTrapH();  /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
+        prgmTrapHandler();  /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
     }
  }
 

@@ -34,8 +34,12 @@ void nontimerInterruptHandler(state_PTR procState) {
     5. After I/O request finishes, the blocked process is moved out of ASL, and resumes its execution on ReadyQueue.
     6. LDST is called to restore the state of the unblocked process. This involves loading the saved context (stored in the process control block, `p_s`) of the unblocked process, which contains all the CPU register values (such as program counter, status, and general-purpose registers). This action effectively resumes the execution of the process, restoring it to the exact point where it was interrupted (before the I/O operation). The **LDST** function performs a context switch to this unblocked process, allowing it to continue from the last known state.
     */
-    /* consider to change to memaddr */
-    
+
+    /* NOTE: 
+    - consider to change to memaddr 
+    - need to consider dereferencing
+    */
+
     memaddr registerCause = procState->s_cause;
     memaddr pendingInterrupts = (registerCause & 0x0000FF00) >> 8;
 
@@ -63,11 +67,16 @@ void nontimerInterruptHandler(state_PTR procState) {
     memaddr* deviceAddrBase = (memaddr*)(0x1000.0054 + ((lineNum - 3) * 0x80) + (deviceNum * 0x10));
     memaddr deviceStatus = *deviceAddrBase;
 
+    /* Set ACK status for terminal device to signal the controller about a pending interrupt */
+    if (deviceStatus == TRANSTATUS || deviceStatus == RECVSTATUS) {
+        deviceStatus = ACK;
+    }
+
     int semIndex = (lineNum - OFFSET) * DEVPERINT + deviceNum;
     verhogen(&deviceSemaphores[semIndex]);
     waitForIO(lineNum,deviceNum,(lineNum == 7) ? TRUE: FALSE);
 
-    exceptionState->s_v1 = deviceStatus;
+    procState->s_v1 = deviceStatus;
 
     pcb_PTR unblockedProc = removeBlocked(&deviceSemaphores[semIndex]);
 

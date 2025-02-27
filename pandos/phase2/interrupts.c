@@ -20,8 +20,9 @@ To view version history and changes:
 
 HIDDEN void nontimerInterruptHandler();
 HIDDEN void pdltInterruptHandler();
+HIDDEN void systemIntervalInterruptHandler();
 
-void nontimerInterruptHandler(state_t *stateSYS) {
+void nontimerInterruptHandler(state_PTR procState) {
     /* 
     BIG PICTURE: 
     1. Find the pending interrupts from Cause Register (Processor 0, given its address is 0x0FFF.F000)
@@ -33,8 +34,10 @@ void nontimerInterruptHandler(state_t *stateSYS) {
     5. After I/O request finishes, the blocked process is moved out of ASL, and resumes its execution on ReadyQueue.
     6. LDST is called to restore the state of the unblocked process. This involves loading the saved context (stored in the process control block, `p_s`) of the unblocked process, which contains all the CPU register values (such as program counter, status, and general-purpose registers). This action effectively resumes the execution of the process, restoring it to the exact point where it was interrupted (before the I/O operation). The **LDST** function performs a context switch to this unblocked process, allowing it to continue from the last known state.
     */
-    unsigned int registerCause = stateSYS->s_cause;
-    unsigned int pendingInterrupts = (registerCause & 0x0000FF00) >> 8;
+    /* consider to change to memaddr */
+    
+    memaddr registerCause = procState->s_cause;
+    memaddr pendingInterrupts = (registerCause & 0x0000FF00) >> 8;
 
     int lineNum = -1;
     for (int i = 3; i <= 7; i ++) {
@@ -49,7 +52,7 @@ void nontimerInterruptHandler(state_t *stateSYS) {
         return;
     }
 
-    unsigned int devicePending = *(unsigned int*)(0x1000003C + ((lineNum - 3) * 0x80));
+    memaddr devicePending = *(memaddr*)(0x1000003C + ((lineNum - 3) * 0x80));
 
     int deviceNum = 0;
     while (deviceNum < 8 && !(devicePending & (1 << deviceNum))) {
@@ -57,14 +60,14 @@ void nontimerInterruptHandler(state_t *stateSYS) {
     }
 
     /* Compute the device's device register from lineNum & deviceNum */
-    unsigned int* deviceAddrBase = (unsigned int*)(0x1000.0054 + ((lineNum - 3) * 0x80) + (deviceNum * 0x10));
-    unsigned int deviceStatus = *deviceAddrBase;
+    memaddr* deviceAddrBase = (memaddr*)(0x1000.0054 + ((lineNum - 3) * 0x80) + (deviceNum * 0x10));
+    memaddr deviceStatus = *deviceAddrBase;
 
     int semIndex = (lineNum - OFFSET) * DEVPERINT + deviceNum;
     verhogen(&deviceSemaphores[semIndex]);
     waitForIO(lineNum,deviceNum,(lineNum == 7) ? TRUE: FALSE);
 
-    stateSYS->s_v1 = deviceStatus;
+    exceptionState->s_v1 = deviceStatus;
 
     pcb_PTR unblockedProc = removeBlocked(&deviceSemaphores[semIndex]);
 

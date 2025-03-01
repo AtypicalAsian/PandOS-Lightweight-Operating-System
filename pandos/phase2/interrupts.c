@@ -7,6 +7,9 @@ To view version history and changes:
     - Remote GitHub Repo: https://github.com/AtypicalAsian/CS372-OS-Project
 ****************************************************************************/
 
+#include <string.h>  /* Required for memcpy */
+#include <stdio.h>
+
 #include "../h/asl.h"
 #include "../h/types.h"
 #include "../h/const.h"
@@ -17,10 +20,12 @@ To view version history and changes:
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
 #include "../h/interrupts.h"
+#include "../h/initial.h"
 
 HIDDEN void nontimerInterruptHandler();
-HIDDEN void pdltInterruptHandler();
+HIDDEN void pltInterruptHandler();
 HIDDEN void systemIntervalInterruptHandler();
+cpu_t curr_time;
 
 void nontimerInterruptHandler(state_PTR procState) {
     /* 
@@ -89,4 +94,37 @@ void nontimerInterruptHandler(state_PTR procState) {
     }
 
     LDST(&(unblockedProc->p_s));
+}
+
+void pltInterruptHandler() {
+    
+    /* 
+    BIG PICTURE: 
+    1. Acknowledge the PLT interrupt by reloading the timer.
+    2. Save the current process state (from BIOS Data Page) into the process control block (pcb).
+    3. Update the CPU time for the current process.
+    4. Move the current process to the Ready Queue (since it used up its time slice).
+    5. Call the scheduler to select the next process to run.
+    */
+
+    LDIT(SCHED_TIME_SLICE); 
+
+    if (currProc == NULL) {
+        /* No running process, just reschedule */
+        switchProcess();
+    }
+
+    /* Make a call to getCPUTime() to retrieve current time */
+    getCPUTime();
+    STCK(curr_time); 
+    currProc->p_time += (curr_time - time_of_day_start); 
+
+    /* Note: memcpy is a built-in void in string.h */
+    /* Save the processor state */
+    memcpy(&(currProc->p_s), (state_t *) BIOSDATAPAGE, sizeof(state_t));
+
+    insertProcQ(&ReadyQueue, currProc);
+    currProc = NULL;
+
+    switchProcess();
 }

@@ -97,7 +97,6 @@ void nontimerInterruptHandler(state_PTR procState) {
 }
 
 void pltInterruptHandler() {
-    
     /* 
     BIG PICTURE: 
     1. Acknowledge the PLT interrupt by reloading the timer.
@@ -107,15 +106,16 @@ void pltInterruptHandler() {
     5. Call the scheduler to select the next process to run.
     */
 
-    LDIT(SCHED_TIME_SLICE); 
+    setTIMER(SCHED_TIME_SLICE); 
 
+    /* Consider to remove this block since we do not need to switch process
+    */
     if (currProc == NULL) {
-        /* No running process, just reschedule */
         switchProcess();
     }
 
     /* Make a call to getCPUTime() to retrieve current time */
-    getCPUTime();
+    curr_time = getTIMER();
     STCK(curr_time); 
     currProc->p_time += (curr_time - time_of_day_start); 
 
@@ -127,4 +127,8 @@ void pltInterruptHandler() {
     currProc = NULL;
 
     switchProcess();
+}
+
+void systemIntervalInterruptHandler() {
+    /* TO-DO: implementation */
 }

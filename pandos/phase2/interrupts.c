@@ -25,7 +25,8 @@ To view version history and changes:
 HIDDEN void nontimerInterruptHandler();
 HIDDEN void pltInterruptHandler();
 HIDDEN void systemIntervalInterruptHandler();
-cpu_t curr_time;
+cpu_t curr_time;    /*value of TOD clock when at the time we enter the interrupts module (i.e what is the current time when the interrupt was generated?)*/
+cpu_t time_left;    /*Amount of time remaining in the current process' quantum slice (of 5ms) when the interrupt was generated*/
 
 void nontimerInterruptHandler(state_PTR procState) {
     /* 
@@ -142,5 +143,16 @@ void systemIntervalInterruptHandler() {
 
  *****************************************************************************/
 void interruptsHandler(){
+    STCK(curr_time);
+    time_left = getTIMER();
+    savedExceptState = (state_PTR) BIOSDATAPAGE;
 
+    if (((savedExceptState->s_cause) & LINE1MASK) != STATUS_ALL_OFF){
+        pltInterruptHandler();
+    }
+
+    if (((savedExceptState->s_cause) & LINE2MASK) != STATUS_ALL_OFF){
+        systemIntervalInterruptHandler();
+    }
+    /*nontimerInterruptHandler();*/
 }

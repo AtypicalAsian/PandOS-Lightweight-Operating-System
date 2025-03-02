@@ -25,8 +25,37 @@ To view version history and changes:
 HIDDEN void nontimerInterruptHandler();
 HIDDEN void pltInterruptHandler();
 HIDDEN void systemIntervalInterruptHandler();
+
+/*Helper Functions*/
+HIDDEN int getInterruptLine();
+HIDDEN void getDevNum();
+HIDDEN pcb_PTR unblockProcess(int semIndex, int statusCode);
+HIDDEN pcb_PTR handleDeviceInterrupt(int lineNum, int devNum, int semIdx, devregarea_t *devRegPtr);
+HIDDEN void handleNoUnblockedProcess(); /*might not need to  break into separate function for this one!!!!*/
+HIDDEN void resumeCurrentProcess();
+
+
+
+/*Global variables*/
 cpu_t curr_time_enter_interrupt;    /*value of TOD clock when at the time we enter the interrupts module (i.e what is the current time when the interrupt was generated?)*/
 cpu_t time_left;    /*Amount of time remaining in the current process' quantum slice (of 5ms) when the interrupt was generated*/
+
+
+
+/**************************************************************************** 
+ * getInterruptLine()
+ * params:
+ * return: None
+
+ *****************************************************************************/
+int getInterruptLine(){
+    if ((savedExceptState->s_cause & LINE3MASK) != STATUS_ALL_OFF) return LINE3;
+    if ((savedExceptState->s_cause & LINE4MASK) != STATUS_ALL_OFF) return LINE4;
+    if ((savedExceptState->s_cause & LINE5MASK) != STATUS_ALL_OFF) return LINE5;
+    if ((savedExceptState->s_cause & LINE6MASK) != STATUS_ALL_OFF) return LINE6;
+    if ((savedExceptState->s_cause & LINE7MASK) != STATUS_ALL_OFF) return LINE7;
+    return -1;  /* No interrupt detected */
+}
 
 
 
@@ -42,7 +71,65 @@ void getDevNum(line_num){
     return -1;
 }
 
+/**************************************************************************** 
+ * unblockProcess()
+ * Helper function to unblock a process waiting on a device semaphore
+ * params:
+ * return:
 
+ *****************************************************************************/
+pcb_PTR unblockProcess(int semIndex, int statusCode){
+    pcb_PTR proc = removeBlocked(&deviceSemaphores[semIndex]);
+    if (proc != NULL){
+        deviceSemaphores[semIndex]++;
+        proc->p_s.s_v0 = statusCode;
+        softBlockCnt--;
+        insertProcQ(&ReadyQueue,proc);
+    }
+    return proc;
+}
+
+
+/**************************************************************************** 
+ * handleDeviceInterrupt()
+ * params:
+ * return: pointer to PCB of the unblocked process if the process was waiting
+ *         else NULL if no process was blocked
+
+ *****************************************************************************/
+pcb_PTR handleDeviceInterrupt(int lineNum, int devNum, int semIdx, devregarea_t *devRegPtr){
+    int status_code;
+     /* Handle Terminal Devices (Line 7) */
+     if ((lineNum == LINE7) && ((devRegPtr->devreg[semIdx].t_transm_status & TERM_DEV_STATUSFIELD_ON) != READY)) {
+        status_code = devRegPtr->devreg[semIdx].t_transm_status;
+        devRegPtr->devreg[semIdx].t_transm_command = ACK;
+        return unblockProcess(semIdx + DEVPERINT, status_code);
+    }
+
+    /* Handle Other Devices and Terminal Reception */
+    status_code = devRegPtr->devreg[semIdx].t_recv_status;
+    devRegPtr->devreg[semIdx].t_recv_command = ACK;
+    return unblockProcess(semIdx, semIdx);
+}
+
+
+/**************************************************************************** 
+ * handleNoUnblockedProcess()
+ * params:
+ * return: pointer to PCB of the unblocked process if the process was waiting
+ *         else NULL if no process was blocked
+
+ *****************************************************************************/
+void handleNoUnblockedProcess(){
+    if (currProc == NULL){
+        switchProcess();
+    } else{
+        update_pcb_state();
+        currProc->p_time += (curr_time_enter_interrupt - time_of_day_start);
+        setTIMER(time_left);
+        swContext(currProc);
+    }
+}
 
 /**************************************************************************** 
  * nontimerInterruptHandler()

@@ -28,7 +28,7 @@ HIDDEN void systemIntervalInterruptHandler();
 
 /*Helper Functions*/
 HIDDEN int getInterruptLine();
-HIDDEN void getDevNum();
+HIDDEN int getDevNum();
 HIDDEN pcb_PTR unblockProcess(int semIndex, int statusCode);
 HIDDEN pcb_PTR handleDeviceInterrupt(int lineNum, int devNum, int semIdx, devregarea_t *devRegPtr);
 HIDDEN void handleNoUnblockedProcess(); /*might not need to  break into separate function for this one!!!!*/
@@ -39,7 +39,6 @@ HIDDEN void resumeCurrentProcess();
 /*Global variables*/
 cpu_t curr_time_enter_interrupt;    /*value of TOD clock when at the time we enter the interrupts module (i.e what is the current time when the interrupt was generated?)*/
 cpu_t time_left;    /*Amount of time remaining in the current process' quantum slice (of 5ms) when the interrupt was generated*/
-
 
 
 /**************************************************************************** 
@@ -67,7 +66,16 @@ int getInterruptLine(){
  * return: None
 
  *****************************************************************************/
-void getDevNum(line_num){
+int getDevNum(int line_num){
+    devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR; /* Get the Device Register Area */
+    unsigned int bitMap = devRegArea->interrupt_dev[line_num - OFFSET]; /* Get Interrupt Devices Bit Map */
+    /* Scan through the 8 possible devices using bitwise operations */
+    for (int i = 0; i < DEVPERINT; i++) {
+        if (bitMap & (1 << i)) { /* Check if bit i is set */
+            return i; /* Return the first (highest-priority) device with a pending interrupt */
+        }
+    }
+    /*No pending interrupts*/
     return -1;
 }
 
@@ -154,88 +162,40 @@ void nontimerInterruptHandler(state_PTR procState) {
     - consider to change to memaddr 
     - need to consider dereferencing
     */
-
-    int deviceNum;
-    int interrupt_line; /*stores which line generated the interrupt*/
-    int status_code;
+    
     cpu_t curr_time;    /*value on time of day clock (currently)*/
-    pcb_PTR unblockedProc;
-    devregarea_t *dev_reg_ptr; /*ptr to dev register area*/
-    int idx;
 
-    /*Find out which line caused the Interrupt (Highest Prio First)*/
-    if (((savedExceptState->s_cause) & LINE3MASK) != STATUS_ALL_OFF){
-        interrupt_line = LINE3;
-    }
-    else if (((savedExceptState->s_cause) & LINE4MASK) != STATUS_ALL_OFF){
-        interrupt_line = LINE4;
-    }
-    else if (((savedExceptState->s_cause) & LINE5MASK) != STATUS_ALL_OFF){
-        interrupt_line = LINE5;
-    }
-    else if (((savedExceptState->s_cause) & LINE6MASK) != STATUS_ALL_OFF){
-        interrupt_line = LINE6;
-    }
-    else {
-        interrupt_line = LINE7;
-    }
-
-    /*no valid interrupt line*/
-    if (interrupt_line < 0){
+    int lineNum = getInterruptLine();
+    if (lineNum < 0){
         return;
     }
 
-    /*Find out which device on the line generated the interrupt*/
-    /*deviceNum = getDevNum(interrupt_line);*/
-    dev_reg_ptr = (devregarea_t *) RAMBASEADDR;
-    idx = (interrupt_line - OFFSET) * DEVPERINT + deviceNum;
-
-    /*Get device status & acknowledge interrupt*/
+    int devNum = getDevNum(lineNum);
+    devregarea_t *devRegPtr = (devregarea_t *) RAMBASEADDR;
+    int semIdx = (lineNum - OFFSET) * DEVPERINT + devNum;
     
-    /*Line 7 has terminal devices, which contain 2 sub-devices - one for transmission, one for reception -> have to handle transmission separately*/
-    if ((interrupt_line == LINE7) && ((dev_reg_ptr->devreg[idx].t_transm_status & TERM_DEV_STATUSFIELD_ON) != READY)) {
-        status_code = dev_reg_ptr->devreg[idx].t_transm_status;
-        dev_reg_ptr->devreg[idx].t_transm_command = ACK;
-        unblockedProc = removeBlocked(&deviceSemaphores[idx + DEVPERINT]);
-        deviceSemaphores[idx+DEVPERINT]++;
-    }
-    /*Line 7 Reception or Other Lines*/
-    else{
-        status_code = dev_reg_ptr->devreg[idx].t_recv_status;
-        dev_reg_ptr->devreg[idx].t_recv_command = ACK;
-        unblockedProc = removeBlocked(&deviceSemaphores[idx]);
-        deviceSemaphores[idx]++;
-    }
+    pcb_PTR unblockProcess = handleDeviceInterrupt(lineNum,devNum,semIdx,devRegPtr);
 
-    /*If there was a process unblocked*/
-    if (unblockedProc != NULL){
-        unblockedProc->p_s.s_v0 = status_code;
+    /*if there was a process unblocked after interrupt was handled*/
+    if (unblockProcess != NULL){
+        unblockProcess->p_s.s_v0 = devRegPtr->devreg[semIdx].t_recv_status;
+        insertProcQ(&ReadyQueue,unblockProcess);
         softBlockCnt--;
-        insertProcQ(&ReadyQueue,unblockedProc);
+    } else{
+        handleNoUnblockedProcess();
     }
 
-    /*Special Case: No process unblocked*/
-    if (unblockedProc == NULL){
-        if (currProc == NULL){
-            switchProcess();
-        }
-        else{
-            update_pcb_state();
-            currProc->p_time += (curr_time_enter_interrupt - time_of_day_start);
-            setTIMER(time_left);
-            swContext(currProc);
-        }
-    }
-
+    /*Restore execution to current process or if there's no currProc -> call scheduler to run next job*/
     if (currProc != NULL){
         update_pcb_state();
         setTIMER(time_left);
         currProc->p_time += (curr_time_enter_interrupt - time_of_day_start);
         STCK(curr_time);
-        unblockedProc->p_time += (curr_time - curr_time_enter_interrupt);
+        unblockProcess->p_time += (curr_time - curr_time_enter_interrupt);
         swContext(currProc);
     }
     switchProcess();
+
 }
 
 

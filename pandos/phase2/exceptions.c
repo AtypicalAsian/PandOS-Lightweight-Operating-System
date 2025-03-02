@@ -279,12 +279,12 @@ void getSupportData(){
 
 
 /**************************************************************************** 
- * exceptionHandlerSwitch()
+ * exceptionPassUpHandler()
  * params:
  * return: None
 
  *****************************************************************************/
-void exceptionHandlerSwitch(int exceptionCode){
+void exceptionPassUpHandler(int exceptionCode){
     /*If current process has a support structure -> pass up exception to the exception handler */
     if (currProc->p_supportStruct != NULL){
         copyState(savedExceptState, &(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
@@ -382,7 +382,7 @@ void sysTrapHandler(){
 
  *****************************************************************************/
 void tlbTrapHanlder(){
-    exceptionHandlerSwitch(PGFAULTEXCEPT);
+    exceptionPassUpHandler(PGFAULTEXCEPT);
 }
 
 /**************************************************************************** 
@@ -392,7 +392,7 @@ void tlbTrapHanlder(){
 
  *****************************************************************************/
 void prgmTrapHandler(){
-    exceptionHandlerSwitch(PGFAULTEXCEPT);
+    exceptionPassUpHandler(PGFAULTEXCEPT);
 }
 
 

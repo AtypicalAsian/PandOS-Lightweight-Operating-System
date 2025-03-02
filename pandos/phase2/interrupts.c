@@ -132,3 +132,15 @@ void pltInterruptHandler() {
 void systemIntervalInterruptHandler() {
     /* TO-DO: implementation */
 }
+
+
+/**************************************************************************** 
+ * interruptsHandler()
+ * This is the entrypoint to the interrupts.c module when handling interrupts
+ * params:
+ * return: None
+
+ *****************************************************************************/
+void interruptsHandler(){
+
+}

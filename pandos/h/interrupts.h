@@ -6,5 +6,5 @@
  * Declaration file for interrupts handler module
  ****************************************************************************/
 #include "../h/types.h"
-extern void intTrapH();
+extern void interruptsHandler();
 #endif

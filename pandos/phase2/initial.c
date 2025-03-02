@@ -82,10 +82,10 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
      * 1. Retrieves the saved processor state from BIOSDATAPAGE to analyze the exception.
      * 2. Extracts the exception code from the cause register to determine the type of exception.
      * 3. Delegates handling based on exception type:
-     *      a. Device Interrupts (Code 0) → processing passed to device interrupt handler -> Calls intTrapH().
-     *      b. TLB Exceptions (Codes 1-3) → processing passed to TLB exception handler -> Calls tlbTrapH().
-     *      c. System Calls (Code 8) → processing passed to syscall exception handler -> Calls sysTrapH().
-     *      d. Program Traps (Code 4-7,9-12) → processing passed to program trap exception handler → Calls pgmTrapH().
+     *      a. Device Interrupts (Code 0) → processing passed to device interrupt handler -> Calls interruptsHandler().
+     *      b. TLB Exceptions (Codes 1-3) → processing passed to TLB exception handler -> Calls 
+     *      c. System Calls (Code 8) → processing passed to syscall exception handler -> Calls 
+     *      d. Program Traps (Code 4-7,9-12) → processing passed to program trap exception handler → Calls 
 
     *****************************************************************************/
     
@@ -98,7 +98,7 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
 
     if (exception_code == INTCONST) {  
         /* Case 1: Exception Code 0 - Device Interrupt */
-        intTrapH();  /* call the Nucleus' device interrupt handler function */
+        interruptsHandler();  /* call the Nucleus' device interrupt handler function */
     }  
     else if (exception_code >= 1 && exception_code <= 3) {  
         /* Case 2: Exception Codes 1-3 - TLB Exceptions */

@@ -37,6 +37,18 @@ int syscallNo;
 
 
 /**************************************************************************** 
+ * update_pcb_state()
+ * Helper function
+ * params:
+ * return: None
+
+ *****************************************************************************/
+void update_pcb_state(){
+    copyState(savedExceptState,&(currProc->p_s));
+}
+
+
+/**************************************************************************** 
  * blockCurrProc()
  * Helper function that performs the ops necessary when blocking a process.
  * This involves updating the accumulated CPU time for the current process,

@@ -107,26 +107,19 @@ void pltInterruptHandler() {
     5. Call the scheduler to select the next process to run.
     */
 
-    setTIMER(SCHED_TIME_SLICE); 
-
-    /* Consider to remove this block since we do not need to switch process
-    */
-    if (currProc == NULL) {
-        switchProcess();
+    cpu_t curr_time;
+    /*If there is no running process when the interrupt was generated*/
+    if (currProc == NULL){
+        PANIC(); /*stop the system*/
     }
 
-    /* Make a call to getCPUTime() to retrieve current time */
-    curr_time = getTIMER();
-    STCK(curr_time); 
-    currProc->p_time += (curr_time - time_of_day_start); 
-
-    /* Note: memcpy is a built-in void in string.h */
-    /* Save the processor state */
-    memcpy(&(currProc->p_s), (state_t *) BIOSDATAPAGE, sizeof(state_t));
-
-    insertProcQ(&ReadyQueue, currProc);
+    /*If there is a running process when the interrupt was generated*/
+    setTIMER(LARGETIME);
+    update_pcb_state();
+    STCK(curr_time);
+    currProc->p_time += (curr_time - time_of_day_start);
+    insertProcQ(&ReadyQueue,currProc);
     currProc = NULL;
-
     switchProcess();
 }
 

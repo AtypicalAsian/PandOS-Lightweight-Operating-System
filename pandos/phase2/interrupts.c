@@ -140,11 +140,42 @@ void pltInterruptHandler() {
 
  *****************************************************************************/
 void systemIntervalInterruptHandler() {
-    /* TO-DO: implementation */
+    /* 
+    BIG PICTURE: 
+    1. Load Interval Timer with 100ms
+    2. Unblock ALL pcbs blocked on the Pseudo-clock semaphore.
+    3. Reset the Pseudo-clock semaphore to zero. This insures that all SYS7 calls
+        block and that the Pseudo-clock semaphore does not grow positive
+    4. Perform a LDST on the saved exception state -> return control to curr process
+
+    5. If no currProc to return control to -> executes WAIT()
+    */
+
+    pcb_PTR unblockedProc; /*pointer to a process being unblocked*/
     LDIT(INITTIMER);
 
+
     /*unblock (wake-up) all pcbs blocked on the Pseudo-Clock Semaphore*/
-    
+    while (headBlocked(&deviceSemaphores[PSEUDOCLOCKIDX]) != NULL){
+        unblockedProc = removeBlocked(&deviceSemaphores[PSEUDOCLOCKIDX]);
+        softBlockCnt--;
+        insertProcQ(&ReadyQueue,unblockedProc);
+    }
+
+    /*Reset Pseudo-Clock Semaphore*/
+    deviceSemaphores[PSEUDOCLOCKIDX] = PSEUDOCLOCKSEM4INIT;
+
+    /*Return control to the current process (if curr proc not NULL)*/
+    if (currProc != NULL){
+        setTIMER(time_left);
+        update_pcb_state();
+        currProc->p_time += (curr_time - time_of_day_start);
+        swContext(currProc);    /*return control to current process (switch back to context of current process)*/
+    }
+
+    /*If no curr process to return to -> call scheduler to run next job*/
+    switchProcess();
+
 }
 
 

@@ -85,7 +85,7 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
      *      a. Device Interrupts (Code 0) → processing passed to device interrupt handler -> Calls interruptsHandler().
      *      b. TLB Exceptions (Codes 1-3) → processing passed to TLB exception handler -> Calls 
      *      c. System Calls (Code 8) → processing passed to syscall exception handler -> Calls 
-     *      d. Program Traps (Code 4-7,9-12) → processing passed to program trap exception handler → Calls 
+     *      d. Program Traps (Code 4-7,9-12) → processing passed to program trap exception handler → Calls e
 
     *****************************************************************************/
     

@@ -113,6 +113,11 @@
 /*interval timer intialized to 100ms in main() of initial.c*/
 #define INITTIMER       100000
 
+/*Pseudo-clock index in the device semaphores list*/
+#define PSEUDOCLOCKIDX  (MAXDEVICECNT-1)
+
+#define PSEUDOCLOCKSEM4INIT 0
+
 /*Initial values for process count, softBlockCount, device semaphores, accumulated time for a process that has been created*/
 #define INITSBLOCKCNT   0   /*initial soft block count*/
 #define INITPROCCNT     0   /*initial process count*/

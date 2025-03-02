@@ -265,7 +265,7 @@ void waitForClock(){
 
 
 /**************************************************************************** 
- * getSupportData() - SYS7
+ * getSupportData() - SYS8
  * params:
  * return: None
 

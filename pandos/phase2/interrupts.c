@@ -97,6 +97,14 @@ void nontimerInterruptHandler(state_PTR procState) {
     LDST(&(unblockedProc->p_s));
 }
 
+
+
+/**************************************************************************** 
+ * pltInterruptHandler()
+ * params:
+ * return: None
+
+ *****************************************************************************/
 void pltInterruptHandler() {
     /* 
     BIG PICTURE: 
@@ -123,8 +131,20 @@ void pltInterruptHandler() {
     switchProcess();
 }
 
+
+
+/**************************************************************************** 
+ * systemIntervalInterruptHandler()
+ * params:
+ * return: None
+
+ *****************************************************************************/
 void systemIntervalInterruptHandler() {
     /* TO-DO: implementation */
+    LDIT(INITTIMER);
+
+    /*unblock (wake-up) all pcbs blocked on the Pseudo-Clock Semaphore*/
+    
 }
 
 

@@ -61,11 +61,23 @@
 #define	LINE7MASK		0x00008000		/* constant for setting all bits to 0 in the Cause register except for bit 15 -> line 7 interrupts */
 
 
+/* Constants for the different line numbers an interrupt may occur on */
+#define	LINE1			1				/* constant representing line 1 */
+#define	LINE2			2				/* constant representing line 2 */
+#define	LINE3			3				/* constant representing line 3 */
+#define	LINE4			4				/* constant representing line 4 */
+#define	LINE5			5				/* constant representing line 5 */
+#define	LINE6			6				/* constant representing line 6 */
+#define	LINE7			7				/* constant representing line 7 */
+
+/* Constant that represents when the first four bits in a terminal device's device register's status field are turned on */
+#define	TERM_DEV_STATUSFIELD_ON		0x0F
+
 /* device register field number for non-terminal devices */
 #define STATUS			  0
 #define COMMAND			  1
-#define DATA0			    2
-#define DATA1			    3
+#define DATA0			  2
+#define DATA1			  3
 
 /* device register field number for terminal devices */
 #define RECVSTATUS  	0

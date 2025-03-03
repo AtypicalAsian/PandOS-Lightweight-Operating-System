@@ -86,6 +86,9 @@ typedef struct support_t {
 	int				sup_asid;				/* process Id (asid) */
 	state_t			sup_exceptState[2];		/* stored except states */
 	context_t		sup_exceptContext[2];	/* pass up contexts */
+	pte_entry_t		sup_privatePgTbl[32];	/* the user process's page table */
+	int				sup_stackTLB[500];		/* the stack area for the process' TLB exception handler */
+	int				sup_stackGen[500];		/* the stack area for the process' general exception handler */
 } support_t;
 
 /* Process Control Block (PCB) type */

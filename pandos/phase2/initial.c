@@ -33,12 +33,18 @@ To view version history and changes:
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../h/pcb.h"
-#include "/usr/include/umps3/umps/libumps.h"
-
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
 #include "../h/interrupts.h"
 
+#include "/usr/include/umps3/umps/libumps.h"
+
+/**************************************************************************** 
+ * METHOD DECLARATIONS
+ *****************************************************************************/
+extern void test(); /*Function to help debug the Nucleus, defined in the test file for this module*/
+HIDDEN void gen_exception_handler(); /* hidden function that is responsible for handling general exceptions */
+extern void uTLB_RefillHandler(); /*this function is a placeholder function not implemented in Phase 2 and whose code is provided. This function implementation will be replaced when the support level is implemented*/
 
 /**************************************************************************** 
  * GLOBAL VARIABLES DECLARATIONS
@@ -54,13 +60,6 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
 
 
 /**************************************************************************** 
- * METHOD DECLARATIONS
- *****************************************************************************/
- HIDDEN void exception_handler(); /* hidden function that is responsible for handling general exceptions */
- extern void uTLB_RefillHandler(); /*this function is a placeholder function not implemented in Phase 2 and whose code is provided. This function implementation will be replaced when the support level is implemented*/
- extern void test(); /*Function to help debug the Nucleus, defined in the test file for this module*/
-
-/**************************************************************************** 
  * METHOD IMPLEMENTATIONS
  *****************************************************************************/
 
@@ -73,7 +72,7 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
  * return: None
 
  *****************************************************************************/
- void exception_handler(){
+ void gen_exception_handler(){
 
     /**************************************************************************** 
      * BIG PICTURE
@@ -87,9 +86,8 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
 
     *****************************************************************************/
     
-    
-    int exception_code; /* Stores the extracted exception type */  
     state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
+    int exception_code; /* Stores the extracted exception type */  
 
     saved_state = (state_t *) BIOSDATAPAGE;  /* Retrieve the saved processor state from BIOS data page */
     exception_code = ((saved_state->s_cause) & GETEXCPCODE) >> CAUSESHIFT; /* Extract exception code from the cause register */
@@ -98,18 +96,16 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
         /* Case 1: Exception Code 0 - Device Interrupt */
         interruptsHandler();  /* call the Nucleus' device interrupt handler function */
     }  
-    else if (exception_code >= CONST1 && exception_code <= CONST3) {  
+    if (exception_code <= CONST3) {  
         /* Case 2: Exception Codes 1-3 - TLB Exceptions */
         tlbTrapHanlder();  /* call the Nucleus' TLB exception handler function */
     }  
-    else if (exception_code == SYSCONST) {  
+    if (exception_code == SYSCONST) {  
         /* Case 3: Exception Code 8 - System Calls */
         sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
-    }  
-    else {  
-        /* Case 4: All Other Exceptions - Program Traps */
-        prgmTrapHandler();  /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
     }
+    /* Case 4: All Other Exceptions - Program Traps */
+    prgmTrapHandler(); /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
  }
 
 
@@ -165,30 +161,29 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
     memaddr topRAM; /* the address of the last RAM frame */
     devregarea_t *dra; /* device register area that used to determine RAM size */
 
-    /*Initialize passUp vector fields*/
-    proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer to the address (0x0FFFF900) defined in const.h*/
-    proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
-    proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
-    proc0_passup_vec->execption_handler = (memaddr) exception_handler;      /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
-    proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
-
-
-    /*2. Initialize Level 2 data structures*/
-    initPcbs(); /*Set up the Process Control Block (PCB) free list.*/
-    initASL(); /*Set up the Active Semaphore List (ASL).*/
-
-
-    /*3. Initialize nucleus maintained variables*/
+    ReadyQueue = mkEmptyProcQ();  /*Initialize the Ready Queue*/
+    currProc = NULL;  /*No process is running initially */
+    procCnt = INITPROCCNT;  /*No active processes yet*/
+    softBlockCnt = INITSBLOCKCNT;  /*No soft-blocked processes*/
 
     /*Initialize device semaphores*/
     int i;
     for (i = 0; i < MAXDEVICECNT; i++) {
         deviceSemaphores[i] = INITDEVICESEM;
     }
-    ReadyQueue = mkEmptyProcQ();  /*Initialize the Ready Queue*/
-    currProc = NULL;  /*No process is running initially */
-    procCnt = INITPROCCNT;  /*No active processes yet*/
-    softBlockCnt = INITSBLOCKCNT;  /*No soft-blocked processes*/
+
+    /*2. Initialize Level 2 data structures*/
+    initPcbs(); /*Set up the Process Control Block (PCB) free list.*/
+    initASL(); /*Set up the Active Semaphore List (ASL).*/
+
+    /*Initialize passUp vector fields*/
+    proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer to the address (0x0FFFF900) defined in const.h*/
+    proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
+    proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
+    proc0_passup_vec->execption_handler = (memaddr) gen_exception_handler;      /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
+    proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
+
+
 
     /*4. Configure System Timer (Load the system-wide Interval Timer with 100 milliseconds)*/
     LDIT(INITTIMER);  /*Set interval timer to 100ms*/
@@ -210,10 +205,11 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
         topRAM = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
 
         /*Initialize the process state*/
-        first_proc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
         first_proc->p_s.s_sp = topRAM; /*Stack pointer set to top of RAM*/
         first_proc->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
         first_proc->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
+        first_proc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
+
 
         /*Add process to Ready Queue & update process count */
         insertProcQ(&ReadyQueue, first_proc);       /*insert first process into ready queue*/

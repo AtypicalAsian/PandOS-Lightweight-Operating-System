@@ -192,7 +192,7 @@
 
 #define LINENUM7        7
 
-/*Cause Register Constansts (used in exception_handler in initial.c)*/
+/*Cause Register Constansts (used in gen_exception_handler in initial.c)*/
 #define CAUSESHIFT      2       /**/
 #define GETEXCPCODE     0x0000007C /*set Cause register bits to 0 except for ExcCode field*/
 #define INTCONST		0			/* exception code signaling an interrupt occurred */

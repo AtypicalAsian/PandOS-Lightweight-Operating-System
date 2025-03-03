@@ -22,11 +22,11 @@ To view version history and changes:
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../h/pcb.h"
-#include "/usr/include/umps3/umps/libumps.h"
-
 #include "../h/scheduler.h"
 #include "../h/interrupts.h"
 #include "../h/initial.h"
+
+#include "/usr/include/umps3/umps/libumps.h"
 
 
 
@@ -41,10 +41,10 @@ To view version history and changes:
  *****************************************************************************/
 void copyState(state_PTR src, state_PTR dst){
     /*Copy all 4 control registers*/
-    dst->s_pc = src->s_pc;
-    dst->s_cause = src->s_cause;
     dst->s_entryHI = src->s_entryHI;
+    dst->s_cause = src->s_cause;
     dst->s_status = src->s_status;
+    dst->s_pc = src->s_pc;
 
     /*Copy 31 general purpose registers*/
     int i;
@@ -109,7 +109,7 @@ void switchProcess() {
     }
 
     /*at least one "blocked" process*/
-    if ((softBlockCnt > INITSBLOCKCNT) && (procCnt > INITPROCCNT)){
+    if ((procCnt > INITPROCCNT) && (softBlockCnt > INITSBLOCKCNT)){
         setSTATUS(STATUS_ALL_OFF |  STATUS_INT_ON | STATUS_IECON);
         setTIMER(LARGETIME);
         WAIT();

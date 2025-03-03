@@ -13,13 +13,12 @@ To view version history and changes:
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../h/pcb.h"
-#include "/usr/include/umps3/umps/libumps.h"
-
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
 #include "../h/interrupts.h"
 #include "../h/initial.h"
 
+#include "/usr/include/umps3/umps/libumps.h"
 
 /*function prototypes*/
 HIDDEN void blockCurrProc(int *sem);
@@ -84,21 +83,23 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
     - Increment the process count to track active processes.
     - Return success (0) in the caller's v0 register.
     */
-    pcb_PTR newProc = allocPcb(); 
-    if (newProc == NULL) {
+    pcb_PTR newProc;
+    newProc = allocPcb();
+    if (newProc != NULL){
+        copyState(stateSYS, &(newProc->p_s));        /*perform deep copy of processor state - 31 general and 4 control registers*/
+        newProc->p_supportStruct = suppStruct;      
+        newProc->p_time = INITIAL_TIME; 
+        newProc->p_semAdd = NULL; 
+     
+        insertChild(currProc, newProc); 
+        insertProcQ(&ReadyQueue, newProc); 
+
+        currProc->p_s.s_v0 = SUCCESS;
+        procCnt++;
+    }
+    else{
         currProc->p_s.s_v0 = NULL_PTR_ERROR;
     }
-    
-    copyState(stateSYS, &(newProc->p_s));        /*perform deep copy of processor state - 31 general and 4 control registers*/
-    newProc->p_supportStruct = suppStruct;      
-    newProc->p_time = INITIAL_TIME; 
-    newProc->p_semAdd = NULL; 
-     
-    insertChild(currProc, newProc); 
-    insertProcQ(&ReadyQueue, newProc); 
-
-    currProc->p_s.s_v0 = SUCCESS;
-    procCnt++;
 
     STCK(curr_time);
     currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
@@ -111,26 +112,28 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
  * return: None
 
  *****************************************************************************/
-void terminateProcess(pcb_PTR proc) {  
+void terminateProcess(pcb_PTR proc) {
+    int *processSem; /*ptr to sempahore of the current Process*/
+    processSem = proc->p_semAdd;
+
     /* Recursively terminate all child processes */
-    while (!emptyChild(proc)) {  
-        pcb_PTR child = removeChild(proc);  
-        terminateProcess(child);  
-    }  
+    while (!(emptyChild(proc))){
+        terminateProcess(removeChild(proc));
+    }
+    
 
     /* Remove the process from its current state (Running, Blocked, or Ready) */
     if (proc == currProc) {  
         /* If the process is currently running, detach it from its parent */
         outChild(proc);  
     }  
-    else if (proc->p_semAdd != NULL) {  
+    else if (processSem != NULL) {  
         /* If the process is blocked, remove it from the ASL */
-        outBlocked(proc);  
-
-        /* If the process was NOT blocked on a device semaphore, increment the semaphore */
-        if (proc->p_semAdd < &deviceSemaphores[DEV0] || proc->p_semAdd > &deviceSemaphores[INDEXCLOCK]) {  
-            (*(proc->p_semAdd))++;  
-        }  
+        outBlocked(proc);
+        
+        if (!(processSem >= &deviceSemaphores[DEV0] && processSem <= &deviceSemaphores[INDEXCLOCK])){ /* if proc is not blocked on a device semaphore */
+			(*(processSem))++; /* incrementing the val of sema4*/
+		}
         else {  
             softBlockCnt--;  /* Decrease soft-blocked process count */
         }  
@@ -142,7 +145,8 @@ void terminateProcess(pcb_PTR proc) {
 
     /* Free the process and update system counters */
     freePcb(proc);  
-    procCnt--;  
+    procCnt--;
+    proc = NULL;
 }
 
 
@@ -187,14 +191,10 @@ void verhogen(int *sem) {
     - Remove the first blocked process from ASL if there are any.
     - If there exists a process, add it to ReadyQueue to proceed.
     */
-
-    pcb_PTR p;
     (*sem)++;
     if (*sem <= SEM4BLOCKED) {
-        p = removeBlocked(sem);
-        if (p != NULL) {
-            insertProcQ(&ReadyQueue,p);
-        }
+        pcb_PTR p = removeBlocked(sem);
+        insertProcQ(&ReadyQueue,p);
     }
     STCK(curr_time);
     currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
@@ -229,9 +229,9 @@ void verhogen(int *sem) {
         semIndex += DEVPERINT;
     }
 
+    softBlockCnt++;
     (deviceSemaphores[semIndex])--;
     blockCurrProc(&deviceSemaphores[semIndex]);
-    softBlockCnt++;
     switchProcess();
 
  }
@@ -257,8 +257,8 @@ void getCPUTime(){
  *****************************************************************************/
 void waitForClock(){
     (deviceSemaphores[INDEXCLOCK])--;
-    softBlockCnt++; 
-	blockCurrProc(&deviceSemaphores[INDEXCLOCK]); 
+    blockCurrProc(&deviceSemaphores[INDEXCLOCK]); 
+    softBlockCnt++;
 	switchProcess();
 }
 
@@ -286,9 +286,9 @@ void getSupportData(){
 void exceptionPassUpHandler(int exceptionCode){
     /*If current process has a support structure -> pass up exception to the exception handler */
     if (currProc->p_supportStruct != NULL){
-        copyState(savedExceptState, &(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
-        STCK(curr_time);
-        currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+        copyState(savedExceptState, &(currProc->p_supportStruct->sup_exceptState[exceptionCode])); /* copy saved exception state from BIOS Data Page to currProc's sup_exceptState field */
+        STCK(curr_time); /*get current time on TOD clock*/
+        currProc->p_time = currProc->p_time + (curr_time - time_of_day_start); /*update currProc with accumulated CPU time*/
         LDCXT(currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_stackPtr, currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_status,currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_pc);
     }
     /*Else, if no support structure -> terminate the current process and its children*/
@@ -314,20 +314,19 @@ void sysTrapHandler(){
     syscallNo = savedExceptState->s_a0;  
 
     /*Increment PC by 4 avoid infinite loops*/
-    savedExceptState->s_pc += WORDSIZE;
-
-    /*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
-    if (syscallNo < SYS1 || syscallNo > SYS8) {  
-        prgmTrapHandler();  /* Invalid syscall, treat as Program Trap */
-    }    
+    savedExceptState->s_pc = savedExceptState->s_pc + WORDLEN;
 
     /*Edge case: If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
-
     /*DOUBLE CHECK CONDITION*/
     if (((savedExceptState->s_status) & STATUS_USERPON) != STATUS_ALL_OFF){
         savedExceptState->s_cause = (savedExceptState->s_cause) & RESINSTRCODE; /* Set exception cause to Reserved Instruction */
         prgmTrapHandler();  /* Handle it as a Program Trap */
     } 
+
+    /*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
+    if ((syscallNo < SYS1) || (syscallNo > SYS8)) {  
+        prgmTrapHandler();  /* Invalid syscall, treat as Program Trap */
+    }
 
 
     /*save processor state into cur */
@@ -336,8 +335,7 @@ void sysTrapHandler(){
     /* Execute the appropriate syscall based on sysNum */
     switch (syscallNo) {  
         case SYS1:  
-            createProcess((state_PTR) currProc->p_s.s_a1, (support_t *) currProc->p_s.s_a2);  
-            break;  
+            createProcess((state_PTR) (currProc->p_s.s_a1), (support_t *) (currProc->p_s.s_a2));
 
         case SYS2:  
             terminateProcess(currProc);  
@@ -345,10 +343,10 @@ void sysTrapHandler(){
             switchProcess();
 
         case SYS3:  
-            passeren((int *) currProc->p_s.s_a1);  
+            passeren((int *) (currProc->p_s.s_a1));  
 
         case SYS4:  
-            verhogen((int *) currProc->p_s.s_a1);  
+            verhogen((int *) (currProc->p_s.s_a1));  
 
         case SYS5:  
             waitForIO(currProc->p_s.s_a1, currProc->p_s.s_a2, currProc->p_s.s_a3);  

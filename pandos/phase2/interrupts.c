@@ -14,13 +14,12 @@ To view version history and changes:
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../h/pcb.h"
-#include "/usr/include/umps3/umps/libumps.h"
-
-
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
 #include "../h/interrupts.h"
 #include "../h/initial.h"
+
+#include "/usr/include/umps3/umps/libumps.h"
 
 HIDDEN void nontimerInterruptHandler();
 HIDDEN void pltInterruptHandler();

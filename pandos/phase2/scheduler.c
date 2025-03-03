@@ -97,20 +97,26 @@ void swContext(pcb_PTR curr_proccess){
 
 void switchProcess() {
     currProc = removeProcQ(&ReadyQueue); /* Remove from ReadyQueue and set as current process */
+
+    /*if non-empty ReadyQueue*/
     if (currProc != NULL){
         setTIMER(SCHED_TIME_SLICE);
         swContext(currProc);
     }
 
+    /*if ReadyQueue is Empty*/
     if (procCnt == INITPROCCNT){
         HALT();
     }
 
+    /*at least one "blocked" process*/
     if ((softBlockCnt > INITSBLOCKCNT) && (procCnt > INITPROCCNT)){
         setSTATUS(STATUS_ALL_OFF |  STATUS_INT_ON | STATUS_IECON);
         setTIMER(LARGETIME);
         WAIT();
     }
+
+    /*deadlock -> PANIC()*/
     PANIC();
 }
     

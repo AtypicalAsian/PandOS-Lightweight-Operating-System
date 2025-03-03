@@ -139,6 +139,8 @@
 #define SCHED_TIME_SLICE 5  /*time slice for scheduler set to default 5ms*/
 #define FIRSTDEVIDX 0
 
+#define WORDSIZE     4
+
 
 /* Status Register Bitmask Constants (Processor State) */
 #define STATUS_ALL_OFF   0x0  /* Clears all bits in the Status register (useful for initializing or bitwise-OR operations) */

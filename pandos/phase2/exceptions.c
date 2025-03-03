@@ -97,8 +97,8 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
     insertChild(currProc, newProc); 
     insertProcQ(&ReadyQueue, newProc); 
 
-    procCnt++;
     currProc->p_s.s_v0 = SUCCESS;
+    procCnt++;
 
     STCK(curr_time);
     currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
@@ -171,8 +171,7 @@ void passeren(int *sem){
     /*return control to the Current Process*/
     STCK(curr_time);
     currProc->p_time = currProc->p_time + (curr_time -time_of_day_start);
-    STCK(time_of_day_start);
-    LDST(&(currProc->p_s));
+    swContext(currProc);
 }
 
 
@@ -190,7 +189,7 @@ void verhogen(int *sem) {
     */
 
     pcb_PTR p;
-    (*sem) ++;
+    (*sem)++;
     if (*sem <= SEM4BLOCKED) {
         p = removeBlocked(sem);
         if (p != NULL) {
@@ -199,8 +198,7 @@ void verhogen(int *sem) {
     }
     STCK(curr_time);
     currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
-    STCK(time_of_day_start);
-    LDST(&(currProc->p_s));
+    swContext(currProc);
 }
 
 
@@ -224,7 +222,8 @@ void verhogen(int *sem) {
     - Once the I/O completes, an interrupt will trigger a V operation, unblocking the process.
     - The process resumes and retrieves the device’s status from `deviceStatus[semIndex]`.
     */
-    int semIndex = (lineNum - OFFSET) * DEVPERINT + deviceNum;
+    int semIndex;
+    semIndex = ((lineNum - OFFSET) * DEVPERINT) + deviceNum;
 
     if (lineNum == LINENUM7 && readBool != TRUE) {
         semIndex += DEVPERINT;
@@ -315,22 +314,21 @@ void sysTrapHandler(){
     syscallNo = savedExceptState->s_a0;  
 
     /*Increment PC by 4 avoid infinite loops*/
-    savedExceptState->s_pc += 4;
+    savedExceptState->s_pc += WORDSIZE;
 
     /*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
     if (syscallNo < SYS1 || syscallNo > SYS8) {  
         prgmTrapHandler();  /* Invalid syscall, treat as Program Trap */
-        return;
     }    
 
     /*Edge case: If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
 
     /*DOUBLE CHECK CONDITION*/
-    if (((savedExceptState->s_status >> STATUS_KUc_SHIFT) & STATUS_KUc_MASK) == USER_MODE) {
-        savedExceptState->s_cause |= RESINSTRCODE;  /* Set exception cause to Reserved Instruction */
+    if (((savedExceptState->s_status) & STATUS_USERPON) != STATUS_ALL_OFF){
+        savedExceptState->s_cause = (savedExceptState->s_cause) & RESINSTRCODE; /* Set exception cause to Reserved Instruction */
         prgmTrapHandler();  /* Handle it as a Program Trap */
-        return;
-    }
+    } 
+
 
     /*save processor state into cur */
     update_pcb_state(currProc);  
@@ -344,32 +342,26 @@ void sysTrapHandler(){
         case SYS2:  
             terminateProcess(currProc);  
             currProc = NULL;  
-            switchProcess();  
-            break;  
+            switchProcess();
 
         case SYS3:  
             passeren((int *) currProc->p_s.s_a1);  
-            break;  
 
         case SYS4:  
             verhogen((int *) currProc->p_s.s_a1);  
-            break;  
 
         case SYS5:  
             waitForIO(currProc->p_s.s_a1, currProc->p_s.s_a2, currProc->p_s.s_a3);  
-            break;  
 
         case SYS6:  
             getCPUTime();  
-            break;  
 
         case SYS7:  
             waitForClock();  
-            break;  
 
         case SYS8:  
             getSupportData();  
-            break;  
+
     }  
 
 }
@@ -392,7 +384,7 @@ void tlbTrapHanlder(){
 
  *****************************************************************************/
 void prgmTrapHandler(){
-    exceptionPassUpHandler(PGFAULTEXCEPT);
+    exceptionPassUpHandler(GENERALEXCEPT);
 }
 
 

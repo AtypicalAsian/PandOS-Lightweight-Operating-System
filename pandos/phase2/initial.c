@@ -183,7 +183,8 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
     /*3. Initialize nucleus maintained variables*/
 
     /*Initialize device semaphores*/
-    for (int i = 0; i < MAXDEVICECNT; i++) {
+    int i;
+    for (i = 0; i < MAXDEVICECNT; i++) {
         deviceSemaphores[i] = INITDEVICESEM;
     }
     ReadyQueue = mkEmptyProcQ();  /*Initialize the Ready Queue*/

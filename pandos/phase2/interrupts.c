@@ -69,8 +69,10 @@ int getInterruptLine(){
 int getDevNum(int line_num){
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR; /* Get the Device Register Area */
     unsigned int bitMap = devRegArea->interrupt_dev[line_num - OFFSET]; /* Get Interrupt Devices Bit Map */
+    
     /* Scan through the 8 possible devices using bitwise operations */
-    for (int i = 0; i < DEVPERINT; i++) {
+    int i;
+    for (i = 0; i < DEVPERINT; i++) {
         if (bitMap & (1 << i)) { /* Check if bit i is set */
             return i; /* Return the first (highest-priority) device with a pending interrupt */
         }

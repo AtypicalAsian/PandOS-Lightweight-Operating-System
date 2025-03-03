@@ -98,7 +98,7 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
         /* Case 1: Exception Code 0 - Device Interrupt */
         interruptsHandler();  /* call the Nucleus' device interrupt handler function */
     }  
-    else if (exception_code >= 1 && exception_code <= 3) {  
+    else if (exception_code >= CONST1 && exception_code <= CONST3) {  
         /* Case 2: Exception Codes 1-3 - TLB Exceptions */
         tlbTrapHanlder();  /* call the Nucleus' TLB exception handler function */
     }  

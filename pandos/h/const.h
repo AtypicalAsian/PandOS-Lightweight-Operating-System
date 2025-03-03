@@ -108,6 +108,10 @@
 #define GENERALEXCEPT	  1
 
 
+#define CONST1  1
+#define CONST3  3
+
+
 /* Phase 1: Additional constants */
 #define MAXPROC 20
 #define MAXPROC_SEM 22

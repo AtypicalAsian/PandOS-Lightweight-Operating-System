@@ -302,5 +302,5 @@ void interruptsHandler(){
     if (((savedExceptState->s_cause) & LINE2MASK) != STATUS_ALL_OFF){
         systemIntervalInterruptHandler();
     }
-    /*nontimerInterruptHandler();*/
+    nontimerInterruptHandler();
 }

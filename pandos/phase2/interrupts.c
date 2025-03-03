@@ -7,9 +7,6 @@ To view version history and changes:
     - Remote GitHub Repo: https://github.com/AtypicalAsian/CS372-OS-Project
 ****************************************************************************/
 
-#include <string.h>  /* Required for memcpy */
-#include <stdio.h>
-
 #include "../h/asl.h"
 #include "../h/types.h"
 #include "../h/const.h"
@@ -219,19 +216,19 @@ void pltInterruptHandler() {
     */
 
     cpu_t curr_time;
-    /*If there is no running process when the interrupt was generated*/
-    if (currProc == NULL){
-        PANIC(); /*stop the system*/
-    }
 
     /*If there is a running process when the interrupt was generated*/
-    setTIMER(LARGETIME);
-    update_pcb_state();
-    STCK(curr_time);
-    currProc->p_time += (curr_time - time_of_day_start);
-    insertProcQ(&ReadyQueue,currProc);
-    currProc = NULL;
-    switchProcess();
+    if (currProc != NULL){
+        setTIMER(LARGETIME);
+        update_pcb_state();
+        STCK(curr_time);
+        currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+        insertProcQ(&ReadyQueue,currProc);
+        currProc = NULL;
+        switchProcess();
+    }
+    PANIC();
+
 }
 
 
@@ -261,8 +258,8 @@ void systemIntervalInterruptHandler() {
     /*unblock (wake-up) all pcbs blocked on the Pseudo-Clock Semaphore*/
     while (headBlocked(&deviceSemaphores[PSEUDOCLOCKIDX]) != NULL){
         unblockedProc = removeBlocked(&deviceSemaphores[PSEUDOCLOCKIDX]);
-        softBlockCnt--;
         insertProcQ(&ReadyQueue,unblockedProc);
+        softBlockCnt--;
     }
 
     /*Reset Pseudo-Clock Semaphore*/
@@ -272,7 +269,7 @@ void systemIntervalInterruptHandler() {
     if (currProc != NULL){
         setTIMER(time_left);
         update_pcb_state();
-        currProc->p_time += (curr_time_enter_interrupt - time_of_day_start);
+        currProc->p_time = currProc->p_time + (curr_time_enter_interrupt - time_of_day_start);
         swContext(currProc);    /*return control to current process (switch back to context of current process)*/
     }
 

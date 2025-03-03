@@ -98,7 +98,7 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
     insertProcQ(&ReadyQueue, newProc); 
 
     procCnt++;
-    currProc->p_s.s_v0 = READY;
+    currProc->p_s.s_v0 = SUCCESS;
 
     STCK(curr_time);
     currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);

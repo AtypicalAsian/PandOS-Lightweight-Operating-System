@@ -164,14 +164,15 @@
 #define SYS7              7
 #define SYS8              8
 
-
+/* Constants for returning values in v0 to the caller */
+#define ERRCONST		-1			/* constant denoting an error occurred in the caller's request */
+#define SUCCESS	        0			/* constant denoting that the caller's request completed successfully */
 
 /**/
 #define LARGETIME        0xFFFFFFFF
 #define INITIAL_TIME     0
 
 #define NULL_PTR_ERROR   -1
-#define READY            0
 
 
 #define SEM4BLOCKED     0

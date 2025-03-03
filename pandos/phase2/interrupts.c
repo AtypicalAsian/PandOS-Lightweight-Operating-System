@@ -25,9 +25,6 @@ HIDDEN void systemIntervalInterruptHandler();
 /*Helper Functions*/
 HIDDEN int getInterruptLine();
 HIDDEN int getDevNum();
-HIDDEN pcb_PTR unblockProcess(int semIndex, int statusCode);
-HIDDEN pcb_PTR handleDeviceInterrupt(int lineNum, int devNum, int semIdx, devregarea_t *devRegPtr);
-HIDDEN void handleNoUnblockedProcess(); /*might not need to  break into separate function for this one!!!!*/
 
 
 
@@ -94,48 +91,6 @@ pcb_PTR unblockProcess(int semIndex, int statusCode){
     return proc;
 }
 
-
-/**************************************************************************** 
- * handleDeviceInterrupt()
- * params:
- * return: pointer to PCB of the unblocked process if the process was waiting
- *         else NULL if no process was blocked
-
- *****************************************************************************/
-pcb_PTR handleDeviceInterrupt(int lineNum, int devNum, int semIdx, devregarea_t *devRegPtr){
-    int status_code;
-     /* Handle Terminal Devices (Line 7) */
-     if ((lineNum == LINE7) && ((devRegPtr->devreg[semIdx].t_transm_status & TERM_DEV_STATUSFIELD_ON) != READY)) {
-        status_code = devRegPtr->devreg[semIdx].t_transm_status;
-        devRegPtr->devreg[semIdx].t_transm_command = ACK;
-        return unblockProcess(semIdx + DEVPERINT, status_code);
-    }
-
-    /* Handle Other Devices and Terminal Reception */
-    status_code = devRegPtr->devreg[semIdx].t_recv_status;
-    devRegPtr->devreg[semIdx].t_recv_command = ACK;
-    return unblockProcess(semIdx, status_code);
-}
-
-
-/**************************************************************************** 
- * handleNoUnblockedProcess()
- * params:
- * return: pointer to PCB of the unblocked process if the process was waiting
- *         else NULL if no process was blocked
-
- *****************************************************************************/
-void handleNoUnblockedProcess(){
-    if (currProc == NULL){
-        switchProcess();
-    } else{
-        update_pcb_state();
-        currProc->p_time += (curr_time_enter_interrupt - time_of_day_start);
-        setTIMER(time_left);
-        swContext(currProc);
-    }
-}
-
 /**************************************************************************** 
  * nontimerInterruptHandler()
  * params:
@@ -160,41 +115,63 @@ void nontimerInterruptHandler() {
     - need to consider dereferencing
     */
     
-    cpu_t curr_time;    /*value on time of day clock (currently)*/
+    cpu_t curr_time; /*value on time of day clock (currently)*/
+    int lineNum;     /* The line number where the highest-priority interrupt occurred */
+    int devNum;      /* The device number where the highest-priority interrupt occurred */
+    int index;       /* Index in device register array of the interrupting device */
+    devregarea_t *devRegPtr; /* Pointer to the device register area */
+    int statusCode;  /* Status code from the interrupting device's device register */
+    pcb_PTR unblockedPcb; /* Process that originally initiated the I/O request */
 
-    /* Find out which line the interrupt occurred at */
-    int lineNum = getInterruptLine();
-    if (lineNum < 0){
-        return;
+    /* Step 1: Identify the interrupt line */
+    lineNum = getInterruptLine();
+
+    /* Step 2: Identify the specific device that triggered the interrupt */
+    devNum = getDevNum(lineNum);  
+    index = ((lineNum - OFFSET) * DEVPERINT) + devNum; /* Compute device index */
+    devRegPtr = (devregarea_t *) RAMBASEADDR;  /* Load device register area */
+
+     /* Step 3: Handle Terminal Device Interrupts */
+     if ((lineNum == LINE7) && (((devRegPtr->devreg[index].t_transm_status) & TERM_DEV_STATUSFIELD_ON) != READY)) {
+        /* Transmission (Write) Interrupt */
+        statusCode = devRegPtr->devreg[index].t_transm_status;
+        devRegPtr->devreg[index].t_transm_command = ACK; /* Acknowledge interrupt */
+        unblockedPcb = removeBlocked(&deviceSemaphores[index + DEVPERINT]); /* Unblock */
+        deviceSemaphores[index + DEVPERINT]++; /* Perform V operation */
+    } else {
+        /* Reception (Read) Interrupt or Non-Terminal Device Interrupt */
+        statusCode = devRegPtr->devreg[index].t_recv_status;
+        devRegPtr->devreg[index].t_recv_command = ACK; /* Acknowledge interrupt */
+        unblockedPcb = removeBlocked(&deviceSemaphores[index]); /* Unblock */
+        deviceSemaphores[index]++; /* Perform V operation */
     }
 
-    /*Find out which device on the line generated the interrupt*/
-    int devNum = getDevNum(lineNum);
-    devregarea_t *devRegPtr = (devregarea_t *) RAMBASEADDR;
-    int semIdx = (lineNum - OFFSET) * DEVPERINT + devNum;
-    
-    pcb_PTR unblockProcess = handleDeviceInterrupt(lineNum,devNum,semIdx,devRegPtr);
-
-    /*if there was a process unblocked after interrupt was handled*/
-    if (unblockProcess != NULL){
-        unblockProcess->p_s.s_v0 = devRegPtr->devreg[semIdx].t_recv_status;
-        insertProcQ(&ReadyQueue,unblockProcess);
-        softBlockCnt--;
-    } else{
-        handleNoUnblockedProcess();
+    /* Step 4: If no process was waiting for I/O, return control */
+    if (unblockedPcb == NULL) {
+        if (currProc != NULL) { /* Resume execution of current process */
+            update_pcb_state();
+            currProc->p_time = currProc->p_time + (curr_time_enter_interrupt - time_of_day_start);
+            setTIMER(time_left);
+            switchContext(currProc);
+        }
+        switchProcess();  /* Call scheduler if no current process exists */
     }
 
-    /*Restore execution to current process or if there's no currProc -> call scheduler to run next job*/
-    if (currProc != NULL){
+    /* Step 5: Process was unblocked, update its state */
+    unblockedPcb->p_s.s_v0 = statusCode; /* Store status code in `v0` */
+    insertProcQ(&ReadyQueue, unblockedPcb); /* Move process to Ready Queue */
+    softBlockCnt--; /* Decrement soft-blocked process count */
+
+    /* Step 6: Resume execution */
+    if (currProc != NULL) { 
         update_pcb_state();
         setTIMER(time_left);
-        currProc->p_time += (curr_time_enter_interrupt - time_of_day_start);
-        STCK(curr_time);
-        unblockProcess->p_time += (curr_time - curr_time_enter_interrupt);
-        swContext(currProc);
+        currProc->p_time = currProc->p_time + (curr_time_enter_interrupt - time_of_day_start);
+        STCK(curr_time); /* Get current time */
+        unblockedPcb->p_time =unblockedPcb->p_time + (curr_time - curr_time_enter_interrupt); /* Charge time */
+        switchContext(currProc);
     }
-    switchProcess();
-
+    switchProcess(); /* Call the scheduler */
 }
 
 

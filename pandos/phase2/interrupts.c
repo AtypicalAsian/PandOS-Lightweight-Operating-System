@@ -117,7 +117,7 @@ pcb_PTR handleDeviceInterrupt(int lineNum, int devNum, int semIdx, devregarea_t 
     /* Handle Other Devices and Terminal Reception */
     status_code = devRegPtr->devreg[semIdx].t_recv_status;
     devRegPtr->devreg[semIdx].t_recv_command = ACK;
-    return unblockProcess(semIdx, semIdx);
+    return unblockProcess(semIdx, status_code);
 }
 
 
@@ -165,11 +165,13 @@ void nontimerInterruptHandler(state_PTR procState) {
     
     cpu_t curr_time;    /*value on time of day clock (currently)*/
 
+    /* Find out which line the interrupt occurred at */
     int lineNum = getInterruptLine();
     if (lineNum < 0){
         return;
     }
 
+    /*Find out which device on the line generated the interrupt*/
     int devNum = getDevNum(lineNum);
     devregarea_t *devRegPtr = (devregarea_t *) RAMBASEADDR;
     int semIdx = (lineNum - OFFSET) * DEVPERINT + devNum;

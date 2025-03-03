@@ -96,37 +96,21 @@ void swContext(pcb_PTR curr_proccess){
 */
 
 void switchProcess() {
-
-    /*Step 1: Check if ReadyQueue is empty*/
-    /*ReadyQ empty*/
-    if (emptyProcQ(ReadyQueue)) {
-        /*no process started*/
-        if (procCnt == INITPROCCNT){
-            HALT();
-        }
-        if ((softBlockCnt > INITSBLOCKCNT) && (procCnt > INITPROCCNT)){
-            /*enable interrupts for status register to enter Wait State (execute wait instruction)*/
-            /*first we clear all bits in the status register, then enables global interrupts, then enable external interrupts by performing a bitwise OR*/
-            setSTATUS(STATUS_ALL_OFF |  STATUS_INT_ON | STATUS_IECON);
-            setTIMER(LARGETIME);
-            WAIT();
-        }
-        /*Else, when procCnt > 0 and softBlockCnt==0 -> deadlock happens*/
-        else{
-            PANIC();
-        }
+    currProc = removeProcQ(&ReadyQueue); /* Remove from ReadyQueue and set as current process */
+    if (currProc != NULL){
+        setTIMER(SCHED_TIME_SLICE);
+        swContext(currProc);
     }
 
-    /*Step 2: Select the next process to run since readyQ is non-empty*/
-    currProc = removeProcQ(&ReadyQueue); /* Remove from ReadyQueue and set as current process */
+    if (procCnt == INITPROCCNT){
+        HALT();
+    }
 
-    /*Step 3: Record Process Start Time*/
-    STCK(time_of_day_start);
-
-    /*Step 4: Set local timer (PLT) to 5ms*/
-    setTIMER(SCHED_TIME_SLICE);
-
-    /* Step 5: Load the process state*/
-    LDST(&(currProc->p_s));
+    if ((softBlockCnt > INITSBLOCKCNT) && (procCnt > INITPROCCNT)){
+        setSTATUS(STATUS_ALL_OFF |  STATUS_INT_ON | STATUS_IECON);
+        setTIMER(LARGETIME);
+        WAIT();
+    }
+    PANIC();
 }
     

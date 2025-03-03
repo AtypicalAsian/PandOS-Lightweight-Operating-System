@@ -140,7 +140,7 @@
 #define INITACCTIME     0   /*initial accumulated time for a process that has been created*/
 #define INITDEVICESEM   0   /*initial value for device semaphore*/
 
-#define SCHED_TIME_SLICE 5  /*time slice for scheduler set to default 5ms*/
+#define SCHED_TIME_SLICE 5000  /*time slice for scheduler set to default 5ms*/
 #define FIRSTDEVIDX 0
 
 #define WORDSIZE     4

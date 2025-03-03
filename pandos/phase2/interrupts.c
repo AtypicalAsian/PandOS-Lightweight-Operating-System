@@ -41,10 +41,10 @@ cpu_t time_left;    /*Amount of time remaining in the current process' quantum s
  *****************************************************************************/
 int getInterruptLine(){
     if ((savedExceptState->s_cause & LINE3MASK) != STATUS_ALL_OFF) return LINE3;
-    if ((savedExceptState->s_cause & LINE4MASK) != STATUS_ALL_OFF) return LINE4;
-    if ((savedExceptState->s_cause & LINE5MASK) != STATUS_ALL_OFF) return LINE5;
-    if ((savedExceptState->s_cause & LINE6MASK) != STATUS_ALL_OFF) return LINE6;
-    if ((savedExceptState->s_cause & LINE7MASK) != STATUS_ALL_OFF) return LINE7;
+    else if ((savedExceptState->s_cause & LINE4MASK) != STATUS_ALL_OFF) return LINE4;
+    else if ((savedExceptState->s_cause & LINE5MASK) != STATUS_ALL_OFF) return LINE5;
+    else if ((savedExceptState->s_cause & LINE6MASK) != STATUS_ALL_OFF) return LINE6;
+    else if ((savedExceptState->s_cause & LINE7MASK) != STATUS_ALL_OFF) return LINE7;
     return -1;  /* No interrupt detected */
 }
 

@@ -137,6 +137,7 @@
 #define INITDEVICESEM   0   /*initial value for device semaphore*/
 
 #define SCHED_TIME_SLICE 5  /*time slice for scheduler set to default 5ms*/
+#define FIRSTDEVIDX 0
 
 
 /* Status Register Bitmask Constants (Processor State) */

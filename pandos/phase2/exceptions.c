@@ -111,38 +111,37 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
  * return: None
 
  *****************************************************************************/
-void terminateProcess(pcb_PTR proc) {  
-    /* Recursively terminate all child processes */
-    while (!emptyChild(proc)) {  
-        pcb_PTR child = removeChild(proc);  
-        terminateProcess(child);  
-    }  
+void terminateProcess(pcb_PTR proc){ 
+	int *procSem; 
 
-    /* Remove the process from its current state (Running, Blocked, or Ready) */
-    if (proc == currProc) {  
-        /* If the process is currently running, detach it from its parent */
-        outChild(proc);  
-    }  
-    else if (proc->p_semAdd != NULL) {  
-        /* If the process is blocked, remove it from the ASL */
-        outBlocked(proc);  
 
-        /* If the process was NOT blocked on a device semaphore, increment the semaphore */
-        if (proc->p_semAdd < &deviceSemaphores[DEV0] || proc->p_semAdd > &deviceSemaphores[INDEXCLOCK]) {  
-            (*(proc->p_semAdd))++;  
-        }  
-        else {  
-            softBlockCnt--;  /* Decrease soft-blocked process count */
-        }  
-    }  
-    else {  
-        /* Otherwise, the process was in the Ready Queue, so remove it */
-        outProcQ(&ReadyQueue, proc);  
-    }  
+	procSem = proc->p_semAdd; 
 
-    /* Free the process and update system counters */
-    freePcb(proc);  
-    procCnt--;  
+	
+	while (!(emptyChild(proc))){ 
+		terminateProcess(removeChild(proc)); 
+	}
+
+
+	
+	if (proc == currProc){ 
+		outChild(proc);
+	}
+	else if (procSem != NULL){
+		outBlocked(proc);
+		if (!(procSem >= &deviceSemaphores[FIRSTDEVIDX] && procSem <= &deviceSemaphores[PSEUDOCLOCKIDX])){ 
+			(*(procSem))++;
+		}
+		else{
+			softBlockCnt--; 
+		}
+	} 
+	else{ 
+		outProcQ(&ReadyQueue, proc); 
+	}
+	freePcb(proc);
+	procCnt--; 
+	proc = NULL; 
 }
 
 

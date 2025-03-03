@@ -29,7 +29,7 @@ HIDDEN void passeren(int *sem);
 HIDDEN void verhogen(int *sem);
 HIDDEN void waitForIO(int lineNum, int deviceNum, int readBool);
 HIDDEN void getCPUTime();
-HIDDEN void waitForPClock();
+HIDDEN void waitForClock();
 HIDDEN void getSupportData();
 
 cpu_t curr_time;    /*stores the current time in the TOD clock*/
@@ -259,7 +259,7 @@ void getCPUTime(){
 void waitForClock(){
     (deviceSemaphores[INDEXCLOCK])--;
     softBlockCnt++; 
-	blockCurr(&deviceSemaphores[INDEXCLOCK]); 
+	blockCurrProc(&deviceSemaphores[INDEXCLOCK]); 
 	switchProcess();
 }
 
@@ -319,7 +319,7 @@ void sysTrapHandler(){
 
     /*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
     if (syscallNo < SYS1 || syscallNo > SYS8) {  
-        pgmTrapH();  /* Invalid syscall, treat as Program Trap */
+        prgmTrapHandler();  /* Invalid syscall, treat as Program Trap */
         return;
     }    
 
@@ -328,12 +328,12 @@ void sysTrapHandler(){
     /*DOUBLE CHECK CONDITION*/
     if (((savedExceptState->s_status >> STATUS_KUc_SHIFT) & STATUS_KUc_MASK) == USER_MODE) {
         savedExceptState->s_cause |= RESINSTRCODE;  /* Set exception cause to Reserved Instruction */
-        pgmTrapH();  /* Handle it as a Program Trap */
+        prgmTrapHandler();  /* Handle it as a Program Trap */
         return;
     }
 
     /*save processor state into cur */
-    updateCurrPcb(currProc);  
+    update_pcb_state(currProc);  
 
     /* Execute the appropriate syscall based on sysNum */
     switch (syscallNo) {  

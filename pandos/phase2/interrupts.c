@@ -32,7 +32,6 @@ HIDDEN int getDevNum();
 HIDDEN pcb_PTR unblockProcess(int semIndex, int statusCode);
 HIDDEN pcb_PTR handleDeviceInterrupt(int lineNum, int devNum, int semIdx, devregarea_t *devRegPtr);
 HIDDEN void handleNoUnblockedProcess(); /*might not need to  break into separate function for this one!!!!*/
-HIDDEN void resumeCurrentProcess();
 
 
 
@@ -147,7 +146,7 @@ void handleNoUnblockedProcess(){
  * return: None
 
  *****************************************************************************/
-void nontimerInterruptHandler(state_PTR procState) {
+void nontimerInterruptHandler() {
     /* 
     BIG PICTURE: 
     1. Find the pending interrupts from Cause Register (Processor 0, given its address is 0x0FFF.F000)

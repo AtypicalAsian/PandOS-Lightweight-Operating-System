@@ -22,7 +22,7 @@ To view version history and changes:
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../h/pcb.h"
-// #include "/usr/include/umps3/umps/libumps.h"
+#include "/usr/include/umps3/umps/libumps.h"
 
 #include "../h/scheduler.h"
 #include "../h/interrupts.h"
@@ -101,7 +101,7 @@ void switchProcess() {
     /*ReadyQ empty*/
     if (emptyProcQ(ReadyQueue)) {
         /*no process started*/
-        if (procCnt == 0){
+        if (procCnt == INITPROCCNT){
             HALT();
         }
         if ((softBlockCnt > INITSBLOCKCNT) && (procCnt > INITPROCCNT)){

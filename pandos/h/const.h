@@ -140,11 +140,13 @@
 
 
 /* Status Register Bitmask Constants (Processor State) */
-#define STATUS_ALL_OFF   0x00000000  /* Clears all bits in the Status register (useful for initializing or bitwise-OR operations) */
+#define STATUS_ALL_OFF   0x0  /* Clears all bits in the Status register (useful for initializing or bitwise-OR operations) */
 #define STATUS_IE_ENABLE 0x00000004  /* Enables global interrupts (IEp, bit 2 = 1) after LDST */
 #define STATUS_PLT_ON    0x08000000  /* Enables the Processor Local Timer (PLT) (TE, bit 27 = 1) */
 #define STATUS_INT_ON    0x0000FF00  /* Enables all external interrupts by setting the Interrupt Mask bits */
 #define STATUS_USERPON	 0x00000008	/* constant for setting the user-mode on after LDST (i.e., KUp (bit 3) = 1) */
+#define	STATUS_IECOFF	 0xFFFFFFFE	/* constant for disabling the global interrupt bit (i.e., IEc (bit 0) = 0) */
+#define STATUS_IECON	 0x00000001	/* constant for enabling the global interrupt bit (i.e., IEc (bit 0) = 1) */
 
 #define	RESINSTRCODE	 0xFFFFFF28
 

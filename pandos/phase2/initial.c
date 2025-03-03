@@ -210,7 +210,7 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
         topRAM = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
 
         /*Initialize the process state*/
-        first_proc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;   /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
+        first_proc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
         first_proc->p_s.s_sp = topRAM; /*Stack pointer set to top of RAM*/
         first_proc->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
         first_proc->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/

@@ -58,8 +58,6 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
  *****************************************************************************/
  HIDDEN void exception_handler(); /* hidden function that is responsible for handling general exceptions */
  extern void uTLB_RefillHandler(); /*this function is a placeholder function not implemented in Phase 2 and whose code is provided. This function implementation will be replaced when the support level is implemented*/
-
-
  extern void test(); /*Function to help debug the Nucleus, defined in the test file for this module*/
 
 /**************************************************************************** 
@@ -140,7 +138,7 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
      * - Set the Nucleus TLB-Refill event handler address
      * - Set Stack Pointer for Nucleus TLB-Refill event handler to top of Nucleus stack page (0x20001000)
      * - Set the Nucleus exception handler address to the address of your Level 3 Nucleus function that is to be the entry point for exception (and interrupt) handling
-     * - Set Stack Pointer for Nucleus exception handler to top of Nucleus stack page: 0x2000.1000
+     * - Set Stack Pointer for Nucleus exception handler to top of Nucleus stack page: 0x20001000
      * 
      * 2. Initialize Level 2 data structures
      * - Calls initPcbs() to set up the Process Control Block (PCB) free list.

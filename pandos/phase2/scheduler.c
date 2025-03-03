@@ -107,7 +107,7 @@ void switchProcess() {
         if ((softBlockCnt > INITSBLOCKCNT) && (procCnt > INITPROCCNT)){
             /*enable interrupts for status register to enter Wait State (execute wait instruction)*/
             /*first we clear all bits in the status register, then enables global interrupts, then enable external interrupts by performing a bitwise OR*/
-            setSTATUS(STATUS_ALL_OFF | STATUS_IE_ENABLE |  STATUS_INT_ON);
+            setSTATUS(STATUS_ALL_OFF |  STATUS_INT_ON | STATUS_IECON);
             setTIMER(LARGETIME);
             WAIT();
         }

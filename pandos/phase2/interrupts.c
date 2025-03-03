@@ -74,24 +74,6 @@ int getDevNum(int line_num){
 }
 
 /**************************************************************************** 
- * unblockProcess()
- * Helper function to unblock a process waiting on a device semaphore
- * params:
- * return:
-
- *****************************************************************************/
-pcb_PTR unblockProcess(int semIndex, int statusCode){
-    pcb_PTR proc = removeBlocked(&deviceSemaphores[semIndex]);
-    if (proc != NULL){
-        deviceSemaphores[semIndex]++;
-        proc->p_s.s_v0 = statusCode;
-        softBlockCnt--;
-        insertProcQ(&ReadyQueue,proc);
-    }
-    return proc;
-}
-
-/**************************************************************************** 
  * nontimerInterruptHandler()
  * params:
  * return: None
@@ -152,7 +134,7 @@ void nontimerInterruptHandler() {
             update_pcb_state();
             currProc->p_time = currProc->p_time + (curr_time_enter_interrupt - time_of_day_start);
             setTIMER(time_left);
-            switchContext(currProc);
+            swContext(currProc);
         }
         switchProcess();  /* Call scheduler if no current process exists */
     }
@@ -169,7 +151,7 @@ void nontimerInterruptHandler() {
         currProc->p_time = currProc->p_time + (curr_time_enter_interrupt - time_of_day_start);
         STCK(curr_time); /* Get current time */
         unblockedPcb->p_time =unblockedPcb->p_time + (curr_time - curr_time_enter_interrupt); /* Charge time */
-        switchContext(currProc);
+        swContext(currProc);
     }
     switchProcess(); /* Call the scheduler */
 }

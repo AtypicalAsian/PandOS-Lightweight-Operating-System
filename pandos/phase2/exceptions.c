@@ -32,7 +32,55 @@ HIDDEN void waitForClock();
 HIDDEN void getSupportData();
 
 
+
+
 int syscallNo;
+
+
+/**************************************************************************** 
+ * This function is responsible for handling general exceptions. It determines 
+ * the type of exception that occurred and delegates handling to the appropriate 
+ * exception handler.
+ * 
+ * params: None
+ * return: None
+
+ *****************************************************************************/
+void gen_exception_handler(){
+
+    /**************************************************************************** 
+     * BIG PICTURE
+     * 1. Retrieves the saved processor state from BIOSDATAPAGE to analyze the exception.
+     * 2. Extracts the exception code from the cause register to determine the type of exception.
+     * 3. Delegates handling based on exception type:
+     *      a. Device Interrupts (Code 0) → processing passed to device interrupt handler -> Calls interruptsHandler().
+     *      b. TLB Exceptions (Codes 1-3) → processing passed to TLB exception handler -> Calls 
+     *      c. System Calls (Code 8) → processing passed to syscall exception handler -> Calls 
+     *      d. Program Traps (Code 4-7,9-12) → processing passed to program trap exception handler → Calls e
+
+    *****************************************************************************/
+    
+    state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
+    int exception_code; /* Stores the extracted exception type */  
+
+    saved_state = (state_t *) BIOSDATAPAGE;  /* Retrieve the saved processor state from BIOS data page */
+    exception_code = ((saved_state->s_cause) & GETEXCPCODE) >> CAUSESHIFT; /* Extract exception code from the cause register */
+
+    if (exception_code == INTCONST) {  
+        /* Case 1: Exception Code 0 - Device Interrupt */
+        interruptsHandler();  /* call the Nucleus' device interrupt handler function */
+    }  
+    if (exception_code <= CONST3) {  
+        /* Case 2: Exception Codes 1-3 - TLB Exceptions */
+        tlbTrapHanlder();  /* call the Nucleus' TLB exception handler function */
+    }  
+    if (exception_code == SYSCONST) {  
+        /* Case 3: Exception Code 8 - System Calls */
+        sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
+    }
+    /* Case 4: All Other Exceptions - Program Traps */
+    prgmTrapHandler(); /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
+ }
 
 
 /**************************************************************************** 

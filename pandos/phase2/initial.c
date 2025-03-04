@@ -67,56 +67,40 @@ state_PTR savedExceptState; /* a pointer to the saved exception state */
 
 
 
-/***********************METHOD IMPLEMENTATIONS*********************************/
+/***********************HELPER METHODS***************************************/
 
-/**************************************************************************** 
- * This function is responsible for handling general exceptions. It determines 
- * the type of exception that occurred and delegates handling to the appropriate 
- * exception handler.
+/****************************************************************************
+ * populate_passUpVec()
  * 
- * params: None
- * return: None
+ *  
+ * @brief
+ * This function sets up the Pass-Up Vector, a data structure located in the  
+ * BIOS Data Page, which defines where the system should transfer control  
+ * when specific exceptions occur. Instead of the BIOS handling these exceptions  
+ * directly, the Pass-Up Vector redirects them to the Nucleus exception handlers,  
+ * allowing the kernel to manage them.  
+ * 
+ * 
+ * @protocol 
+ *  1. Retrieves the Pass-Up Vector from its memory location in the BIOS Data Page.  
+ *  2. Assigns the TLB-Refill Exception Handler to handle TLB exceptions, which occur  
+ *      when a virtual address translation is missing in the TLB.  
+ *  3. Sets the stack pointer for the TLB-Refill Exception Handler
+ *  4. Assigns the General Exception Handler to handle all other exceptions, including  
+ *      system calls, program traps, and device interrupts.  
+ *  6. Configures the stack pointer for the General Exception Handler
+ * 
+ * 
+ * @note  
+ * The Pass-Up Vector allows user-mode programs to trigger system calls and handle  
+ * exceptional conditions efficiently.  
+ * 
+ * 
+ * @param None
+ * @return None
+ * 
 
  *****************************************************************************/
- void gen_exception_handler(){
-
-    /**************************************************************************** 
-     * BIG PICTURE
-     * 1. Retrieves the saved processor state from BIOSDATAPAGE to analyze the exception.
-     * 2. Extracts the exception code from the cause register to determine the type of exception.
-     * 3. Delegates handling based on exception type:
-     *      a. Device Interrupts (Code 0) → processing passed to device interrupt handler -> Calls interruptsHandler().
-     *      b. TLB Exceptions (Codes 1-3) → processing passed to TLB exception handler -> Calls 
-     *      c. System Calls (Code 8) → processing passed to syscall exception handler -> Calls 
-     *      d. Program Traps (Code 4-7,9-12) → processing passed to program trap exception handler → Calls e
-
-    *****************************************************************************/
-    
-    state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
-    int exception_code; /* Stores the extracted exception type */  
-
-    saved_state = (state_t *) BIOSDATAPAGE;  /* Retrieve the saved processor state from BIOS data page */
-    exception_code = ((saved_state->s_cause) & GETEXCPCODE) >> CAUSESHIFT; /* Extract exception code from the cause register */
-
-    if (exception_code == INTCONST) {  
-        /* Case 1: Exception Code 0 - Device Interrupt */
-        interruptsHandler();  /* call the Nucleus' device interrupt handler function */
-    }  
-    if (exception_code <= CONST3) {  
-        /* Case 2: Exception Codes 1-3 - TLB Exceptions */
-        tlbTrapHanlder();  /* call the Nucleus' TLB exception handler function */
-    }  
-    if (exception_code == SYSCONST) {  
-        /* Case 3: Exception Code 8 - System Calls */
-        sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
-    }
-    /* Case 4: All Other Exceptions - Program Traps */
-    prgmTrapHandler(); /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
- }
-
-
-
-/*Helper to init pass up vector*/
 void populate_passUpVec(){
     passupvector_t *proc0_passup_vec;                                       /*Pointer to Processor 0 Pass-Up Vector */
     proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer*/
@@ -126,7 +110,37 @@ void populate_passUpVec(){
     proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
 }
 
-/*Helper to init proccess state*/
+/****************************************************************************
+ * init_proc_state()
+ * 
+ * 
+ * @brief 
+ * This function sets up the initial state of the first process in the system  
+ * by configuring its stack pointer, program counter, status register, and  
+ * other key fields in the Process Control Block (PCB).  
+ *  
+ *
+ * @protocol 
+ * 1. Determines the top of RAM by accessing the Device Register Area (DRA),
+ *    which contains the base RAM address and total RAM size.  
+ * 2. Configures the Stack Pointer (SP) so that the process stack starts at 
+ *    the highest valid RAM address.  
+ * 3. Sets the Program Counter (PC) and t9 register to point to test()
+ * 4. Initializes the Status Register to enable global and external interrupts,
+ *    activate the Processor Local Timer (PLT), and ensure the process starts 
+ *    in Kernel Mode.  
+ * 
+ * 
+ * @note  
+ * The t9 register is explicitly set to test() due to the MIPS convention that  
+ * requires `t9` to match PC when jumping to a function.
+ * 
+ * 
+ * @param pcb_PTR firstProc
+ * @return None
+ * 
+
+ *****************************************************************************/
 void init_proc_state(pcb_PTR firstProc){
     memaddr topRAM;                         /* the address of the last RAM frame */
     devregarea_t *dra;                      /* device register area that used to determine RAM size */
@@ -139,6 +153,37 @@ void init_proc_state(pcb_PTR firstProc){
     firstProc->p_s.s_t9 = (memaddr) test;   /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
     firstProc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
 }
+
+
+/****************************************************************************
+ * debug_fxn()
+ * 
+ * 
+ * @brief 
+ * Helper function to debug the program as we set breakpoints during execution.
+ * 
+ * 
+ * @note
+ * The values for the four parameters to this debug fxn can be accessed in
+ * registers a0,a1,a2,a3
+ * 
+ * 
+ * @param i - can be line number or a unique identifier
+ * @param p1 - first var to be configured
+ * @param p2 - second var to be configured
+ * @param p3 - third var to be configured
+ * @return None
+ * 
+
+ *****************************************************************************/
+void debug_fxn(int i, int p1, int p2, int p3){
+    char debugMsg[100];
+    char *s = debugMsg;
+}
+
+
+/***********************MAIN METHOD***************************************/
+
 
 /****************************************************************************
  * main()

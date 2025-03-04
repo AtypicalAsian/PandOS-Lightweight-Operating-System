@@ -15,5 +15,6 @@ extern void tlbTrapHanlder();
 extern void prgmTrapHandler();
 extern void update_pcb_state();
 extern void uTLB_RefillHandler();
+extern void gen_exception_handler();
 
 #endif

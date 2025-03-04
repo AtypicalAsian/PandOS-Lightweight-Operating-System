@@ -221,7 +221,7 @@ void update_accumulated_CPUtime(cpu_t start_time, cpu_t end_time, pcb_PTR curr_p
 
  *****************************************************************************/
 void debug_fxn(int i, int p1, int p2, int p3){
-    return 0;
+    return;
 }
 
 

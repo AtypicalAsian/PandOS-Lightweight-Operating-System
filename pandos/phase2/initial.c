@@ -1,32 +1,42 @@
+
 /************************************************************************************************ 
-CS372 - Operating Systems
-Dr. Mikey Goldweber
-Written by: Nicolas & Tran
-
-This module contains the entry point for Phase 2 - the main() function, which 
-initializes Phase 1 data structures, consisting of the free semaphore descriptor
-list, Active Semaphore List (ASL), and process queue (contains processes 
-ready to be scheduled). With regards to the process queue, the module will
-create an intial process in the ready queue to in order for the scheduler 
-to begin execution.
-
-Additional global variables for phase 2 are defined and specified as needed with in-line 
-comments, and the general exception handler is implemented in this model, whose job is to 
-pass up control to the device interrupt handler during interruptions or to the
-appropriate function in the exceptions.c module to handle the particular type
-of exception.
-
-Last but not least, this module sets up four words in BIOS data page, each 
-for the following item: TLB-refill handler, its stack pointer, 
-the general exception handler and its stack pointer.
-
- Once main() calls the Scheduler its task is complete. At this point the only mechanism for 
- re-entering the Nucleus is through an exception; which includes device interrupts. As long as there 
- are processes to run, the processor is executing instructions on their behalf and only 
- temporarily enters the Nucleus long enough to handle a device interrupt or exception when they occur.
-
-To view version history and changes:
-    - Remote GitHub Repo: https://github.com/AtypicalAsian/CS372-OS-Project
+ * CS372 - Dr. Goldweber
+ * 
+ * @file initial.c
+ * 
+ * 
+ * @brief
+ * This module serves as the entry point for Phase 2 - the Nucleus via the main() function. It is responsible 
+ * for initializing core data structures, setting up exception handling, and launching the first process.
+ * Once initialization is complete, the system enters the scheduler to begin process execution.
+ * 
+ * 
+ * @def
+ * The Nucleus in the Pandos OS functions as the core of the kernel. The purpose of the Nucleus is 
+ * to provide an environment in which asynchronous sequential processes exist, each making forward 
+ * progress as they take turns sharing the processor. Furthermore, the Nucleus provides these processes 
+ * with exception handling routines, low-level synchronization primitives, and a facility for “passing up” 
+ * the handling of Program Trap, TLB exceptions and certain SYSCALL requests to the Support Level.
+ * 
+ * 
+ * @details
+ * In detail, the initial.c module accomplishes the following:
+ * - Declare Level 3 global variables
+ * - Populate Processor0 Pass-Up Vector
+ * - Initalize Level 2 Data Structures - Active Semaphore List and Free PCB List
+ * - Initialize all Nucleus maintained variables: Process Count (0), Soft-block Count (0), 
+ *              Ready Queue (mkEmptyProcQ()), and Current Process (NULL), device semaphores (all set to zero)
+ * - Configure System-wide Interval Timer 
+ * - Create the first process
+ * - Launch the first process and pass control to the Scheduler (scheduler.c)
+ * 
+ * 
+ * @note Once main() completes, the system's primary execution control is handled by the Scheduler, 
+ *       and the kernel is only re-entered due to exceptions or device interrupts.
+ * 
+ * 
+ * @authors Nicolas & Tran
+ * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
 ************************************************************************************************/
 
 #include "../h/asl.h"
@@ -39,16 +49,12 @@ To view version history and changes:
 
 #include "/usr/include/umps3/umps/libumps.h"
 
-/**************************************************************************** 
- * METHOD DECLARATIONS
- *****************************************************************************/
+/**************** METHOD DECLARATIONS***************************/ 
 extern void test(); /*Function to help debug the Nucleus, defined in the test file for this module*/
-HIDDEN void gen_exception_handler(); /* hidden function that is responsible for handling general exceptions */
 extern void uTLB_RefillHandler(); /*this function is a placeholder function not implemented in Phase 2 and whose code is provided. This function implementation will be replaced when the support level is implemented*/
 
-/**************************************************************************** 
- * GLOBAL VARIABLES DECLARATIONS
- *****************************************************************************/
+
+/*************GLOBAL VARIABLES DECLARATIONS*********************/ 
 int procCnt; /*integer indicating the number of started, but not yet terminated processes.*/
 int softBlockCnt; /*This integer is the number of started, but not terminated processes that in are the “blocked” state due to an I/O or timer request.*/
 pcb_PTR ReadyQueue; /*Tail pointer to a queue of pcbs that are in the “ready” state.*/
@@ -59,9 +65,7 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
 
 
 
-/**************************************************************************** 
- * METHOD IMPLEMENTATIONS
- *****************************************************************************/
+/***********************METHOD IMPLEMENTATIONS*********************************/
 
 /**************************************************************************** 
  * This function is responsible for handling general exceptions. It determines 
@@ -109,62 +113,71 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
  }
 
 
-/**************************************************************************** 
- * This function serves as the starting point of the program. It sets up the necessary 
- * data structures for phase 1, including the ASL, the free list of PCBs, and the queue 
- * that will hold processes ready for execution. Additionally, it configures four specific 
- * words in the BIOS data page: one for the general exception handler, one for 
- * its associated stack pointer, one for the TLB-Refill handler, and one for its stack 
- * pointer. The function then creates a single process and hands it over to the Scheduler 
- * for execution. It also initializes the module's global variables.
+
+/*Helper to init pass up vector*/
+void populate_passUpVec(){
+    proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer*/
+    proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
+    proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
+    proc0_passup_vec->execption_handler = (memaddr) gen_exception_handler;  /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
+    proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
+}
+
+/*Helper to init proccess state*/
+void init_proc_state(pcb_PTR firstProc){
+    dra = (devregarea_t *) RAMBASEADDR;     /*Set the base address of the device register area */
+    topRAM = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
+
+    /*Initialize the process state*/
+    firstProc->p_s.s_sp = topRAM; /*Stack pointer set to top of RAM*/
+    firstProc->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
+    firstProc->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
+    firstProc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
+}
+
+/****************************************************************************
+ * main()
  * 
- * The main() function is only called once. Once main() calls the Scheduler 
- * its task is complete.
+ *  
+ * @brief
+ * This function serves as the entry point for Phase 2. It sets up core data structures
+ * and subsystems that will enable the OS to handle exceptions, enforce time-sharing of the CPU,
+ * and properly manage processes and their state transitions.
  * 
- * params: None
- * return: None
+ * 
+ * @protocol 
+ * The following steps are performed:
+ *  1. Initialize global variables
+ *  2. Initialize Level 2 data structures
+ *  3. Initialize Pass Up Vector fields for exceptions and TLB-refill events
+ *      - Set the Nucleus TLB-Refill event handler address
+ *      - Set Stack Pointer for Nucleus TLB-Refill event handler to top of Nucleus stack page
+ *      - Set the Nucleus exception handler address to the address of general exception handler function
+ *      - Set Stack Pointer for Nucleus exception handler to top of Nucleus stack page
+ *  4. Configure system interval timer (100ms)
+ *  5. Create the first process & initialize its process state
+ *       - Allocates a new PCB
+ *       - Initializes its stack pointer, program counter (PC), and status register (enables interrupts & kernel mode).
+ *       - Inserts the process into the Ready Queue and increments procCnt.
+ *  6. Call the scheduler to run the first process
+ * 
+ * 
+ * @note  
+ * - This function **only runs once** at system startup.  
+ * - Once execution is transferred to the Scheduler, the system enters its normal 
+ *   execution cycle and only re-enters the Nucleus upon **exceptions or interrupts**.  
+ * 
+ * 
+ * @param None  
+ * @return None  
 
  *****************************************************************************/
  int main(){
-
-    /**************************************************************************** 
-     * BIG PICTURE
-     * 
-     * 1. Set Up Exception Handling - Populate Processor 0 Pass-Up Vector
-     * - Set the Nucleus TLB-Refill event handler address
-     * - Set Stack Pointer for Nucleus TLB-Refill event handler to top of Nucleus stack page (0x20001000)
-     * - Set the Nucleus exception handler address to the address of your Level 3 Nucleus function that is to be the entry point for exception (and interrupt) handling
-     * - Set Stack Pointer for Nucleus exception handler to top of Nucleus stack page: 0x20001000
-     * 
-     * 2. Initialize Level 2 data structures
-     * - Calls initPcbs() to set up the Process Control Block (PCB) free list.
-     * - Calls initASL() to set up the Active Semaphore List (ASL).
-     * 
-     * 3. Initialize all Nucleus maintained variables: Process Count (0), Soft-block Count (0), Ready Queue (mkEmptyProcQ()), and Current Process (NULL), device semaphores (all set to zero at first)
-     * 
-     * 4. Configure System Timer (Load the system-wide Interval Timer with 100 milliseconds)
-     * 
-     * 5. Create and Launch the First Process
-     * - Allocates a new process (PCB).
-     * - Initializes its stack pointer, program counter (PC), and status register (enables interrupts & kernel mode).
-     * - Inserts the process into the Ready Queue and increments procCnt.
-     * - Calls switchProcess() to begin execution.
-     * 
-     * 6. If no PCB is available, the system calls PANIC() to halt execution. 
-
-    *****************************************************************************/
-
-    /*1. Set Up Exception Handling*/
-    
+    /*Declare variables*/
     pcb_PTR first_proc; /* a pointer to the first process in the ready queue to be created so that the scheduler can begin execution */
     passupvector_t *proc0_passup_vec; /*Pointer to Processor 0 Pass-Up Vector */
     memaddr topRAM; /* the address of the last RAM frame */
     devregarea_t *dra; /* device register area that used to determine RAM size */
-
-    ReadyQueue = mkEmptyProcQ();  /*Initialize the Ready Queue*/
-    currProc = NULL;  /*No process is running initially */
-    procCnt = INITPROCCNT;  /*No active processes yet*/
-    softBlockCnt = INITSBLOCKCNT;  /*No soft-blocked processes*/
 
     /*Initialize device semaphores*/
     int i;
@@ -172,44 +185,30 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
         deviceSemaphores[i] = INITDEVICESEM;
     }
 
-    /*2. Initialize Level 2 data structures*/
-    initPcbs(); /*Set up the Process Control Block (PCB) free list.*/
-    initASL(); /*Set up the Active Semaphore List (ASL).*/
+    /*Initialize variables*/
+    ReadyQueue = mkEmptyProcQ();  /*Initialize the Ready Queue*/
+    currProc = NULL;  /*No process is running initially */
+    procCnt = INITPROCCNT;  /*No active processes yet*/
+    softBlockCnt = INITSBLOCKCNT;  /*No soft-blocked processes*/
+
+
+    /*Initialize Level 2 data structures*/
+    initPcbs(); /*Set up the Process Control Block (PCB) free list (pool of avaible pcbs)*/
+    initASL(); /*Set up the Active Semaphore List (ASL)*/
 
     /*Initialize passUp vector fields*/
-    proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer to the address (0x0FFFF900) defined in const.h*/
-    proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
-    proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
-    proc0_passup_vec->execption_handler = (memaddr) gen_exception_handler;      /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
-    proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
+    populate_passUpVec();
 
-
-
-    /*4. Configure System Timer (Load the system-wide Interval Timer with 100 milliseconds)*/
+    /*Load the system-wide Interval Timer with 100 milliseconds*/
     LDIT(INITTIMER);  /*Set interval timer to 100ms*/
 
-    /*5. Create and Launch the First Process*/
-    /**************************************************************************** 
-     * In particular this process will have interrupts enabled, the processor Local Timer enabled, kernel-mode on, the SP set to RAMTOP, and its PC set to the address of test. 
-     * The remaining pcb fields as follows:
-     *      Set all the Process Tree fields to NULL.
-     *      Set the accumulated time field (p time) to zero.
-     *      Set the blocking semaphore address (p semAdd) to NULL.
-     *      Set the Support Structure pointer (p supportStruct) to NULL.
-
-    *****************************************************************************/
-    first_proc = allocPcb();    /*allocate a PCB for the first process*/
+    /*Create and Launch the First Process*/
+    first_proc = allocPcb();    /*allocate a PCB from the PCB free list for the first process*/
     
+    /*If there are avaible pcbs to be allocated*/
     if (first_proc != NULL){
-        dra = (devregarea_t *) RAMBASEADDR;     /*Set the base address of the device register area */
-        topRAM = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
-
-        /*Initialize the process state*/
-        first_proc->p_s.s_sp = topRAM; /*Stack pointer set to top of RAM*/
-        first_proc->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
-        first_proc->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
-        first_proc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
-
+        /*Initialize the process state for first process*/
+        init_proc_state(first_proc);
 
         /*Add process to Ready Queue & update process count */
         insertProcQ(&ReadyQueue, first_proc);       /*insert first process into ready queue*/

@@ -29,7 +29,6 @@ HIDDEN int getDevNum();
 
 
 /*Global variables*/
-cpu_t at_interrupt_TOD;    /*value of TOD clock when at the time we enter the interrupts module (i.e what is the current time when the interrupt was generated?)*/
 cpu_t time_left;    /*Amount of time remaining in the current process' quantum slice (of 5ms) when the interrupt was generated*/
 
 

@@ -66,7 +66,7 @@ void copyState(state_PTR src, state_PTR dst){
  *****************************************************************************/
 void swContext(pcb_PTR curr_proccess){
     currProc = curr_proccess;
-    STCK(time_of_day_start);
+    STCK(start_TOD);
     LDST(&(curr_proccess->p_s));
 }
 

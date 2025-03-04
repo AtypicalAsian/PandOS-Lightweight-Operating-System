@@ -56,12 +56,14 @@ extern void uTLB_RefillHandler(); /*this function is a placeholder function not 
 
 /*************GLOBAL VARIABLES DECLARATIONS*********************/ 
 int procCnt; /*integer indicating the number of started, but not yet terminated processes.*/
-int softBlockCnt; /*This integer is the number of started, but not terminated processes that in are the “blocked” state due to an I/O or timer request.*/
+int softBlockCnt; /*Integer representing the number of started, but not terminated processes that in are the “blocked” state due to an I/O or timer request.*/
 pcb_PTR ReadyQueue; /*Tail pointer to a queue of pcbs that are in the “ready” state.*/
 pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. the current executing process.*/
-int deviceSemaphores[MAXDEVICECNT]; /*Integer array of device semaphores that is associated with external (sub) devices, plus one semd for the Pseudo-clock*/
-state_PTR savedExceptState; /*ptr to saved exception state*/
-cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) clock when a process starts running. Used to calculate difference between current time of day value and the start time when the process is interrupted*/
+cpu_t start_TOD; /*the value on the time of day clock that the Current Process begins executing at*/
+cpu_t curr_TOD; /*current time on the time of day clock*/
+cpu_t at_interrupt_TOD; /*time on time of day clock when interrupt was generated*/
+int deviceSemaphores[MAXDEVICECNT]; /* semaphore integer array that represents each external (sub) device, plus one semd for the Pseudo-clock */
+state_PTR savedExceptState; /* a pointer to the saved exception state */
 
 
 

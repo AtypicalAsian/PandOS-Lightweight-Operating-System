@@ -31,7 +31,7 @@ HIDDEN void getCPUTime();
 HIDDEN void waitForClock();
 HIDDEN void getSupportData();
 
-cpu_t curr_time;    /*stores the current time in the TOD clock*/
+cpu_t curr_TOD;    /*stores the current time in the TOD clock*/
 int syscallNo;
 
 
@@ -57,8 +57,8 @@ void update_pcb_state(){
 
  *****************************************************************************/
 void blockCurrProc(int *sem){
-    STCK(curr_time);
-    currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+    STCK(curr_TOD);
+    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD);
     insertBlocked(sem,currProc);
     currProc = NULL;
 }
@@ -101,8 +101,8 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
         currProc->p_s.s_v0 = NULL_PTR_ERROR;
     }
 
-    STCK(curr_time);
-    currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+    STCK(curr_TOD);
+    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD);
     swContext(currProc);
 }
 
@@ -173,8 +173,8 @@ void passeren(int *sem){
     }
 
     /*return control to the Current Process*/
-    STCK(curr_time);
-    currProc->p_time = currProc->p_time + (curr_time -time_of_day_start);
+    STCK(curr_TOD);
+    currProc->p_time = currProc->p_time + (curr_TOD -start_TOD);
     swContext(currProc);
 }
 
@@ -196,8 +196,8 @@ void verhogen(int *sem) {
         pcb_PTR p = removeBlocked(sem);
         insertProcQ(&ReadyQueue,p);
     }
-    STCK(curr_time);
-    currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+    STCK(curr_TOD);
+    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD);
     swContext(currProc);
 }
 
@@ -243,9 +243,9 @@ void verhogen(int *sem) {
 
  *****************************************************************************/
 void getCPUTime(){
-    STCK(curr_time);
-    currProc->p_s.s_v0 = currProc->p_time + (curr_time - time_of_day_start);
-    currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+    STCK(curr_TOD);
+    currProc->p_s.s_v0 = currProc->p_time + (curr_TOD - start_TOD);
+    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD);
     swContext(currProc);
 }
 
@@ -271,8 +271,8 @@ void waitForClock(){
  *****************************************************************************/
 void getSupportData(){
     currProc->p_s.s_v0 = (int) (currProc->p_supportStruct);
-    STCK(curr_time);
-    currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+    STCK(curr_TOD);
+    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD);
     swContext(currProc);
 }
 
@@ -287,8 +287,8 @@ void exceptionPassUpHandler(int exceptionCode){
     /*If current process has a support structure -> pass up exception to the exception handler */
     if (currProc->p_supportStruct != NULL){
         copyState(savedExceptState, &(currProc->p_supportStruct->sup_exceptState[exceptionCode])); /* copy saved exception state from BIOS Data Page to currProc's sup_exceptState field */
-        STCK(curr_time); /*get current time on TOD clock*/
-        currProc->p_time = currProc->p_time + (curr_time - time_of_day_start); /*update currProc with accumulated CPU time*/
+        STCK(curr_TOD); /*get current time on TOD clock*/
+        currProc->p_time = currProc->p_time + (curr_TOD - start_TOD); /*update currProc with accumulated CPU time*/
         LDCXT(currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_stackPtr, currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_status,currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_pc);
     }
     /*Else, if no support structure -> terminate the current process and its children*/

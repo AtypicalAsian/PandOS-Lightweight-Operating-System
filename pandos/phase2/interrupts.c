@@ -29,7 +29,7 @@ HIDDEN int getDevNum();
 
 
 /*Global variables*/
-cpu_t curr_time_enter_interrupt;    /*value of TOD clock when at the time we enter the interrupts module (i.e what is the current time when the interrupt was generated?)*/
+cpu_t at_interrupt_TOD;    /*value of TOD clock when at the time we enter the interrupts module (i.e what is the current time when the interrupt was generated?)*/
 cpu_t time_left;    /*Amount of time remaining in the current process' quantum slice (of 5ms) when the interrupt was generated*/
 
 
@@ -97,7 +97,7 @@ void nontimerInterruptHandler() {
     - need to consider dereferencing
     */
     
-    cpu_t curr_time; /*value on time of day clock (currently)*/
+    cpu_t curr_TOD; /*value on time of day clock (currently)*/
     int lineNum;     /* The line number where the highest-priority interrupt occurred */
     int devNum;      /* The device number where the highest-priority interrupt occurred */
     int index;       /* Index in device register array of the interrupting device */
@@ -132,7 +132,7 @@ void nontimerInterruptHandler() {
     if (unblockedPcb == NULL) {
         if (currProc != NULL) { /* Resume execution of current process */
             update_pcb_state();
-            currProc->p_time = currProc->p_time + (curr_time_enter_interrupt - time_of_day_start);
+            currProc->p_time = currProc->p_time + (at_interrupt_TOD - start_TOD);
             setTIMER(time_left);
             swContext(currProc);
         }
@@ -148,9 +148,9 @@ void nontimerInterruptHandler() {
     if (currProc != NULL) { 
         update_pcb_state();
         setTIMER(time_left);
-        currProc->p_time = currProc->p_time + (curr_time_enter_interrupt - time_of_day_start);
-        STCK(curr_time); /* Get current time */
-        unblockedPcb->p_time =unblockedPcb->p_time + (curr_time - curr_time_enter_interrupt); /* Charge time */
+        currProc->p_time = currProc->p_time + (at_interrupt_TOD - start_TOD);
+        STCK(curr_TOD); /* Get current time */
+        unblockedPcb->p_time =unblockedPcb->p_time + (curr_TOD - at_interrupt_TOD); /* Charge time */
         swContext(currProc);
     }
     switchProcess(); /* Call the scheduler */
@@ -172,14 +172,14 @@ void pltInterruptHandler() {
     5. Call the scheduler to select the next process to run.
     */
 
-    cpu_t curr_time;
+    cpu_t curr_TOD;
 
     /*If there is a running process when the interrupt was generated*/
     if (currProc != NULL){
         setTIMER(LARGETIME);
         update_pcb_state();
-        STCK(curr_time);
-        currProc->p_time = currProc->p_time + (curr_time - time_of_day_start);
+        STCK(curr_TOD);
+        currProc->p_time = currProc->p_time + (curr_TOD - start_TOD);
         insertProcQ(&ReadyQueue,currProc);
         currProc = NULL;
         switchProcess();
@@ -226,7 +226,7 @@ void systemIntervalInterruptHandler() {
     if (currProc != NULL){
         setTIMER(time_left);
         update_pcb_state();
-        currProc->p_time = currProc->p_time + (curr_time_enter_interrupt - time_of_day_start);
+        currProc->p_time = currProc->p_time + (at_interrupt_TOD - start_TOD);
         swContext(currProc);    /*return control to current process (switch back to context of current process)*/
     }
 
@@ -244,7 +244,7 @@ void systemIntervalInterruptHandler() {
 
  *****************************************************************************/
 void interruptsHandler(){
-    STCK(curr_time_enter_interrupt);
+    STCK(at_interrupt_TOD);
     time_left = getTIMER();
     savedExceptState = (state_PTR) BIOSDATAPAGE;
 

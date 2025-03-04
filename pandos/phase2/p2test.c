@@ -13,7 +13,7 @@
  *      Modified by Michael Goldweber on May 15, 2004
  *		Modified by Michael Goldweber on June 19, 2020
  */
-
+#include <stdio.h>
 #include "../h/const.h"
 #include "../h/types.h"
 #include "/usr/include/umps3/umps/libumps.h"
@@ -442,7 +442,7 @@ void p4() {
 
 /* p5's program trap handler */
 void p5gen() {
-	int i = 0;
+	int errorCode = 0;
 	unsigned int exeCode = pFiveSupport.sup_exceptState[GENERALEXCEPT].s_cause;
 	exeCode = (exeCode & CAUSEMASK) >> 2;
 	switch (exeCode) {
@@ -450,8 +450,8 @@ void p5gen() {
 		print("Bus Error: Access non-existent memory\n");
 		pFiveSupport.sup_exceptState[GENERALEXCEPT].s_pc = (memaddr)p5a;   /* Continue with p5a() */
 		pFiveSupport.sup_exceptState[GENERALEXCEPT].s_t9 = (memaddr)p5a;   /* Continue with p5a() */
-		print(i);
-		i+=1;
+		printf("Error Code: %d\n", errorCode);
+		errorCode+=1;
 		break;
 		
 	case RESVINSTR:

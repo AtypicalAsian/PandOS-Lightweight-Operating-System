@@ -97,7 +97,6 @@ void nontimerInterruptHandler() {
     - need to consider dereferencing
     */
     
-    cpu_t curr_TOD; /*value on time of day clock (currently)*/
     int lineNum;     /* The line number where the highest-priority interrupt occurred */
     int devNum;      /* The device number where the highest-priority interrupt occurred */
     int index;       /* Index in device register array of the interrupting device */

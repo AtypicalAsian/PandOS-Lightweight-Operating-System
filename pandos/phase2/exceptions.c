@@ -31,7 +31,7 @@ HIDDEN void getCPUTime();
 HIDDEN void waitForClock();
 HIDDEN void getSupportData();
 
-cpu_t curr_TOD;    /*stores the current time in the TOD clock*/
+
 int syscallNo;
 
 

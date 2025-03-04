@@ -40,17 +40,17 @@ To view version history and changes:
 
  *****************************************************************************/
 void copyState(state_PTR src, state_PTR dst){
-    /*Copy all 4 control registers*/
-    dst->s_entryHI = src->s_entryHI;
-    dst->s_cause = src->s_cause;
-    dst->s_status = src->s_status;
-    dst->s_pc = src->s_pc;
-
     /*Copy 31 general purpose registers*/
     int i;
     for (i=0;i<STATEREGNUM;i++){
         dst->s_reg[i] = src->s_reg[i];
     }
+    
+    /*Copy all 4 control registers*/
+    dst->s_entryHI = src->s_entryHI;
+    dst->s_cause = src->s_cause;
+    dst->s_status = src->s_status;
+    dst->s_pc = src->s_pc;
 
 }
 

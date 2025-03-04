@@ -156,6 +156,50 @@ void init_proc_state(pcb_PTR firstProc){
 
 
 /****************************************************************************
+ * update_accumulated_CPUtime()
+ * 
+ * 
+ * @brief 
+ * This function updates the total accumulated CPU time for the given process 
+ * by computing the time spent in execution during its most recent run.
+ *  
+ *
+ * @protocol 
+ * This function is called whenever a process transitions from the "running" 
+ * state to either "ready" (preempted) or "blocked" (waiting for I/O).
+ * It computes the CPU time used during the latest execution period and 
+ * adds it to the process's total execution time.
+ * The function ensures that the PCB field `p_time` correctly reflects the 
+ * total CPU time consumed by the process so far.
+ * 
+ * 
+ * @param start_time - The Time of Day (TOD) clock value at which the process 
+ *                     started executing.
+ * @param end_time   - The TOD clock value when the process was interrupted 
+ *                     or stopped running.
+ * @param curr_process - Pointer to the Process Control Block (PCB) of the 
+ *                       process whose CPU time is being updated.
+ * 
+ * 
+ * @return None
+ * 
+ * 
+ * @note 
+ * The difference (end_time - start_time) represents the time the process 
+ * was actively using the CPU during this execution slice.
+ * This function must be called before switching to another process to 
+ * ensure accurate CPU accounting.
+ * The stored CPU time in p_time is cumulative and persists until the 
+ * process terminates.
+
+ *****************************************************************************/
+void update_accumulated_CPUtime(cpu_t start_time, cpu_t end_time, pcb_PTR curr_process){
+    curr_process->p_time = curr_process->p_time + (end_time - start_time);
+}
+
+
+
+/****************************************************************************
  * debug_fxn()
  * 
  * 

@@ -116,6 +116,7 @@ cpu_t time_of_day_start; /*current time from the system’s Time of Day (TOD) cl
 
 /*Helper to init pass up vector*/
 void populate_passUpVec(){
+    passupvector_t *proc0_passup_vec;                                       /*Pointer to Processor 0 Pass-Up Vector */
     proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer*/
     proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
     proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
@@ -125,13 +126,15 @@ void populate_passUpVec(){
 
 /*Helper to init proccess state*/
 void init_proc_state(pcb_PTR firstProc){
+    memaddr topRAM;                         /* the address of the last RAM frame */
+    devregarea_t *dra;                      /* device register area that used to determine RAM size */
     dra = (devregarea_t *) RAMBASEADDR;     /*Set the base address of the device register area */
     topRAM = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
 
     /*Initialize the process state*/
-    firstProc->p_s.s_sp = topRAM; /*Stack pointer set to top of RAM*/
-    firstProc->p_s.s_pc = (memaddr) test; /*Set PC to test()*/ 
-    firstProc->p_s.s_t9 = (memaddr) test; /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
+    firstProc->p_s.s_sp = topRAM;           /*Stack pointer set to top of RAM*/
+    firstProc->p_s.s_pc = (memaddr) test;   /*Set PC to test()*/ 
+    firstProc->p_s.s_t9 = (memaddr) test;   /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
     firstProc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
 }
 
@@ -147,7 +150,7 @@ void init_proc_state(pcb_PTR firstProc){
  * 
  * @protocol 
  * The following steps are performed:
- *  1. Initialize global variables
+ *  1. Declare variables
  *  2. Initialize Level 2 data structures
  *  3. Initialize Pass Up Vector fields for exceptions and TLB-refill events
  *      - Set the Nucleus TLB-Refill event handler address
@@ -175,9 +178,6 @@ void init_proc_state(pcb_PTR firstProc){
  int main(){
     /*Declare variables*/
     pcb_PTR first_proc; /* a pointer to the first process in the ready queue to be created so that the scheduler can begin execution */
-    passupvector_t *proc0_passup_vec; /*Pointer to Processor 0 Pass-Up Vector */
-    memaddr topRAM; /* the address of the last RAM frame */
-    devregarea_t *dra; /* device register area that used to determine RAM size */
 
     /*Initialize device semaphores*/
     int i;
@@ -219,7 +219,7 @@ void init_proc_state(pcb_PTR firstProc){
         return (0);  
     }
 
-    /*7. If no PCB is available, the system calls PANIC() to halt execution*/
+    /*If no PCB is available, the system calls PANIC() to halt execution*/
     PANIC();
     return (0);
  }

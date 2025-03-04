@@ -442,6 +442,7 @@ void p4() {
 
 /* p5's program trap handler */
 void p5gen() {
+	int i = 0;
 	unsigned int exeCode = pFiveSupport.sup_exceptState[GENERALEXCEPT].s_cause;
 	exeCode = (exeCode & CAUSEMASK) >> 2;
 	switch (exeCode) {
@@ -449,6 +450,8 @@ void p5gen() {
 		print("Bus Error: Access non-existent memory\n");
 		pFiveSupport.sup_exceptState[GENERALEXCEPT].s_pc = (memaddr)p5a;   /* Continue with p5a() */
 		pFiveSupport.sup_exceptState[GENERALEXCEPT].s_t9 = (memaddr)p5a;   /* Continue with p5a() */
+		print(i);
+		i+=1;
 		break;
 		
 	case RESVINSTR:

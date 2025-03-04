@@ -156,8 +156,6 @@ void nontimerInterruptHandler() {
     switchProcess(); /* Call the scheduler */
 }
 
-
-
 /**************************************************************************** 
  * pltInterruptHandler()
  * params:

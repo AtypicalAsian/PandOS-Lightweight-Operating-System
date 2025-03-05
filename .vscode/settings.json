@@ -2,6 +2,7 @@
   "files.associations": {
     "asl.h": "c",
     "pcb.h": "c",
-    "types.h": "c"
+    "types.h": "c",
+    "exceptions.h": "c"
   }
 }

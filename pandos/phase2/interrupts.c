@@ -18,17 +18,14 @@ To view version history and changes:
 
 #include "/usr/include/umps3/umps/libumps.h"
 
+/**************** METHOD DECLARATIONS***************************/ 
 HIDDEN void nontimerInterruptHandler();
 HIDDEN void pltInterruptHandler();
 HIDDEN void systemIntervalInterruptHandler();
-
-/*Helper Functions*/
 HIDDEN int getInterruptLine();
 HIDDEN int getDevNum();
 
 
-
-/*Global variables*/
 cpu_t time_left;    /*Amount of time remaining in the current process' quantum slice (of 5ms) when the interrupt was generated*/
 
 

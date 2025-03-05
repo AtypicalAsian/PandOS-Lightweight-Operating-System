@@ -155,7 +155,7 @@ void init_proc_state(pcb_PTR firstProc){
 
 
 /****************************************************************************
- * update_accumulated_CPUtime()
+ * update_accumulated_CPUtime(cpu_t start_time, cpu_t end_time, pcb_PTR curr_process)
  * 
  * 
  * @brief 

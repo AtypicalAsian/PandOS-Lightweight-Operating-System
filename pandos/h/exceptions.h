@@ -2,7 +2,7 @@
 #define EXCEPTIONS
 
 /**************************************************************************** 
- *
+ * Nicolas & Tran
  * The externals declaration file for exceptions.c module
  * 
  * 

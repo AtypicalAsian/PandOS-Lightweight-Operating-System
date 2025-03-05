@@ -20,6 +20,6 @@ extern int deviceSemaphores[MAXDEVICECNT]; /* semaphore integer array that repre
 extern state_PTR savedExceptState; /* a pointer to the saved exception state */
 
 extern void debug_fxn(int i, int p1, int p2, int p3); /*dummy function to help debug when breakpoints are set*/
-extern void update_accumulated_CPUtime(cpu_t start_time, cpu_t end_time, pcb_PTR curr_process) /*helper method to update accumulated CPU time of current process*/
+extern void update_accumulated_CPUtime(cpu_t start_time, cpu_t end_time, pcb_PTR curr_process); /*helper method to update accumulated CPU time of current process*/
 
 #endif

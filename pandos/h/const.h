@@ -182,7 +182,8 @@
 #define INITIAL_TIME     0
 
 #define NULL_PTR_ERROR   -1
-
+#define NO_INTERRUPTS    -1
+#define INTERRUPT_BITMASK_INITIAL  1
 
 #define SEM4BLOCKED     0
 #define OFFSET          3

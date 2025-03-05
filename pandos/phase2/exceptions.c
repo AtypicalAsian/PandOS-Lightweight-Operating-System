@@ -131,7 +131,7 @@ void update_pcb_state(){
  *****************************************************************************/
 void blockCurrProc(int *sem){
     STCK(curr_TOD);  /* Store the current Time of Day (TOD) clock value */
-    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD); /* Update the accumulated CPU time of the current process */
+    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Update the accumulated CPU time of the current process */
     insertBlocked(sem,currProc); /* Insert the current process into the Active Semaphore List (ASL), effectively blocking it */
     currProc = NULL; /* Set the current process pointer to NULL, indicating that no process is currently running */
 }
@@ -186,7 +186,7 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
 
     /* Update CPU time (charge time spent in SYSCALL 1 handler) for the calling process */
     STCK(curr_TOD); /* Store the current Time-of-Day (TOD) clock value */
-    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD); /* Charge accumulated CPU time spent in exception handler to currProc */
+    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Charge accumulated CPU time spent in exception handler to currProc */
     swContext(currProc); /* Perform a context switch to resume execution from the calling process */
 }
 
@@ -286,7 +286,7 @@ void passeren(int *sem){
 
     /*return control to the Current Process*/
     STCK(curr_TOD); /* Store the current Time-of-Day (TOD) clock value */
-    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD); /* Charge accumulated CPU time spent in exception handler to currProc */
+    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Charge accumulated CPU time spent in exception handler to currProc */
     swContext(currProc); /* Perform a context switch to resume execution from the calling process */
 }
 
@@ -319,7 +319,7 @@ void verhogen(int *sem) {
         insertProcQ(&ReadyQueue,p);     /* Add the unblocked process to the Ready Queue */
     }
     STCK(curr_TOD); /* Store the current Time-of-Day (TOD) clock value */
-    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD); /* Charge accumulated CPU time spent in exception handler to currProc */
+    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc);  /* Charge accumulated CPU time spent in exception handler to currProc */
     swContext(currProc); /* Perform a context switch to resume execution from the calling process */
 }
 
@@ -396,7 +396,7 @@ void verhogen(int *sem) {
 void getCPUTime(){
     STCK(curr_TOD);   /* Store the current Time-of-Day (TOD) clock value */
     currProc->p_s.s_v0 = currProc->p_time + (curr_TOD - start_TOD); /* put the accumulated processor taken up spent by the calling process in v0 */
-    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD);/* Update accumulated CPU time to correctly track process execution time */
+    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Update accumulated CPU time to correctly track process execution time */
     swContext(currProc); /* Perform a context switch back to the calling process */
 }
 
@@ -440,7 +440,7 @@ void waitForClock(){
 void getSupportData(){
     currProc->p_s.s_v0 = (int) (currProc->p_supportStruct); /* Store the address of the support structure in the v0 register */
     STCK(curr_TOD); /* Store the current Time-of-Day (TOD) clock value */
-    currProc->p_time = currProc->p_time + (curr_TOD - start_TOD); /* Update accumulated CPU time to correctly track process execution time */
+    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Update accumulated CPU time to correctly track process execution time */
     swContext(currProc); /* Perform a context switch back to the calling process */
 }
 
@@ -473,7 +473,7 @@ void exceptionPassUpHandler(int exceptionCode){
     if (currProc->p_supportStruct != NULL){
         copyState(savedExceptState, &(currProc->p_supportStruct->sup_exceptState[exceptionCode])); /* copy saved exception state from BIOS Data Page to currProc's sup_exceptState field */
         STCK(curr_TOD); /*get current time on TOD clock*/
-        currProc->p_time = currProc->p_time + (curr_TOD - start_TOD); /*update currProc with accumulated CPU time*/
+        update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /*update currProc with accumulated CPU time*/
         LDCXT(currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_stackPtr, currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_status,currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_pc); /* Load the user-level exception handler context */
     }
     /* No user-level handler defined, so terminate the process */

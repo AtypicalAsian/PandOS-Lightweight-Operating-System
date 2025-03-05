@@ -149,22 +149,6 @@ int getDevNum(int line_num){
  * @return None
  *****************************************************************************/
 void nontimerInterruptHandler() {
-    /* 
-    BIG PICTURE: 
-    1. Find the pending interrupts from Cause Register (Processor 0, given its address is 0x0FFF.F000)
-    2. Get the first interrupt (highest priority -- the lower the interrupt line and device number,
-    the higher the priority of the interrupt), since the Interrupting Devices Bit Map will
-    indicate which devices on each of these interrupt lines have a pending interrupt.
-    3. Perform signal operation to notify CPU once an interrupt triggers (verhogen)
-    4. Since the process terminates temporarily because of an I/O request, waitForIO is called.
-    5. After I/O request finishes, the blocked process is moved out of ASL, and resumes its execution on ReadyQueue.
-    6. LDST is called to restore the state of the unblocked process. This involves loading the saved context (stored in the process control block, `p_s`) of the unblocked process, which contains all the CPU register values (such as program counter, status, and general-purpose registers). This action effectively resumes the execution of the process, restoring it to the exact point where it was interrupted (before the I/O operation). The **LDST** function performs a context switch to this unblocked process, allowing it to continue from the last known state.
-    */
-
-    /* NOTE: 
-    - consider to change to memaddr 
-    - need to consider dereferencing
-    */
     
     int lineNum;     /* The line number where the highest-priority interrupt occurred */
     int devNum;      /* The device number where the highest-priority interrupt occurred */
@@ -287,17 +271,6 @@ void pltInterruptHandler() {
  * @return None
  *****************************************************************************/
 void systemIntervalInterruptHandler() {
-    /* 
-    BIG PICTURE: 
-    1. Load Interval Timer with 100ms
-    2. Unblock ALL pcbs blocked on the Pseudo-clock semaphore.
-    3. Reset the Pseudo-clock semaphore to zero. This insures that all SYS7 calls
-        block and that the Pseudo-clock semaphore does not grow positive
-    4. Perform a LDST on the saved exception state -> return control to curr process
-
-    5. If no currProc to return control to -> executes WAIT()
-    */
-
     pcb_PTR unblockedProc; /*pointer to a process being unblocked*/
     LDIT(INITTIMER);       /* Load the Interval Timer with 100ms to maintain periodic interrupts */
 

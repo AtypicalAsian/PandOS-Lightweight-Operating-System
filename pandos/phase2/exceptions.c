@@ -353,19 +353,7 @@ void verhogen(int *sem) {
  * @return None  
  *****************************************************************************/
 
- void waitForIO(int lineNum, int deviceNum, int readBool) {
-    /*devAddrBase = ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) (for memory address w. device's device register, not I/O device ???)*/ 
-    
-    /*
-    BIG PICTURE: 
-    - Many I/O devices can cause a process to be blocked while waiting for I/O to complete.
-    - Each interrupt line (3–7) has up to 8 devices, requiring us to compute `semIndex` to find the correct semaphore.
-    - Terminal devices (line 7) have two independent sub-devices: read (input) and write (output), requiring an extra adjustment in `semIndex`.
-    - When a process requests I/O, it performs a P operation on `deviceSemaphores[semIndex]`, potentially blocking the process.
-    - If blocked, the process is inserted into the Active Semaphore List (ASL) and the system switches to another process.
-    - Once the I/O completes, an interrupt will trigger a V operation, unblocking the process.
-    - The process resumes and retrieves the device’s status from `deviceStatus[semIndex]`.
-    */
+ void waitForIO(int lineNum, int deviceNum, int readBool) {    
     int semIndex;  /*Index representing the semaphore associated with the device requesting I/O */
 
     /* 
@@ -457,36 +445,70 @@ void getSupportData(){
 }
 
 
-/**************************************************************************** 
- * exceptionPassUpHandler()
- * params:
- * return: None
-
+/****************************************************************************  
+ * exceptionPassUpHandler()  
+ *  
+ * @brief  
+ * Implements the pass up or die mechanism, which means we handle exceptions 
+ * by either passing control to the user-level exception handler  
+ * (if one is defined) or terminating the process if no handler exists.  
+ *  
+ * @details  
+ * - If the current process has a support structure, the exception is "passed up"  
+ *   to the corresponding user-defined handler.  
+ * - The function copies the saved processor state from the BIOS Data Page into  
+ *   the appropriate exception state field of the process's support structure.  
+ * - CPU time used up to the exception is recorded and charged to the process.  
+ * - The process context is then switched to the user-level exception handler.  
+ * - If the process does not have a support structure, it is terminated  
+ *   along with any of its child processes.  
+ *  
+ * @param exceptionCode - The type of exception that occurred (e.g., TLB, SYSCALL, Program Trap).  
+ *  
+ * @return None (This function either transfers control to the user-level handler  
+ *               or terminates the process and schedules another one).  
  *****************************************************************************/
 void exceptionPassUpHandler(int exceptionCode){
     /*If current process has a support structure -> pass up exception to the exception handler */
     if (currProc->p_supportStruct != NULL){
         copyState(savedExceptState, &(currProc->p_supportStruct->sup_exceptState[exceptionCode])); /* copy saved exception state from BIOS Data Page to currProc's sup_exceptState field */
         STCK(curr_TOD); /*get current time on TOD clock*/
-        currProc->p_time = currProc->p_time + (curr_TOD - start_TOD); /*update currProc with accumulated CPU time*/
-        LDCXT(currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_stackPtr, currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_status,currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_pc);
+        update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /*update currProc with accumulated CPU time*/
+        LDCXT(currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_stackPtr, currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_status,currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_pc); /* Load the user-level exception handler context */
     }
-    /*Else, if no support structure -> terminate the current process and its children*/
+    /* No user-level handler defined, so terminate the process */
     else{
-        terminateProcess(currProc);
-        currProc = NULL;
-        switchProcess();
+        terminateProcess(currProc); /* Recursively terminates the process and its children */
+        currProc = NULL; /* Clear the current process pointer */
+        switchProcess(); /* Call the scheduler to switch to the next ready process */
     }
 }
 
 
-/**************************************************************************** 
- * sysTrapHandler()
- * Entrypoint to exceptions.c module
- * params:
- * return: None
-
- *****************************************************************************/
+/****************************************************************************  
+ * sysTrapHandler()  
+ *  
+ * @brief  
+ * Handles system call (SYSCALL) exceptions by determining the system call number  
+ * and executing the corresponding system call function.  
+ *  
+ * 
+ * @details  
+ * - Retrieves the saved processor state from the BIOS data page to analyze the exception.  
+ * - Extracts the system call number from register a0 to determine the requested SYSCALL.  
+ * - Increments the program counter (PC) to prevent infinite loops.  
+ * - Checks if the SYSCALL was made in user mode:  
+ *   - If true, it is considered an illegal instruction and is handled as a program trap.  
+ * - Validates the system call number:  
+ *   - If it is not between SYS1 and SYS8, it is treated as a program trap.  
+ * - If valid, updates the current process state and executes the corresponding system call.  
+ *  
+ * @note  
+ * SYSCALL requests should only be made in kernel mode. If a user-mode process attempts  
+ * a system call, the process is terminated via the program trap handler.  
+ *  
+ * @return None  
+ *****************************************************************************/  
 void sysTrapHandler(){
 
     /*Retrieve saved processor state (located at start of the BIOS Data Page) & extract the syscall number to find out which type of exception was raised*/
@@ -496,8 +518,7 @@ void sysTrapHandler(){
     /*Increment PC by 4 avoid infinite loops*/
     savedExceptState->s_pc = savedExceptState->s_pc + WORDLEN;
 
-    /*Edge case: If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
-    /*DOUBLE CHECK CONDITION*/
+    /*If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
     if (((savedExceptState->s_status) & STATUS_USERPON) != STATUS_ALL_OFF){
         savedExceptState->s_cause = (savedExceptState->s_cause) & RESINSTRCODE; /* Set exception cause to Reserved Instruction */
         prgmTrapHandler();  /* Handle it as a Program Trap */
@@ -508,11 +529,13 @@ void sysTrapHandler(){
         prgmTrapHandler();  /* Invalid syscall, treat as Program Trap */
     }
 
-
     /*save processor state into cur */
     update_pcb_state(currProc);  
 
-    /* Execute the appropriate syscall based on sysNum */
+     /*  
+     * Execute the appropriate system call function based on the syscall number.  
+     * Each case corresponds to a specific system call (SYS1 to SYS8).  
+     */
     switch (syscallNo) {  
         case SYS1:  
             createProcess((state_PTR) (currProc->p_s.s_a1), (support_t *) (currProc->p_s.s_a2));
@@ -523,7 +546,7 @@ void sysTrapHandler(){
             switchProcess();
 
         case SYS3:  
-            passeren((int *) (currProc->p_s.s_a1));  
+            passeren((int *) (currProc->p_s.s_a1));     
 
         case SYS4:  
             verhogen((int *) (currProc->p_s.s_a1));  
@@ -545,50 +568,79 @@ void sysTrapHandler(){
 }
 
 
-/**************************************************************************** 
-* tlbTrapHanlder()
- * params:
- * return: None
-
- *****************************************************************************/
-void tlbTrapHanlder(){
-    exceptionPassUpHandler(PGFAULTEXCEPT);
-}
-
-/**************************************************************************** 
-* prgmTrapHandler()
- * params:
- * return: None
-
- *****************************************************************************/
-void prgmTrapHandler(){
-    exceptionPassUpHandler(GENERALEXCEPT);
-}
-
-
-/**************************************************************************** 
- * This function is responsible for handling general exceptions. It determines 
- * the type of exception that occurred and delegates handling to the appropriate 
- * exception handler.
+/****************************************************************************  
+ * tlbTrapHandler()  
+ *  
  * 
- * params: None
- * return: None
+ * @brief  
+ * Handles TLB exceptions, typically triggered when a process accesses an 
+ * invalid or unmapped virtual address.  
+ *  
+ * 
+ * @details  
+ * - This function is called when a Page Fault Exception occurs.  
+ * - Instead of handling the exception directly, it delegates the handling  
+ *   to exceptionPassUpHandler(), which determines whether the process  
+ *   has a user-defined exception handler using the PGFAULTEXCEPT index value
+ * - If a handler exists, the exception state is passed up to user space.  
+ * - If no handler is present, the process is terminated.  
+ *  
+ * 
+ * @return None  
+ *****************************************************************************/ 
+void tlbTrapHanlder(){
+    exceptionPassUpHandler(PGFAULTEXCEPT); /* Pass up the TLB exception (Page Fault) */
+}
 
+/****************************************************************************  
+ * prgmTrapHandler()  
+ *  
+ * @brief  
+ * Handles program-related exceptions, including illegal operations,  
+ * invalid memory accesses, and arithmetic errors.  
+ *  
+ * @details  
+ * - This function is called when a General Exception occurs.  
+ * - Instead of resolving the exception itself, it delegates the task to  
+ *   exceptionPassUpHandler(), which determines if the process has a  
+ *   user-defined exception handler using the GENERALEXCEPT index value  
+ * - If a handler is available, the exception is passed up for processing.  
+ * - If no handler exists, the process is terminated.  
+ *  
+ * @return None (This function does not return, as it either transfers control  
+ *               to a user-defined handler or terminates the process).  
+ *****************************************************************************/  
+void prgmTrapHandler(){
+    exceptionPassUpHandler(GENERALEXCEPT); /* Pass up the TLB exception */
+}
+
+
+/****************************************************************************  
+ * gen_exception_handler()  
+ *  
+ * @brief  
+ * Handles all general exceptions that occur in the system by determining  
+ * the exception type and delegating it to the appropriate handler.  
+ *  
+ * @details  
+ * - The function retrieves the saved processor state from the BIOS data page.  
+ * - It extracts the exception code from the cause register to identify  
+ *   the type of exception that occurred.  
+ * - Based on the exception type, it redirects control to the corresponding  
+ *   handler function:  
+ *     - Interrupts (Code 0) → interruptsHandler() (handles device I/O)  
+ *     - TLB Exceptions (Codes 1-3) → tlbTrapHandler() (handles memory page faults)  
+ *     - System Calls (Code 8) → sysTrapHandler() (handles user mode system calls)  
+ *     - Program Traps (Codes 4-7) → prgmTrapHandler() (handles invalid operations)  
+ *  
+ * @note  
+ * This function does not return to the caller. Instead, control is  
+ * passed to the appropriate exception handler. If an exception occurs  
+ * in a process without an appropriate handler, the process is terminated.  
+ *  
+ * @return None  
  *****************************************************************************/
 void gen_exception_handler(){
-
-    /**************************************************************************** 
-     * BIG PICTURE
-     * 1. Retrieves the saved processor state from BIOSDATAPAGE to analyze the exception.
-     * 2. Extracts the exception code from the cause register to determine the type of exception.
-     * 3. Delegates handling based on exception type:
-     *      a. Device Interrupts (Code 0) → processing passed to device interrupt handler -> Calls interruptsHandler().
-     *      b. TLB Exceptions (Codes 1-3) → processing passed to TLB exception handler -> Calls 
-     *      c. System Calls (Code 8) → processing passed to syscall exception handler -> Calls 
-     *      d. Program Traps (Code 4-7,9-12) → processing passed to program trap exception handler → Calls e
-
-    *****************************************************************************/
-    
     state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
     int exception_code; /* Stores the extracted exception type */  
 

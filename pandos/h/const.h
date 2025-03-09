@@ -191,6 +191,8 @@
 
 #define INDEXCLOCK      (MAXDEVICECNT - 1)
 
+#define MAXUPROCESS     1 /*max number of user processes can be run at any point in time*/
+#define MAXFRAMES       MAXUPROCESS * 2
 
 #define LINENUM7        7
 

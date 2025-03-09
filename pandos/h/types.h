@@ -82,6 +82,13 @@ typedef struct state_t {
 } state_t, *state_PTR;
 
 
+/*define the swap pool struct*/
+typedef struct swap_pool{
+	int		asid; /*unique identifier*/
+	pte_entry_t		*ownerEntry; /* a ptr to the matching PT entry in the PT of the owner process */
+	int		pg_number; /*page number*/
+} swap_pool_t;
+
 typedef struct support_t {
 	int				sup_asid;				/* process Id (asid) */
 	state_t			sup_exceptState[2];		/* stored except states */

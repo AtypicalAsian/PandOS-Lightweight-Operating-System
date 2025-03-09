@@ -3,6 +3,8 @@
     "asl.h": "c",
     "pcb.h": "c",
     "types.h": "c",
-    "exceptions.h": "c"
+    "exceptions.h": "c",
+    "const.h": "c",
+    "scheduler.h": "c"
   }
 }

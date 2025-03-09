@@ -187,6 +187,7 @@
 
 #define SEM4BLOCKED     0
 #define OFFSET          3
+#define MAXSHAREIODEVS  48
 
 #define INDEXCLOCK      (MAXDEVICECNT - 1)
 

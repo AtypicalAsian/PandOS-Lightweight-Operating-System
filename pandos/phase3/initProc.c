@@ -53,6 +53,7 @@ void init_userproc_processorState(){
 void test(){
     /*Declare local variables*/
     int process_id; /*unique process id (asid) associated with each user process that's created (instantiated)*/
+    static support_t supp_struct_array[MAXUPROCESS+1]; /*array of support structures*/
 
     /*Initialize I/O device semaphores to 1*/
     int i;
@@ -65,6 +66,7 @@ void test(){
 
     for (process_id=1; process_id < MAXUPROCESS + 1; process_id++){
         /*create and launch MAXUPROCESS user processes*/
+        supp_struct_array[process_id].sup_asid = process_id;  /*set up user process' unique identifier ASID*/
         return;
     }
 

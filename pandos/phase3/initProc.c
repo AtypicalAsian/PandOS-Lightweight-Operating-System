@@ -35,24 +35,28 @@ int masterSema4; /* A Support Level semaphore used to ensure that test() termina
 HIDDEN void init_userproc_processorState();
 
 /*Initialize base processor state for user-process (define a function for this)*/
-void init_userproc_processorState(){
-
+void init_userproc_processorState(state_PTR base_state){
+    base_state->s_status = STATUS_ALL_OFF; /*needs user-mode, interrupts enabled, PLT clock on*/
+    base_state->s_pc = 1; /*initialize PC*/
+    base_state->s_t9 = 1; /*have to set t9 register after setting s_pc*/
+    base_state->s_reg[26] = 1; /*stack pointer*/
 }
 
 
 /**************************************************************************************************
  * TO-DO  
- * Implement test() function
- *      1. Initialize I/O device semaphores + master semaphore
- *      2. Initialize Virtual Memory (swap pool table)
- *      3. Initialize base processor state for all user processes
- *      4. Create and launch max number of processes
- *      5. Optimization (perform P op on master sema4 MAXUPROCESS times)
- *      6. Terminate test()
+ * Implement test() function 
+ *      1. Initialize I/O device semaphores + master semaphore (done)
+ *      2. Initialize Virtual Memory (swap pool table) (working on it!!!)
+ *      3. Initialize base processor state for all user processes (working on it!!!)
+ *      4. Create and launch max number of processes (working on it!!!)
+ *      5. Optimization (perform P op on master sema4 MAXUPROCESS times) (working on it!!!)
+ *      6. Terminate test() (working on it!!!)
  **************************************************************************************************/
 void test(){
     /*Declare local variables*/
     int process_id; /*unique process id (asid) associated with each user process that's created (instantiated)*/
+    state_t base_proc_state;
     static support_t supp_struct_array[MAXUPROCESS+1]; /*array of support structures*/
 
     /*Initialize I/O device semaphores to 1*/
@@ -64,6 +68,13 @@ void test(){
     /*Initialize master semaphore to 0*/
     masterSema4 = 0; /*DEFINE CONSTANT FOR 0*/
 
+    /*Initialize virtual memory*/
+
+    /*Initialize base processor state of a user process*/
+    init_userproc_processorState(&base_proc_state);
+
+    /*create and launch MAXUPROCESS user processes*/
+    /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/
     for (process_id=1; process_id < MAXUPROCESS + 1; process_id++){
         /*create and launch MAXUPROCESS user processes*/
         supp_struct_array[process_id].sup_asid = process_id;  /*set up user process' unique identifier ASID*/

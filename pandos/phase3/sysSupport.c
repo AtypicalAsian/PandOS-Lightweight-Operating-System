@@ -30,3 +30,10 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 /*#include "/usr/include/umps3/umps/libumps.h"*/
+
+/*SYSCALL 9-12 function declarations*/
+HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
+HIDDEN void get_TOD();      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
+HIDDEN void write_to_printer(); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
+HIDDEN void write_to_terminal(); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
+HIDDEN void read_from_terminal(); /*SYS13*/

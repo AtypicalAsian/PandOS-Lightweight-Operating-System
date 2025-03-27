@@ -41,6 +41,30 @@
 
 /*GLOBAL VARIABLES/DATA STRUCTRES DECLARATION*/
 HIDDEN swap_pool_t swap_pool[MAXFRAMES];
+HIDDEN int semaphore_swapPool;
+
+
+/*Helper Methods*/
+HIDDEN void find_missing_page();
+HIDDEN void find_frame_swapPool(); /*find frame from swap pool (page replacement algo)*/
+HIDDEN void is_occupied_frame(); /*handle ops when frame occupied*/
+HIDDEN void flash_read_write(); /*perform read or write to flash device*/
+HIDDEN void page_table_lookup(); /*find Pg Table entry via page number*/
+
+/**************************************************************************************************
+ * Initialize swap pool table and accompanying semaphores
+ * NEED TO DEFINE CONSTANT FOR -1 LATER
+ **************************************************************************************************/
+void init_swap_structs(){
+    /*initialize swap pool semaphore to 1 -> free at first*/
+    semaphore_swapPool = 1;
+
+    /*initialize swap pool table*/
+    int i;
+    for (i=0;i<MAXFRAMES;i++){
+        swap_pool[i].asid = -1;
+    }
+}
 
 
 /**************************************************************************************************
@@ -65,26 +89,32 @@ void tlb_refill_handler(){
  * BIG PICTURE
  * TLB refills managed by refill handler
  * Pager manages other page faults (page fault on load, page fault on store op, attemp write
- *          to read only page? does pandos have this?)
+ *          to read only page?should not occur in Pandos so treat as program trap)
  * 
  * STEPS
  *       1.Obtain Current Process’s Support Structure (SYS8)
  *       2.Identify the cause of the TLB exception from `sup_exceptState[0].Cause`
- *       3.If the cause is a "Modification" exception**, treat it as a **program trap
+ *       3.If the cause is a "Modification" exception, treat it as a program trap
  *       4.Gain mutual exclusion over the Swap Pool Table (SYS3 - P operation)
  *       5.Determine the missing page number (EntryHi in the exception state).
- *       6.Pick a frame** from the Swap Pool (determined by the page replacement algorithm).
+ *       6.Pick a frame from the Swap Pool (determined by the page replacement algorithm).
  *       7.Check if the frame is occupied by another process’s page
- *       8.If occupied**, perform the following steps:
+ *       8.If occupied, perform the following steps:
  *           - Mark the old page as invalid in the previous process’s Page Table.
  *           - Update the TLB, ensuring it reflects the invalidated page.
  *           - Write the old page back to its backing store (flash device).
  *       9.Load the missing page from the backing store into the selected frame.
  *       10.Update the Swap Pool Table to reflect the new contents.
- *       11.Update the Page Table for the new process, marking the page as **valid (V bit)
+ *       11.Update the Page Table for the new process, marking the page as valid (V bit)
  *       12.Update the TLB to include the new page.
  *       13.Release mutual exclusion over the Swap Pool Table (SYS4 - V operation).
  *       14.Retry the instruction that caused the page fault using LDST.
+ * 
+ * 
+ * Note on update tlb: there are 2 approaches
+ *      1. Probe the TLB (TLBP) to see if the newly updated TLB entry is indeed cached in the TLB. 
+ *         If so (Index.P is 0), rewrite (update) that entry (TLBWI) to match the entry in the Page Table.
+ *      2. Erase ALL the entries in the TLB (TLBCLR) - implement this before implementing the first approach
  **************************************************************************************************/
 void tlb_exception_handler(){
 

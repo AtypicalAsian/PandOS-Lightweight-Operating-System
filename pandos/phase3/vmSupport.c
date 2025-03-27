@@ -40,8 +40,8 @@
 /*#include "/usr/include/umps3/umps/libumps.h"*/
 
 /*GLOBAL VARIABLES/DATA STRUCTRES DECLARATION*/
-HIDDEN swap_pool_t swap_pool[MAXFRAMES];
-HIDDEN int semaphore_swapPool;
+HIDDEN swap_pool_t swap_pool[MAXFRAMES];    /*swap pool table*/
+HIDDEN int semaphore_swapPool;              /*swap pool sempahore*/
 
 
 /*Helper Methods*/
@@ -62,7 +62,7 @@ void init_swap_structs(){
     /*initialize swap pool table*/
     int i;
     for (i=0;i<MAXFRAMES;i++){
-        swap_pool[i].asid = -1;
+        swap_pool[i].asid = -1; /*If a frame is unoccupied, its ASID entry is set to -1 [section 4.4]*/
     }
 }
 

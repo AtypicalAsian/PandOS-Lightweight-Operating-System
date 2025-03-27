@@ -46,6 +46,6 @@ HIDDEN swap_pool_t swap_pool[MAXFRAMES];
  *      3. Write this Page Table entry into the TLB. This is a three-set process: setENTRYHI, setENTRYLO, TLBWR
  *      4. Return control to current process
  **************************************************************************************************/
-void tlb_exception_handler(){
+void tlb_refill_handler(){
 
 }

@@ -17,6 +17,13 @@
  * @authors  
  * Nicolas & Tran  
  * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
+ * 
+ * TODO
+ * This module implements
+ *       general exception handler. [Section 4.6]
+ *       SYSCALL exception handler. [Section 4.7]
+ *       Program Trap exception handler. [Section 4.8]
+ * 
  **************************************************************************************************/
 #include "../h/types.h"
 #include "../h/const.h"
@@ -32,6 +39,8 @@
 /*#include "/usr/include/umps3/umps/libumps.h"*/
 
 /*SYSCALL 9-12 function declarations*/
+HIDDEN void syscall_excp_handler(); /*Syscall exception handler*/
+HIDDEN void gen_excp_handler(); /*General exception handler*/
 HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
 HIDDEN void get_TOD();      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
 HIDDEN void write_to_printer(); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/

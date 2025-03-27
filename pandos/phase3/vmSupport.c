@@ -33,6 +33,19 @@
 /*GLOBAL VARIABLES/DATA STRUCTRES DECLARATION*/
 HIDDEN swap_pool_t swap_pool[MAXFRAMES];
 
+
+/**************************************************************************************************
+ * TO-DO  
+ * BIG PICTURE
+ *      1. Determine the page number (denoted as p) of the missing TLB entry by
+ *         inspecting EntryHi in the saved exception state located at the start of the
+ *         BIOS Data Page. [Section 3.4]
+ *      2. Get the Page Table entry for page number p for the Current Process. This
+ *         will be located in the Current Process’s Page Table, which is part of its 
+ *         Support Structure.
+ *      3. Write this Page Table entry into the TLB. This is a three-set process: setENTRYHI, setENTRYLO, TLBWR
+ *      4. Return control to current process
+ **************************************************************************************************/
 void tlb_exception_handler(){
 
 }

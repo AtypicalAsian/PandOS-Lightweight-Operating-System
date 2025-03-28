@@ -107,9 +107,14 @@
 #define	PGFAULTEXCEPT	  0
 #define GENERALEXCEPT	  1
 
+#define VPNSHIFTMASK      12
+#define PAGESHIFT         0xFFFFF000
+
 
 #define CONST1  1
 #define CONST3  3
+
+#define MODEXCEPTION 1
 
 
 /* Phase 1: Additional constants */

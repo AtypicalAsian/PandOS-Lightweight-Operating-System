@@ -46,7 +46,7 @@ HIDDEN int semaphore_swapPool;              /*swap pool sempahore*/
 
 /*Helper Methods*/
 HIDDEN void find_missing_page();
-HIDDEN void find_frame_swapPool(); /*find frame from swap pool (page replacement algo)*/
+HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo)*/
 HIDDEN void is_occupied_frame(); /*handle ops when frame occupied*/
 HIDDEN void flash_read_write(); /*perform read or write to flash device*/
 HIDDEN void page_table_lookup(); /*find Pg Table entry via page number*/
@@ -66,6 +66,39 @@ void init_swap_structs(){
     }
 }
 
+
+/**************************************************************************************************
+ * TO-DO  
+ * BIG PICTURE - To read/write to a flash device, we need to perform these 2 steps:
+ *      1. Write the flash device’s DATA0 field with the appropriate starting physical
+ *      address of the 4k block to be read (or written); the particular frame’s starting address
+ * 
+ *      2. Write the flash device’s COMMAND field with the device block number 
+ *      (high order three bytes) and the command to read (or write) in the lower order byte.
+ * 
+ * After these 2 steps, we will perform a SYS5 operation (section 3.5.5)
+ * 
+ * @note
+ * Write the COMMAND field and issue SYS5 atomically (disable interrupts before, enable after) 
+ * to ensure interrupt always happen after the SYS5
+ * 
+ * Each u-proc is associated with its own flash device, already initialized with backing store data.
+ * Flash device blocks 0 to 30 store .text and .data, block 31 stores the stack page
+ **************************************************************************************************/
+void flash_read_write(){
+
+}
+
+/**************************************************************************************************
+ * TO-DO  
+ * BIG PICTURE - Implement Page Replacement Algorithm (using Round Robin approach)
+ **************************************************************************************************/
+int find_frame_swapPool(){
+    static int frame_no = 0;    /*use static to retain frame_no value inside of the method, we don't
+    want to declare frame_no as global var*/
+    frame_no = (frame_no + 1) % MAXFRAMES;
+    return frame_no;
+}
 
 /**************************************************************************************************
  * TO-DO  
@@ -95,6 +128,8 @@ void tlb_refill_handler(){
  *       1.Obtain Current Process’s Support Structure (SYS8)
  *       2.Identify the cause of the TLB exception from `sup_exceptState[0].Cause`
  *       3.If the cause is a "Modification" exception, treat it as a program trap
+ * 
+ *       Otherwise:
  *       4.Gain mutual exclusion over the Swap Pool Table (SYS3 - P operation)
  *       5.Determine the missing page number (EntryHi in the exception state).
  *       6.Pick a frame from the Swap Pool (determined by the page replacement algorithm).
@@ -117,5 +152,30 @@ void tlb_refill_handler(){
  *      2. Erase ALL the entries in the TLB (TLBCLR) - implement this before implementing the first approach
  **************************************************************************************************/
 void tlb_exception_handler(){
+    /*If we're here, page fault has occured*/
 
+    support_t* currProc_supp_struct = (support_t*) SYSCALL(8,0,0,0);      /*Obtain current process support structure via syscall number 8*/
+
+    /*Identify Cause of the TLB Exception from sup_exceptState field of support structure*/
+    unsigned int exception_cause = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_cause & GETEXCPCODE) >> CAUSESHIFT;
+
+    /*If the exception code is a "modification" type, treat as program trap*/
+    if (exception_cause == MODEXCEPTION){
+        /*Pass execution to support level program trap handler*/
+        /*trap_handler();*/ /*Define this method in sysSupport.c*/
+    }
+
+    else{
+        /*First, gain mutual exclusion of swap pool via performing a SYS3 operation*/
+        SYSCALL(3,(int)&semaphore_swapPool,0,0);
+        
+        /*Determine missing page number*/
+        unsigned int missing_page_number = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & PAGESHIFT) >> VPNSHIFTMASK;
+
+        /*Pick a frame from the swap pool (Page Replacement Algorithm)*/
+
+    }
+
+
+    if ()
 }

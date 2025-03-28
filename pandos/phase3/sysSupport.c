@@ -22,7 +22,7 @@
  * This module implements
  *       general exception handler. [Section 4.6]
  *       SYSCALL exception handler. [Section 4.7]
- *       Program Trap exception handler. [Section 4.8]
+ *       Program Trap exception handler. [Section 4.8] - vmSupport pass control here if page fault is a modification type
  * 
  **************************************************************************************************/
 #include "../h/types.h"

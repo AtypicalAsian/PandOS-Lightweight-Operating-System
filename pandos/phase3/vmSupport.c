@@ -151,7 +151,7 @@ void tlb_refill_handler(){
  *         If so (Index.P is 0), rewrite (update) that entry (TLBWI) to match the entry in the Page Table.
  *      2. Erase ALL the entries in the TLB (TLBCLR) - implement this before implementing the first approach
  **************************************************************************************************/
-void tlb_exception_handler(){
+void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
     /*If we're here, page fault has occured*/
 
     support_t* currProc_supp_struct = (support_t*) SYSCALL(8,0,0,0);      /*Obtain current process support structure via syscall number 8*/

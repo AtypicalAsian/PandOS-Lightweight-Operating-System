@@ -62,7 +62,7 @@ void init_swap_structs(){
     /*initialize swap pool table*/
     int i;
     for (i=0;i<MAXFRAMES;i++){
-        swap_pool[i].asid = -1; /*If a frame is unoccupied, its ASID entry is set to -1 [section 4.4]*/
+        swap_pool[i].asid = FREEFRAME; /*If a frame is unoccupied, its ASID entry is set to -1 [section 4.4]*/
     }
 }
 
@@ -173,9 +173,16 @@ void tlb_exception_handler(){
         unsigned int missing_page_number = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & PAGESHIFT) >> VPNSHIFTMASK;
 
         /*Pick a frame from the swap pool (Page Replacement Algorithm)*/
+        int free_frame_num = find_frame_swapPool();
+
+        /*If the frame is occupied*/
+
+
+        /*If the frame is occupied*/
+        if (swap_pool[free_frame_num].asid != FREEFRAME){
+            return;
+        }
+
 
     }
-
-
-    if ()
 }

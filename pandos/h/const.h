@@ -199,6 +199,8 @@
 #define MAXUPROCESS     1 /*max number of user processes can be run at any point in time*/
 #define MAXFRAMES       MAXUPROCESS * 2
 
+#define FREEFRAME       -1
+
 #define LINENUM7        7
 
 /*Cause Register Constansts (used in gen_exception_handler in initial.c)*/

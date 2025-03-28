@@ -45,9 +45,9 @@ HIDDEN int semaphore_swapPool;              /*swap pool sempahore*/
 
 
 /*Helper Methods*/
-HIDDEN void find_missing_page();
 HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo)*/
-HIDDEN void is_occupied_frame(); /*handle ops when frame occupied*/
+HIDDEN void occupied_frame_handler(); /*handle ops when frame occupied*/
+HIDDEN void update_tlb_handler(); /*Helper function to perform operations related to updating the TLB*/
 HIDDEN void flash_read_write(); /*perform read or write to flash device*/
 HIDDEN void page_table_lookup(); /*find Pg Table entry via page number*/
 
@@ -98,6 +98,35 @@ int find_frame_swapPool(){
     want to declare frame_no as global var*/
     frame_no = (frame_no + 1) % MAXFRAMES;
     return frame_no;
+}
+
+
+
+/**************************************************************************************************
+ * TO-DO  
+ * - Mark the old page as invalid in the previous process’s Page Table.
+ * - Update the TLB, ensuring it reflects the invalidated page.
+ * - Write the old page back to its backing store (flash device).
+ **************************************************************************************************/
+void occupied_frame_handler(int frame_number){
+    /*Updating TLB and Swap Pool must be atomic -> DISABLE INTERRUPTS*/
+    setSTATUS();
+
+    /*Step 1: Mark old page currently occupying the frame number as invalid*/
+    swap_pool[frame_number].ownerEntry->entryLO &= VALIDBITOFF; /*go to page table entry of owner process and set valid bit to off*/
+
+    /*Step 2: Update the TLB*/
+    update_tlb_handler();
+
+    /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device)*/
+
+    /*We know these info: frame number, frame address (start addrs of frame in RAM can be calc)*/
+    /*Gain mutex over flash device + disable interrupts*/
+    /*Write to flash device registers (bit shifts)*/
+    /*Do Sys5 to block until the write operation completes*/
+    /*Release mutex (semaphore) of flash device*/
+    /*Enable interrupts when we're done*/
+
 }
 
 /**************************************************************************************************
@@ -175,13 +204,21 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         /*Pick a frame from the swap pool (Page Replacement Algorithm)*/
         int free_frame_num = find_frame_swapPool();
 
-        /*If the frame is occupied*/
-
-
-        /*If the frame is occupied*/
+        /*If the frame is occupied -> need to evict it (invalidate the page occupying this frame)*/
         if (swap_pool[free_frame_num].asid != FREEFRAME){
-            return;
+            occupied_frame_handler(free_frame_num); /*Call the helper method that performs operations when a frame is occupied*/
         }
+
+        /*If frame is not occupied*/
+
+        /*Load missing page from backing store to the selected frame (means we're performing a flash device read operation)*/
+
+
+        /*Update curr proc's page table and the swap pool*/
+        // currProcEntry = (supportStruct)
+        swap_pool[free_frame_num].asid = 0;
+        swap_pool[free_frame_num].pg_number = missing_page_number;
+        swap_pool[free_frame_num].ownerEntry = NULL;
 
 
     }

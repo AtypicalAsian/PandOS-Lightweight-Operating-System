@@ -109,6 +109,7 @@
 
 #define VPNSHIFTMASK      12
 #define PAGESHIFT         0xFFFFF000
+#define POOLBASEADDR      0x20020000 /*Base address of the swap pool (used to calc frame address)*/
 
 
 #define CONST1  1

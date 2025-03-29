@@ -86,7 +86,13 @@ void init_swap_structs(){
  * Flash device blocks 0 to 30 store .text and .data, block 31 stores the stack page
  **************************************************************************************************/
 void flash_read_write(){
+    /*SYS3 to gain mutex on flash device*/
 
+
+    /*SYS4 to release flash device*/
+
+    
+    /*If operation failed (check device status) -> program trap handler*/
 }
 
 /**************************************************************************************************
@@ -142,7 +148,17 @@ void occupied_frame_handler(int frame_number){
  *      4. Return control to current process
  **************************************************************************************************/
 void tlb_refill_handler(){
+    /*Determine missing page number*/
+    savedExceptState = (state_PTR) BIOSDATAPAGE;
+    unsigned int missing_page = (savedExceptState->s_entryHI & PAGESHIFT) >> VPNSHIFTMASK;
 
+    /*Write page table entry into TLB -> 3-step process: setENTRYHI, setENTRYLO, TLBWR*/
+    setENTRYHI();
+    setENTRYLO();
+    TLBWR();
+
+    /*Return control to current process (context switch)*/
+    LSDT(savedExceptState);
 }
 
 
@@ -183,41 +199,58 @@ void tlb_refill_handler(){
 void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
     /*If we're here, page fault has occured*/
 
-    support_t* currProc_supp_struct = (support_t*) SYSCALL(8,0,0,0);      /*Obtain current process support structure via syscall number 8*/
+    /*Step 1: Obtain current process support structure via syscall number 8*/
+    support_t* currProc_supp_struct = (support_t*) SYSCALL(SYS8,0,0,0);
 
-    /*Identify Cause of the TLB Exception from sup_exceptState field of support structure*/
+    /*Step 2: Identify Cause of the TLB Exception from sup_exceptState field of support structure*/
     unsigned int exception_cause = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_cause & GETEXCPCODE) >> CAUSESHIFT;
 
-    /*If the exception code is a "modification" type, treat as program trap*/
+    /*Step 3: If the exception code is a "modification" type, treat as program trap*/
     if (exception_cause == MODEXCEPTION){
         /*Pass execution to support level program trap handler*/
         /*trap_handler();*/ /*Define this method in sysSupport.c*/
     }
 
     else{
-        /*First, gain mutual exclusion of swap pool via performing a SYS3 operation*/
-        SYSCALL(3,(int)&semaphore_swapPool,0,0);
+        /*Step 4: First, gain mutual exclusion of swap pool via performing a SYS3 operation*/
+        SYSCALL(SYS3,(int)&semaphore_swapPool,0,0);
         
-        /*Determine missing page number*/
-        unsigned int missing_page_number = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & PAGESHIFT) >> VPNSHIFTMASK;
+        /*Step 5: Determine missing page number*/
+        unsigned int missing_page = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & PAGESHIFT) >> VPNSHIFTMASK;
 
-        /*Pick a frame from the swap pool (Page Replacement Algorithm)*/
+        /*Step 6: Pick a frame from the swap pool (Page Replacement Algorithm)*/
         int free_frame_num = find_frame_swapPool();
 
-        /*If the frame is occupied -> need to evict it (invalidate the page occupying this frame)*/
+        /*Step 7 + 8: If the frame is occupied -> need to evict it (invalidate the page occupying this frame)*/
         if (swap_pool[free_frame_num].asid != FREEFRAME){
             occupied_frame_handler(free_frame_num); /*Call the helper method that performs operations when a frame is occupied*/
         }
 
         /*If frame is not occupied*/
 
-        /*Load missing page from backing store to the selected frame (means we're performing a flash device read operation)*/
+        /*Step 9: Load missing page from backing store to the selected frame (means we're performing a flash device read operation)*/
 
 
         /*Update curr proc's page table and the swap pool*/
+
+        unsigned int free_frame_address;
+        free_frame_address = (free_frame_num * PAGESIZE) + POOLBASEADDR; /*First, we calculate the address of the free frame in swap pool*/
+        /*section [4.4.1]*/
+
+        /*Step 9:Load missing page from backing store into the selected frame (at address free_fram_address)*/
+        /*For this step, we essentially must do a flash device read operation to load the page into the frame*/
+
+        /*First, get flash device number that is associated with the current u-proc*/
+
+        /*Perform flash read op (helper function)*/
+        flash_read_write();
+
+        /*Step 10: Update the Swap Pool Table to reflect the new contents (atomic operations)*/
+        /*First, we disable Interrupts*/
+
         // currProcEntry = (supportStruct)
         swap_pool[free_frame_num].asid = 0;
-        swap_pool[free_frame_num].pg_number = missing_page_number;
+        swap_pool[free_frame_num].pg_number = missing_page;
         swap_pool[free_frame_num].ownerEntry = NULL;
 
 

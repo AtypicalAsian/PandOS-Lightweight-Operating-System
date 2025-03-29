@@ -5,6 +5,7 @@
     "types.h": "c",
     "exceptions.h": "c",
     "const.h": "c",
-    "scheduler.h": "c"
+    "scheduler.h": "c",
+    "syssupport.h": "c"
   }
 }

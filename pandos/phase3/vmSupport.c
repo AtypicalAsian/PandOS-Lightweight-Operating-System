@@ -45,11 +45,10 @@ HIDDEN int semaphore_swapPool;              /*swap pool sempahore*/
 
 
 /*Helper Methods*/
-HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo)*/
-HIDDEN void occupied_frame_handler(); /*handle ops when frame occupied*/
-HIDDEN void update_tlb_handler(); /*Helper function to perform operations related to updating the TLB*/
-HIDDEN void flash_read_write(); /*perform read or write to flash device*/
-HIDDEN void page_table_lookup(); /*find Pg Table entry via page number*/
+HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo) - DONE*/
+HIDDEN void occupied_frame_handler(); /*handle ops when frame occupied - NOT DONE*/
+HIDDEN void update_tlb_handler(); /*Helper function to perform operations related to updating the TLB (optimization) - NOT DONE*/
+HIDDEN void flash_read_write(); /*perform read or write to flash device - NOT DONE*/
 
 /**************************************************************************************************
  * Initialize swap pool table and accompanying semaphores

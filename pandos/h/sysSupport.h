@@ -8,8 +8,8 @@
 #include "../h/types.h"
 #include "../h/const.h"
 
-extern void support_gen_exception_handler();
-extern void prgmTrap_exception_handler();
+extern void gen_excp_handler();
+extern void program_trap_handler();
 
 
 #endif

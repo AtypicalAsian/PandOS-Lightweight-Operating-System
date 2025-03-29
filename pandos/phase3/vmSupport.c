@@ -208,7 +208,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
     /*Step 3: If the exception code is a "modification" type, treat as program trap*/
     if (exception_cause == MODEXCEPTION){
         /*Pass execution to support level program trap handler*/
-        /*trap_handler();*/ /*Define this method in sysSupport.c*/
+        program_trap_handler(); /*Define this method in sysSupport.c*/
     }
 
     else{
@@ -235,7 +235,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
 
         unsigned int free_frame_address;
         free_frame_address = (free_frame_num * PAGESIZE) + POOLBASEADDR; /*First, we calculate the address of the free frame in swap pool*/
-        /*section [4.4.1]*/
+        /*section 4.4.1 - [pandOS]*/
 
         /*Step 9:Load missing page from backing store into the selected frame (at address free_fram_address)*/
         /*For this step, we essentially must do a flash device read operation to load the page into the frame*/
@@ -246,13 +246,35 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         flash_read_write();
 
         /*Step 10: Update the Swap Pool Table to reflect the new contents (atomic operations)*/
-        /*First, we disable Interrupts*/
+        /*First, we disable Interrupts by getting current status and clearing the IEc (global interrupt) bit*/
+        unsigned int status = getSTATUS(); /*get current status*/
+        status = status & (STATUS_IECOFF); /*clear IEc (global interrupt) bit*/
+        setSTATUS(status); /*section 7.1 - [pops]*/
+        
 
-        // currProcEntry = (supportStruct)
-        swap_pool[free_frame_num].asid = 0;
-        swap_pool[free_frame_num].pg_number = missing_page;
-        swap_pool[free_frame_num].ownerEntry = NULL;
+        /*Update swap pool table with new entry*/
+        swap_pool[free_frame_num].asid = currProc_supp_struct->sup_asid; /*set asid of the u-proc that now owns this frame*/
+        swap_pool[free_frame_num].pg_number = missing_page; /*record virtual page number that is now occupying this frame*/
+        swap_pool[free_frame_num].ownerEntry = &(currProc_supp_struct->sup_privatePgTbl[missing_page]); /*store pointer to page table entry for this page*/
 
 
+        /*Step 11: Update the Page Table for the new process, marking the page as valid (V bit)*/
+        currProc_supp_struct->sup_privatePgTbl[missing_page].entryLO = free_frame_address | V_BIT_SET | D_BIT_SET; /*set the valid bit and dirty bit in entryLO*/
+
+        /*Step 12: Update the TLB to include the new page*/
+        /*update_tlb_handler();*/
+
+        TLBCLR(); /*For now, we will do approach 2 - erase ALL the entries in the TLB (OPTIMIZE LATER)*/
+
+        /*Re-enable interrupts*/
+        status = getSTATUS(); /*get current status*/
+        status = status | STATUS_IE_ENABLE; /*set IEc (global interrupt) bit*/
+        setSTATUS(status); /*section 7.1 - [pops]*/
+
+        /*Step 13: Perform SYS4 to release mutex on swap pool table*/
+        SYSCALL(SYS4,(int)&semaphore_swapPool,0,0);
+
+        /*Step 14: Return control (context switch) to the instruction that caused the page fault*/
+        LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));
     }
 }

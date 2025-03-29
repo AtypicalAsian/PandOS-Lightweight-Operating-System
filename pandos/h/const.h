@@ -110,6 +110,8 @@
 #define VPNSHIFTMASK      12
 #define PAGESHIFT         0xFFFFF000
 #define POOLBASEADDR      0x20020000 /*Base address of the swap pool (used to calc frame address)*/
+#define ENTRYLO_PFN_MASK  0x3FFFF000
+
 
 
 #define CONST1  1
@@ -201,6 +203,8 @@
 #define MAXFRAMES       (MAXUPROCESS * 2)
 
 #define VALIDBITOFF     0xFFFFFDFF
+#define V_BIT_SET       0x00000200      /*Bit 9*/
+#define D_BIT_SET       0x00000400      /*Bit 10*/
 
 #define FREEFRAME       -1
 

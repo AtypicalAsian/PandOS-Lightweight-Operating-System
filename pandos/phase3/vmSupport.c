@@ -163,13 +163,13 @@ void tlb_refill_handler(){
 
 
 /**************************************************************************************************
- * TO-DO  
  * BIG PICTURE
  * TLB refills managed by refill handler
  * Pager manages other page faults (page fault on load, page fault on store op, attemp write
  *          to read only page?should not occur in Pandos so treat as program trap)
  * 
- * STEPS
+ * @details
+ * STEPS (Section 4.4 - pandOS)
  *       1.Obtain Current Process’s Support Structure (SYS8)
  *       2.Identify the cause of the TLB exception from `sup_exceptState[0].Cause`
  *       3.If the cause is a "Modification" exception, treat it as a program trap
@@ -190,11 +190,18 @@ void tlb_refill_handler(){
  *       13.Release mutual exclusion over the Swap Pool Table (SYS4 - V operation).
  *       14.Retry the instruction that caused the page fault using LDST.
  * 
- * 
- * Note on update tlb: there are 2 approaches
+ * @note
+ * To update tlb there are 2 approaches
  *      1. Probe the TLB (TLBP) to see if the newly updated TLB entry is indeed cached in the TLB. 
  *         If so (Index.P is 0), rewrite (update) that entry (TLBWI) to match the entry in the Page Table.
  *      2. Erase ALL the entries in the TLB (TLBCLR) - implement this before implementing the first approach
+ * 
+ * @todo
+ *      - implement occupied_frame_handler helper method
+ *      - implement program_trap_handler helper method
+ *      - implement flash_read_write helper method
+ *      - check step 9 for correctness (refer to Pandos docs)
+ *      - optimize step 12 (after testing)
  **************************************************************************************************/
 void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
     /*If we're here, page fault has occured*/

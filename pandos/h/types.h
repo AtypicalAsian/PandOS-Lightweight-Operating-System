@@ -27,6 +27,28 @@ typedef struct {
 #define t_transm_status		d_data0
 #define t_transm_command	d_data1
 
+/* Device register type for disks, flash and printers */
+typedef struct dtpreg {
+	unsigned int status;
+	unsigned int command;
+	unsigned int data0;
+	unsigned int data1;
+} dtpreg_t;
+
+/* Device register type for terminals */
+typedef struct termreg {
+	unsigned int recv_status;
+	unsigned int recv_command;
+	unsigned int transm_status;
+	unsigned int transm_command;
+} termreg_t;
+
+
+typedef union devreg {
+	dtpreg_t dtp;
+	termreg_t term;
+} devreg_t;
+
 
 /* Bus Register Area */
 typedef struct {

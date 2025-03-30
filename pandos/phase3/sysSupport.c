@@ -76,4 +76,6 @@ void get_TOD() {
     cpu_t currTime;
     STCK(currTime);
     
+    currProc->p_s.s_v0 = currTime;
+    
 }

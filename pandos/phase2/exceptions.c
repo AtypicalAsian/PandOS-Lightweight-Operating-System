@@ -248,7 +248,7 @@ void terminateProcess(pcb_PTR proc) {
     /* Free the process's PCB and update system process count */
     freePcb(proc);   /* Return the PCB to the free list */
     procCnt--;       /* Decrement the count of active processes */
-    proc = NULL;     /* Nullify the pointer*/
+    proc = NULL;     /* Nullify the pointer */
 }
 
 

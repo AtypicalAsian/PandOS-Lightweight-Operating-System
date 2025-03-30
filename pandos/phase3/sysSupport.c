@@ -51,3 +51,29 @@ HIDDEN void read_from_terminal(); /*SYS13*/
 void program_trap_handler(){
     return;
 }
+
+void terminate() {
+    /* If there is no U-Proc found, return */
+    if (currProc == NULL) return;
+
+    /* Before termination, free supportStruct for current U-Proc */
+    if (currProc->p_supportStruct != NULL) {
+        currProc->p_supportStruct = NULL;
+    }
+
+    /* Make call to SYS2 */
+    SYSCALL(2, 0, 0, 0);
+    
+    /* Should we switch to another process??? */
+    switchProcess();
+}
+
+void get_TOD() {
+    /* If there is no U-Proc found, return */
+    if (currProc == NULL) return;
+
+    /* Get number of ticks per seconds from the last time the system was booted/reset?? */
+    cpu_t currTime;
+    STCK(currTime);
+    
+}

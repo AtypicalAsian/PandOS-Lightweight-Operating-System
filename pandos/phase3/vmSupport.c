@@ -43,6 +43,8 @@
 HIDDEN swap_pool_t swap_pool[MAXFRAMES];    /*swap pool table*/
 HIDDEN int semaphore_swapPool;              /*swap pool sempahore*/
 
+extern pcb_PTR currentProc; /*pointer to current proces PCB (defined in case we cannot access global currProc variable)*/
+
 
 /*Helper Methods*/
 HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo) - DONE*/
@@ -52,7 +54,6 @@ HIDDEN void flash_read_write(); /*perform read or write to flash device - NOT DO
 
 /**************************************************************************************************
  * Initialize swap pool table and accompanying semaphores
- * NEED TO DEFINE CONSTANT FOR -1 LATER
  **************************************************************************************************/
 void init_swap_structs(){
     /*initialize swap pool semaphore to 1 -> free at first*/
@@ -105,7 +106,13 @@ int find_frame_swapPool(){
     return frame_no;
 }
 
-
+/**************************************************************************************************
+ * TO-DO  
+ * Helper function to perform ops to update the tlb (part of 4.10 optimizations)
+ **************************************************************************************************/
+void update_tlb_handler(){
+    return;
+}
 
 /**************************************************************************************************
  * TO-DO  
@@ -135,6 +142,7 @@ void occupied_frame_handler(int frame_number){
 }
 
 /**************************************************************************************************
+ * ALMOST DONE
  * TO-DO  
  * BIG PICTURE
  *      1. Determine the page number (denoted as p) of the missing TLB entry by
@@ -147,21 +155,31 @@ void occupied_frame_handler(int frame_number){
  *      4. Return control to current process
  **************************************************************************************************/
 void tlb_refill_handler(){
-    /*Determine missing page number*/
-    savedExceptState = (state_PTR) BIOSDATAPAGE;
-    unsigned int missing_page = (savedExceptState->s_entryHI & PAGESHIFT) >> VPNSHIFTMASK;
+    /*Step 1: Determine missing page number*/
+    /*virtual addr split into: VPN and Offset -> to isolate the virtual page number, we mask out 
+    the offset bits, then shift right by 12 bits to get the page number*/
 
-    /*Write page table entry into TLB -> 3-step process: setENTRYHI, setENTRYLO, TLBWR*/
-    setENTRYHI();
-    setENTRYLO();
+    state_PTR saved_except_state = (state_PTR) BIOSDATAPAGE; /*get the saved exception state located at start of BIOS data page*/
+    unsigned int entryHI = saved_except_state->s_entryHI;   /*get entryHI*/
+    unsigned int missing_virtual_pageNum = (entryHI & VPNMASK) >> VPNSHIFT; /*mask offset bits and shift right 12 bits to get VPN*/
+
+    /*WHAT IF VPN exceed size of 32 we defined in types.h? Mod 32?*/
+
+    /*Step 2: Get matching page table entry for missing page number of current process*/
+    pte_entry_t page_entry = currProc->p_supportStruct->sup_privatePgTbl[missing_virtual_pageNum];
+
+    /*Step 3: Write page table entry into TLB -> 3-step process: setENTRYHI, setENTRYLO, TLBWR*/
+    setENTRYHI(page_entry.entryHI);
+    setENTRYLO(page_entry.entryLO);
     TLBWR();
 
-    /*Return control to current process (context switch)*/
-    LSDT(savedExceptState);
+    /*Step 4: Return control to current process (context switch)*/
+    LSDT(saved_except_state);
 }
 
 
 /**************************************************************************************************
+ * ALMOST DONE
  * BIG PICTURE
  * TLB refills managed by refill handler
  * Pager manages other page faults (page fault on load, page fault on store op, attemp write
@@ -222,7 +240,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         SYSCALL(SYS3,(int)&semaphore_swapPool,0,0);
         
         /*Step 5: Determine missing page number*/
-        unsigned int missing_page = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & PAGESHIFT) >> VPNSHIFTMASK;
+        unsigned int missing_page = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & VPNMASK) >> VPNSHIFT;
 
         /*Step 6: Pick a frame from the swap pool (Page Replacement Algorithm)*/
         int free_frame_num = find_frame_swapPool();
@@ -233,12 +251,6 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         }
 
         /*If frame is not occupied*/
-
-        /*Step 9: Load missing page from backing store to the selected frame (means we're performing a flash device read operation)*/
-
-
-        /*Update curr proc's page table and the swap pool*/
-
         unsigned int free_frame_address;
         free_frame_address = (free_frame_num * PAGESIZE) + POOLBASEADDR; /*First, we calculate the address of the free frame in swap pool*/
         /*section 4.4.1 - [pandOS]*/

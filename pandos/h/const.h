@@ -107,8 +107,8 @@
 #define	PGFAULTEXCEPT	  0
 #define GENERALEXCEPT	  1
 
-#define VPNSHIFTMASK      12
-#define PAGESHIFT         0xFFFFF000
+#define VPNSHIFT      12
+#define VPNMASK         0xFFFFF000
 #define POOLBASEADDR      0x20020000 /*Base address of the swap pool (used to calc frame address)*/
 #define ENTRYLO_PFN_MASK  0x3FFFF000
 

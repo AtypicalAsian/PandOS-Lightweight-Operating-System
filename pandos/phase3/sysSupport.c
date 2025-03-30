@@ -56,16 +56,9 @@ void terminate() {
     /* If there is no U-Proc found, return */
     if (currProc == NULL) return;
 
-    /* Before termination, free supportStruct for current U-Proc */
-    if (currProc->p_supportStruct != NULL) {
-        currProc->p_supportStruct = NULL;
-    }
-
     /* Make call to SYS2 */
     SYSCALL(2, 0, 0, 0);
     
-    /* Should we switch to another process??? */
-    switchProcess();
 }
 
 void get_TOD() {

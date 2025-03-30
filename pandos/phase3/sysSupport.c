@@ -53,22 +53,21 @@ void program_trap_handler(){
 }
 
 void terminate() {
-    /* If there is no U-Proc found, return */
-    if (currProc == NULL) return;
 
     /* Make call to SYS2 */
     SYSCALL(2, 0, 0, 0);
-    
+
 }
 
-void get_TOD() {
-    /* If there is no U-Proc found, return */
-    if (currProc == NULL) return;
+void get_TOD(state_t *excState) {
 
     /* Get number of ticks per seconds from the last time the system was booted/reset?? */
     cpu_t currTime;
     STCK(currTime);
-    
-    currProc->p_s.s_v0 = currTime;
-    
+
+    excState->s_v0 = currTime;
+}
+
+void write_to_printer() {
+
 }

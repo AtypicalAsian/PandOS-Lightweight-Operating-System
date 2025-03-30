@@ -68,7 +68,7 @@ void init_swap_structs(){
 
 
 /**************************************************************************************************
- * TO-DO  
+ * TO-DO - pandOS [section 4.5.1]
  * BIG PICTURE - To read/write to a flash device, we need to perform these 2 steps:
  *      1. Write the flash device’s DATA0 field with the appropriate starting physical
  *      address of the 4k block to be read (or written); the particular frame’s starting address
@@ -85,7 +85,7 @@ void init_swap_structs(){
  * Each u-proc is associated with its own flash device, already initialized with backing store data.
  * Flash device blocks 0 to 30 store .text and .data, block 31 stores the stack page
  **************************************************************************************************/
-void flash_read_write(){
+void flash_read_write(int deviceNum, unsigned int block_num, int op_type, int frame_num){
     /*SYS3 to gain mutex on flash device*/
 
 
@@ -93,6 +93,10 @@ void flash_read_write(){
 
     
     /*If operation failed (check device status) -> program trap handler*/
+    unsigned int device_status = 0;
+    if (device_status != READY){
+        program_trap_handler();
+    }
 }
 
 /**************************************************************************************************
@@ -110,36 +114,41 @@ int find_frame_swapPool(){
  * TO-DO  
  * Helper function to perform ops to update the tlb (part of 4.10 optimizations)
  **************************************************************************************************/
-void update_tlb_handler(){
+void update_tlb_handler(pte_entry_t *new_page_table_entry){
     return;
 }
 
 /**************************************************************************************************
+ * ALMOST DONE
  * TO-DO  
  * - Mark the old page as invalid in the previous process’s Page Table.
  * - Update the TLB, ensuring it reflects the invalidated page.
  * - Write the old page back to its backing store (flash device).
+ * 
+ * @note
+ * If frame i is occupied, assume it's occupied by logical page number k belonging to process x (ASID)
+ * and that it is "dirty" (dirty bit ON) - pandOS [section 4.4]
  **************************************************************************************************/
 void occupied_frame_handler(int frame_number){
-    /*Updating TLB and Swap Pool must be atomic -> DISABLE INTERRUPTS*/
-    setSTATUS();
+    /*Updating TLB and Swap Pool must be atomic -> DISABLE INTERRUPTS - pandOS [section 4.5.3]*/
+    setSTATUS(STATUS_IECOFF);
 
     /*Step 1: Mark old page currently occupying the frame number as invalid*/
     swap_pool[frame_number].ownerEntry->entryLO &= VALIDBITOFF; /*go to page table entry of owner process and set valid bit to off*/
 
     /*Step 2: Update the TLB*/
-    update_tlb_handler();
+    update_tlb_handler(swap_pool[frame_number].ownerEntry);
 
-    /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device)*/
+    /*ENABLE INTERRUPTS*/
+    setSTATUS(STATUS_IECON);
 
-    /*We know these info: frame number, frame address (start addrs of frame in RAM can be calc)*/
-    /*Gain mutex over flash device + disable interrupts*/
-    /*Write to flash device registers (bit shifts)*/
-    /*Do Sys5 to block until the write operation completes*/
-    /*Release mutex (semaphore) of flash device*/
-    /*Enable interrupts when we're done*/
+    unsigned int occupiedASID = swap_pool[frame_number].asid;
+    unsigned int occupiedPageNumber = swap_pool[frame_number].pg_number;    
 
+    /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device) - pandOS [section 4.5.1]*/
+    flash_read_write(3,occupiedASID-1,occupiedPageNumber,frame_number);
 }
+
 
 /**************************************************************************************************
  * ALMOST DONE

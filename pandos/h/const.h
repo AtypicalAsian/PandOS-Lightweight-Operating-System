@@ -93,6 +93,12 @@
 /* device common COMMAND codes */
 #define RESET			    0
 #define ACK				    1
+#define PRINTCHR            2 /* For printer device, specifically */
+
+/* Printer device */
+#define PRINTER_LINE_NUM    6
+#define PRINTER_READY       1
+#define PRINTER_BUSY        3
 
 /* Memory related constants */
 #define KSEG0           0x00000000

@@ -54,20 +54,67 @@ void program_trap_handler(){
 
 void terminate() {
 
-    /* Make call to SYS2 */
+    /* Make call to SYS2
+
+    Ref: pandos section 4.7.1 
+    */
     SYSCALL(2, 0, 0, 0);
 
 }
 
 void get_TOD(state_t *excState) {
 
-    /* Get number of ticks per seconds from the last time the system was booted/reset?? */
+    /* Get number of ticks per seconds from the last time the system was booted/reset
+    
+    Ref: pandos section 4.7.2 
+    */
     cpu_t currTime;
     STCK(currTime);
 
     excState->s_v0 = currTime;
 }
 
-void write_to_printer() {
+void write_to_printer(char *virtAddr, int len, support_t *currProcSupport) {
+    /* 
+    Ref: pandos section 4.7.3 
+    */
+    if (len < 0 || len > 128) {
+        SYSCALL(9, 0, 0, 0);
+    }
 
+    /* STEPS:
+    1. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
+    2. After finding the semaphore, lock it before writing process
+    3. Use For Loop to iterating through each character and write one by one to printer: start at virtAddr, end at virtAddr + len 
+    (cond: the device register is ready to write)
+    4. 
+    
+    Ref: princOfOperations section 5.1, 5.6
+    */
+   int semIndex;
+   /*
+   TO-DO: (Expand STEPS.1 & 2)
+   1. PRINTER_LINE_NUM = 6
+   2. Lock semaphore with semIndex (performing SYS5)
+   
+   */
+   semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
+   SYSCALL(5, semIndex, 0, 0);
+   
+   devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR; /* Pointer to the device register area */
+   device_t *printerDevice = &(devRegArea->devreg[semIndex]);
+
+   int i;
+   for (i = 0; i < len; i ++) {
+        /*
+        Ref: princOfOperations section 5.6, table 5.11
+        */
+        if ((printerDevice->d_status & PRINTER_BUSY) == PRINTER_READY) {
+            printerDevice->d_data0 = (memaddr) *(virtAddr + i);
+            printerDevice->d_command = PRINTCHR;
+        } else {
+            break;
+        }
+    
+   }
 }

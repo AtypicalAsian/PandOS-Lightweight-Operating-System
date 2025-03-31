@@ -48,9 +48,9 @@ extern pcb_PTR currentProc; /*pointer to current proces PCB (defined in case we 
 
 /*Helper Methods*/
 HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo) - DONE*/
-HIDDEN void occupied_frame_handler(); /*handle ops when frame occupied - NOT DONE*/
+HIDDEN void occupied_frame_handler(); /*handle ops when frame occupied - ALMOST DONE*/
 HIDDEN void update_tlb_handler(); /*Helper function to perform operations related to updating the TLB (optimization) - NOT DONE*/
-HIDDEN void flash_read_write(); /*perform read or write to flash device - NOT DONE*/
+HIDDEN void flash_read_write(); /*perform read or write to flash device - ALMOST DONE*/
 
 /**************************************************************************************************
  * Initialize swap pool table and accompanying semaphores
@@ -86,6 +86,16 @@ void init_swap_structs(){
  * Flash device blocks 0 to 30 store .text and .data, block 31 stores the stack page
  **************************************************************************************************/
 void flash_read_write(int deviceNum, unsigned int block_num, int op_type, int frame_num){
+    /*Local variables to thid method*/
+    unsigned int device_status;
+    unsigned int command;
+    memaddr physical_frame_num;
+    dtpreg_t* flash_dev_addr;
+
+    /*Step 1: Calculate physical address of 4k block to be read (or written)*/
+    physical_frame_num = (frame_num << 12) + POOLBASEADDR;
+
+
     /*SYS3 to gain mutex on flash device*/
 
 
@@ -93,7 +103,6 @@ void flash_read_write(int deviceNum, unsigned int block_num, int op_type, int fr
 
     
     /*If operation failed (check device status) -> program trap handler*/
-    unsigned int device_status = 0;
     if (device_status != READY){
         program_trap_handler();
     }
@@ -176,6 +185,9 @@ void tlb_refill_handler(){
 
     /*Step 2: Get matching page table entry for missing page number of current process*/
     pte_entry_t page_entry = currProc->p_supportStruct->sup_privatePgTbl[missing_virtual_pageNum];
+    /*Technically, tlb_refill_handler method is part of phase 2 so we can access currProc global var?*/
+    /*Otherwise, we can use sys8 to access the support structure of the current process*/
+
 
     /*Step 3: Write page table entry into TLB -> 3-step process: setENTRYHI, setENTRYLO, TLBWR*/
     setENTRYHI(page_entry.entryHI);

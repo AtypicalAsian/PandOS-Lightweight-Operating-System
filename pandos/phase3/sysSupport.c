@@ -101,7 +101,6 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport) {
    
    */
    semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
-   SYSCALL(5, semIndex, 0, 0);
    
    devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR; /* Pointer to the device register area */
    device_t *printerDevice = &(devRegArea->devreg[semIndex]);
@@ -110,14 +109,22 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport) {
    for (i = 0; i < len; i ++) {
         /*
         Ref: princOfOperations section 5.6, table 5.11
+             princOfOperations section 2.3
         */
         if ((printerDevice->d_status & PRINTER_BUSY) == PRINTER_READY) {
-            
-            printerDevice->d_data0 = (memaddr) *(virtAddr + i);
+            unsigned int oldStatus = getSTATUS();
+
             /* Need to perform setSTATUS (disable interrupt) to ensure the atomicity */
+            setSTATUS(STATUS_ALL_OFF);
+
+            printerDevice->d_data0 = (memaddr) *(virtAddr + i);
             printerDevice->d_command = PRINTCHR;
-            /* Need to perform waitForIO to "truly" print the character */
-            /* Need to perform setSTATUS (enable interrupt again) to allow I/O request */
+
+            /* Need to perform waitForIO to "truly" request printing the character */
+            SYSCALL(5, semIndex, 0, 0);
+
+            /* Need to perform setSTATUS (enable interrupt again) to restore previous status & allow I/O request */
+            setSTATUS(oldStatus);
         } else {
             break;
         }
@@ -125,4 +132,5 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport) {
    }
 
    /* Add SYSCALL 6 to unblock the semaphore */
+   SYSCALL(6, 0, 0, 0);
 }

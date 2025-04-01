@@ -43,8 +43,6 @@
 HIDDEN swap_pool_t swap_pool[MAXFRAMES];    /*swap pool table*/
 HIDDEN int semaphore_swapPool;              /*swap pool sempahore*/
 
-extern pcb_PTR currentProc; /*pointer to current proces PCB (defined in case we cannot access global currProc variable)*/
-
 
 /*Helper Methods*/
 HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo) - DONE*/
@@ -85,15 +83,18 @@ void init_swap_structs(){
  * Each u-proc is associated with its own flash device, already initialized with backing store data.
  * Flash device blocks 0 to 30 store .text and .data, block 31 stores the stack page
  **************************************************************************************************/
-void flash_read_write(int deviceNum, unsigned int block_num, int op_type, int frame_num){
+void flash_read_write(int deviceNum, int block_num, int op_type, int frame_num){
     /*Local variables to thid method*/
-    unsigned int device_status;
-    unsigned int command;
-    memaddr physical_frame_num;
-    dtpreg_t* flash_dev_addr;
+    unsigned int device_status; /*status of the device (success or no)*/
+    unsigned int command;       /*command to write to COMMAND field of flash device*/
+    device_t* f_device;      /*pointer to the flash device we want to work with*/
+
+
+    f_device = (device_t *) ((DEV_STARTING_REG + ((FLASHINT - DISKINT) * (DEVPERINT * DEVREGSIZE)) + (deviceNum * DEVREGSIZE)));
 
     /*Step 1: Calculate physical address of 4k block to be read (or written)*/
-    physical_frame_num = (frame_num << 12) + POOLBASEADDR;
+
+    /*We shift block number by 8 bits to get high order 3 bytes + set the lower order byte with the command code (read or write)*/
 
 
     /*SYS3 to gain mutex on flash device*/
@@ -151,16 +152,16 @@ void occupied_frame_handler(int frame_number){
     /*ENABLE INTERRUPTS*/
     setSTATUS(STATUS_IECON);
 
-    unsigned int occupiedASID = swap_pool[frame_number].asid;
-    unsigned int occupiedPageNumber = swap_pool[frame_number].pg_number;    
+    unsigned int occp_pageNum = swap_pool[frame_number].pg_number; /*get the page number of the page occupying the frame at swap_pool[frame_number]*/    
+    unsigned int occp_asid = swap_pool[frame_number].asid; /*get ASID of process whose page owns the frame at swap_pool[frame_number]*/
 
     /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device) - pandOS [section 4.5.1]*/
-    flash_read_write(3,occupiedASID-1,occupiedPageNumber,frame_number);
+    flash_read_write(occp_pageNum,occp_asid,3,frame_number);
 }
 
 
 /**************************************************************************************************
- * ALMOST DONE
+ * DONE
  * TO-DO  
  * BIG PICTURE
  *      1. Determine the page number (denoted as p) of the missing TLB entry by

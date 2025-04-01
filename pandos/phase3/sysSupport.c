@@ -38,6 +38,8 @@
 #include "../h/sysSupport.h"
 /*#include "/usr/include/umps3/umps/libumps.h"*/
 
+extern int deviceSema4s[MAXSHAREIODEVS];
+
 /*SYSCALL 9-12 function declarations*/
 HIDDEN void syscall_excp_handler(); /*Syscall exception handler*/
 void gen_excp_handler(); /*General exception handler*/

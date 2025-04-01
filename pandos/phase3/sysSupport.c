@@ -112,12 +112,17 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport) {
         Ref: princOfOperations section 5.6, table 5.11
         */
         if ((printerDevice->d_status & PRINTER_BUSY) == PRINTER_READY) {
+            
             printerDevice->d_data0 = (memaddr) *(virtAddr + i);
-            /* Need to setSTATUS (disable interrupt) to ensure the atomicity */
+            /* Need to perform setSTATUS (disable interrupt) to ensure the atomicity */
             printerDevice->d_command = PRINTCHR;
+            /* Need to perform waitForIO to "truly" print the character */
+            /* Need to perform setSTATUS (enable interrupt again) to allow I/O request */
         } else {
             break;
         }
     
    }
+
+   /* Add SYSCALL 6 to unblock the semaphore */
 }

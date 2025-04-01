@@ -102,7 +102,8 @@
 #define RAMSTART        0x20000000
 #define BIOSDATAPAGE    0x0FFFF000
 #define	PASSUPVECTOR	  0x0FFFF900
-#define DEVICEREGSTART  0x10000054 /*device register starting address - [figure 5.2 pops section 5.2]*/
+#define DEV_STARTING_REG  0x10000054 /*device register starting address - [figure 5.2 pops section 5.2]*/
+#define FRAME_SHIFT 0x20020000 /*starting address of the swap pool*/
 
 /* Exceptions related constants */
 #define	PGFAULTEXCEPT	  0
@@ -112,6 +113,12 @@
 #define VPNMASK         0xFFFFF000
 #define POOLBASEADDR      0x20020000 /*Base address of the swap pool (used to calc frame address)*/
 #define ENTRYLO_PFN_MASK  0x3FFFF000
+
+#define HIGH_ORDER_3BYTES_SHIFT 8
+#define READFLASH 2
+#define WRITEFLASH 3
+
+#define MAX_PAGES 32 /*max number of pages of a process*/
 
 
 /*Macro to get the index of the deviceSema4s array*/
@@ -170,6 +177,9 @@
 #define STATUS_USERPON	 0x00000008	/* constant for setting the user-mode on after LDST (i.e., KUp (bit 3) = 1) */
 #define	STATUS_IECOFF	 0xFFFFFFFE	/* constant for disabling the global interrupt bit (i.e., IEc (bit 0) = 0) */
 #define STATUS_IECON	 0x00000001	/* constant for enabling the global interrupt bit (i.e., IEc (bit 0) = 1) */
+
+#define INT_OFF     getSTATUS() & (STATUS_IECOFF)
+#define INT_ON      getSTATUS() | STATUS_IECON | STATUS_INT_ON
 
 #define	RESINSTRCODE	 0xFFFFFF28
 

@@ -92,12 +92,12 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
 
 
     /*Method 1: Array indexing (Calculate address of specific flash device register block)*/
-    /*int devIdx = (FLASHINT-DISKINT) * DEVPERINT + deviceNum;
+    int devIdx = (FLASHINT-DISKINT) * DEVPERINT + deviceNum;
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
-    device_t * flashDev = &busRegArea->devreg[devIdx];*/
+    f_device = &busRegArea->devreg[devIdx];
 
     /*Compute pointer to correct device_t struct representing the selected flash device - method 2*/
-    f_device = (device_t *) ((DEV_STARTING_REG + ((FLASHINT - DISKINT) * (DEVPERINT * DEVREGSIZE)) + (deviceNum * DEVREGSIZE)));
+    /*f_device = (device_t *) ((DEV_STARTING_REG + ((FLASHINT - DISKINT) * (DEVPERINT * DEVREGSIZE)) + (deviceNum * DEVREGSIZE)));*/
 
     /*Perform SYS3 to lock flash device semaphore*/
     SYSCALL(SYS3, (int)&deviceSema4s[deviceNum],0,0);
@@ -278,7 +278,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
 
         /*Step 6: Pick a frame from the swap pool (Page Replacement Algorithm)*/
         free_frame_num = find_frame_swapPool();
-        frame_addr = (free_frame_num * PAGESIZE) + FRAME_SHIFT; /*Calculate the starting address of the frame (4KB block)*/
+        frame_addr = (free_frame_num * PAGESIZE) + POOLBASEADDR; /*Calculate the starting address of the frame (4KB block)*/
         /*We get frame address by multiplying the page size with the frame number then adding the offset which is the starting address of the swap pool*/
 
 
@@ -309,17 +309,19 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         }
 
         /*If frame is not occupied*/
-        unsigned int free_frame_address;
-        free_frame_address = (free_frame_num * PAGESIZE) + POOLBASEADDR; /*First, we calculate the address of the free frame in swap pool*/
+        
         /*section 4.4.1 - [pandOS]*/
 
         /*Step 9:Load missing page from backing store into the selected frame (at address free_fram_address)*/
         /*For this step, we essentially must do a flash device read operation to load the page into the frame*/
+        asid = currProc_supp_struct->sup_asid; /*Get process asid to map to flash device number*/
+        flash_no = asid - 1; /*Get flash device number associated with the process asid*/
+        missing_page_no = missing_page_no % MAX_PAGES; /*mod to map page to range 0-31*/
 
         /*First, get flash device number that is associated with the current u-proc*/
 
-        /*Perform flash read op (helper function)*/
-        flash_read_write();
+        /*Perform flash read operation*/
+        flash_read_write(flash_no,missing_page_no,READFLASH,frame_addr);
 
         /*Step 10: Update the Swap Pool Table to reflect the new contents (atomic operations)*/
         /*First, we disable Interrupts by getting current status and clearing the IEc (global interrupt) bit*/
@@ -327,15 +329,15 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         
 
         /*Update swap pool table with new entry*/
-        swap_pool[free_frame_num].asid = currProc_supp_struct->sup_asid; /*set asid of the u-proc that now owns this frame*/
+        swap_pool[free_frame_num].asid = asid; /*set asid of the u-proc that now owns this frame*/
         swap_pool[free_frame_num].pg_number = missing_page_no; /*record virtual page number that is now occupying this frame*/
         swap_pool[free_frame_num].ownerEntry = &(currProc_supp_struct->sup_privatePgTbl[missing_page_no]); /*store pointer to page table entry for this page*/
 
 
         /*Step 11: Update the Page Table for the new process, marking the page as valid (V bit)*/
-        currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO = free_frame_address | V_BIT_SET | D_BIT_SET; /*set the valid bit and dirty bit in entryLO*/
+        currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO = frame_addr | V_BIT_SET | D_BIT_SET; /*set the valid bit and dirty bit in entryLO*/
 
-        /*Step 12: Update the TLB to include the new page*/
+        /*Step 12: Update the TLB to include the new page (optimization)*/
         /*update_tlb_handler();*/
 
         TLBCLR(); /*For now, we will do approach 2 - erase ALL the entries in the TLB (OPTIMIZE LATER)*/

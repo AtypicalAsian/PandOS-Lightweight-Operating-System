@@ -89,7 +89,11 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport) {
     2. After finding the semaphore, lock it before writing process
     3. Use For Loop to iterating through each character and write one by one to printer: start at virtAddr, end at virtAddr + len 
     (cond: the device register is ready to write)
-    4. 
+       3.1. Retrieve current processor status before disabling all external interrupts
+       3.2. Reset the status to 0x0 and disable all interrupts
+       3.3. Pass character to printer device with d_data0 & d_command
+       3.4. Request I/O to print the passed character 
+       3.5. Enable the interrupt again by restoring the previous processor status
     
     Ref: princOfOperations section 5.1, 5.6
     */

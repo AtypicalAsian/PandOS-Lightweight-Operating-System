@@ -100,7 +100,7 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     f_device = (device_t *) ((DEV_STARTING_REG + ((FLASHINT - DISKINT) * (DEVPERINT * DEVREGSIZE)) + (deviceNum * DEVREGSIZE)));
 
     /*Perform SYS3 to lock flash device semaphore*/
-    SYSCALL(SYS3, (int)&deviceSemaphores[deviceNum],0,0);
+    SYSCALL(SYS3, (int)&deviceSema4s[deviceNum],0,0);
 
     /*Read DATA1 field to get MAXBLOCK*/
     max_block = f_device->d_data1; /*pops - [section 5.4]*/
@@ -131,7 +131,7 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     setSTATUS(INT_ON); /*enable interrupts*/
     
     /*Perform SYS4 to unlock flash device semaphore*/
-    SYSCALL(SYS4,(int)&deviceSemaphores[deviceNum],0,0);
+    SYSCALL(SYS4,(int)&deviceSema4s[deviceNum],0,0);
 
     /*If operation failed (check device status) -> program trap handler*/
     if (device_status != READY){

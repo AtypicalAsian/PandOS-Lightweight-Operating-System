@@ -113,6 +113,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport) {
         */
         if ((printerDevice->d_status & PRINTER_BUSY) == PRINTER_READY) {
             printerDevice->d_data0 = (memaddr) *(virtAddr + i);
+            /* Need to setSTATUS (disable interrupt) to ensure the atomicity */
             printerDevice->d_command = PRINTCHR;
         } else {
             break;

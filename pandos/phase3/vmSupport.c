@@ -171,7 +171,7 @@ void update_tlb_handler(pte_entry_t *new_page_table_entry){
     TLBP(); /*probe the TLB to searches for a matching entry using the current EntryHi*/
 
     /*Check INDEX.P bit (bit 31 of INDEX)*/
-    if ((KUSEG & getINDEX()) == 0){
+    if ((KUSEG & getINDEX()) == 0){ /*If P bit == 0 -> found a matching entry*/
         setENTRYLO(new_page_table_entry->entryLO);  /* Load the updated physical frame number and permissions into EntryLo */
         setENTRYHI(new_page_table_entry->entryHI);  /* Re-load EntryHi just to be safe before issuing TLBWI (DO WE NEED TO DO THIS?) */
         TLBWI(); /* Write to the TLB at the index found by TLBP. This updates the cached entry to match the page table*/
@@ -270,11 +270,8 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
     /*--------------Declare local variables---------------------*/
     support_t* currProc_supp_struct;
     int free_frame_num = 0;
-    int block_id;
-    int device_status;
     int flash_no;
     unsigned int frame_addr;
-    pte_entry_t *pageTB_entry;
     unsigned int exception_cause;
     int asid;
     unsigned int missing_page_no;

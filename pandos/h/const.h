@@ -247,6 +247,18 @@
 #define MAX(A,B)		((A) < (B) ? B : A)
 #define	ALIGNED(A)		(((unsigned)A & 0x3) == 0)
 
+/* Terminal Device Codes */
+#define TERMINAL_LINE_NUM   7
+
+#define TERMINAL_STATUS_NOT_INSTALLED   0
+#define TERMINAL_STATUS_READY   1
+#define TERMINAL_STATUS_TRANSMITTED 5
+
+#define TERMINAL_COMMAND_TRANSMITCHAR   2
+
+#define TERMINAL_CHAR_SHIFT 8
+#define TERMINAL_STATUS_MASK    0xFF
+
 /* Macro to load the Interval Timer */
 #define LDIT(T)	((* ((cpu_t *) INTERVALTMR)) = (T) * (* ((cpu_t *) TIMESCALEADDR))) 
 

@@ -50,6 +50,7 @@ HIDDEN void update_tlb_handler(); /*Helper function to perform operations relate
 HIDDEN void flash_read_write(); /*perform read or write to flash device - ALMOST DONE*/
 
 /**************************************************************************************************
+ * DONE
  * Initialize swap pool table and accompanying semaphores
  **************************************************************************************************/
 void init_swap_structs(){
@@ -140,22 +141,44 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
 }
 
 /**************************************************************************************************
+ * DONE
  * TO-DO  
  * BIG PICTURE - Implement Page Replacement Algorithm (using Round Robin approach)
  **************************************************************************************************/
 int find_frame_swapPool(){
-    static int frame_no = 0;    /*use static to retain frame_no value inside of the method, we don't
-    want to declare frame_no as global var*/
+    static int frame_no = 0;    /*use static to retain frame_no value inside of the method*/
     frame_no = (frame_no + 1) % MAXFRAMES;
     return frame_no;
 }
 
 /**************************************************************************************************
+ * DONE
  * TO-DO  
- * Helper function to perform ops to update the tlb (part of 4.10 optimizations)
+ * This function ensures TLB cache consistency after the page table is updated.
+ * Reference: POPS 6.4 and PandOS 4.5.2.
  **************************************************************************************************/
 void update_tlb_handler(pte_entry_t *new_page_table_entry){
-    return;
+
+    /* Save the current value of the CP0 EntryHi register (contains VPN + ASID).
+     * We will restore this later to preserve system state.
+     */
+    unsigned int entry_prev = getENTRYHI();
+
+    /* Load the new page's virtual page number (VPN) and ASID into EntryHi.
+     * This is necessary for TLB to find the matching page table entry
+     */
+    setENTRYHI(new_page_table_entry->entryHI);
+    TLBP(); /*probe the TLB to searches for a matching entry using the current EntryHi*/
+
+    /*Check INDEX.P bit (bit 31 of INDEX)*/
+    if ((KUSEG & getINDEX()) == 0){
+        setENTRYLO(new_page_table_entry->entryLO);  /* Load the updated physical frame number and permissions into EntryLo */
+        setENTRYHI(new_page_table_entry->entryHI);  /* Re-load EntryHi just to be safe before issuing TLBWI (DO WE NEED TO DO THIS?) */
+        TLBWI(); /* Write to the TLB at the index found by TLBP. This updates the cached entry to match the page table*/
+    }
+
+    /* Restore the previously saved EntryHi in CP0 register */
+    setENTRYHI(entry_prev);
 }
 
 /**************************************************************************************************

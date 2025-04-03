@@ -89,10 +89,27 @@
 #define UNINSTALLED		0
 #define READY			    1
 #define BUSY			    3
+#define PRINTCHR            2
+
+/*Printer Device*/
+#define PRINTER_LINE_NUM    6
 
 /* device common COMMAND codes */
 #define RESET			    0
 #define ACK				    1
+
+
+/* Terminal Device Codes */
+#define TERMINAL_LINE_NUM   7
+
+#define TERMINAL_STATUS_NOT_INSTALLED   0
+#define TERMINAL_STATUS_READY   1
+#define TERMINAL_STATUS_TRANSMITTED 5
+
+#define TERMINAL_COMMAND_TRANSMITCHAR   2
+
+#define TERMINAL_CHAR_SHIFT 8
+#define TERMINAL_STATUS_MASK    0xFF
 
 /* Memory related constants */
 #define KSEG0           0x00000000

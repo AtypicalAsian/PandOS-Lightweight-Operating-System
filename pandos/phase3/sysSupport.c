@@ -41,31 +41,46 @@
 extern int deviceSema4s[MAXSHAREIODEVS];
 
 /*SYSCALL 9-12 function declarations*/
-HIDDEN void syscall_excp_handler(); /*Syscall exception handler*/
-void gen_excp_handler();            /*General exception handler*/
-void program_trap_handler();        /*Program Trap Handler*/
-HIDDEN void terminate();            /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
-HIDDEN void get_TOD();              /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
-HIDDEN void write_to_printer();     /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
-HIDDEN int write_to_terminal();    /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
-HIDDEN void read_from_terminal();   /*SYS13*/
+HIDDEN void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested); /*Syscall exception handler*/
+void gen_excp_handler(); /*General exception handler*/
+void program_trap_handler(); /*Program Trap Handler*/
+HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
+HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
+HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
+HIDDEN int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
+HIDDEN void read_from_terminal(); /*SYS13*/
 
-void program_trap_handler()
-{
-    return;
+
+/**************************************************************************************************
+ * DONE
+ * This function is a wrapper to perform LDST
+ * Can't use LDST directly in phase 3?
+ **************************************************************************************************/
+void return_control(int exception_code, support_t *supportStruct){
+    state_PTR return_state = &(supportStruct->sup_exceptState[exception_code]);
+    /*Perform LDST to return control to the current process*/
+    LDST(return_state);
 }
 
+
+/**************************************************************************************************
+ * TO-DO 
+ * terminate() is a wrapper for the kernel-mode restricted SYS2 service
+ **************************************************************************************************/
 void terminate()
 {
-
     /* Make call to SYS2
-
     Ref: pandos section 4.7.1
     */
     SYSCALL(2, 0, 0, 0);
 }
 
-void get_TOD(state_t *excState)
+/**************************************************************************************************
+ * TO-DO 
+ * Returns the number of microseconds since system boot
+ * The method calls the hardware TOD clock and stores in register v0
+ **************************************************************************************************/
+void get_TOD(state_PTR excState)
 {
 
     /* Get number of ticks per seconds from the last time the system was booted/reset
@@ -74,34 +89,52 @@ void get_TOD(state_t *excState)
     */
     cpu_t currTime;
     STCK(currTime);
-
     excState->s_v0 = currTime;
 }
 
+
+/**************************************************************************************************
+ * TO-DO 
+ **************************************************************************************************/
 void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 {
-    /*
-    Ref: pandos section 4.7.3
-    */
-    if (len < 0 || len > 128)
-    {
-        SYSCALL(9, 0, 0, 0);
-    }
 
-    /* STEPS:
-    1. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
-    2. After finding the semaphore, lock it before writing process
-    3. Use For Loop to iterating through each character and write one by one to printer: start at virtAddr, end at virtAddr + len
-    (cond: the device register is ready to write)
-       3.1. Retrieve current processor status before disabling all external interrupts
-       3.2. Reset the status to 0x0 and disable all interrupts
-       3.3. Pass character to printer device with d_data0 & d_command
-       3.4. Request I/O to print the passed character
-       3.5. Enable the interrupt again by restoring the previous processor status
+    /* 
+    Ref: pandos section 4.7.3
+    STEPS:
+    1. Check if address we're writing from is outside of the uproc logical address space
+    2. Check if length of string is within bounds (0-128)
+    3. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
+    4. Perform SYS3 to gain mutex over printer device
+    5. Use For Loop to iterating through each character and write one by one to printer: start at virtAddr, end at virtAddr + len
+    (cond: printer device is not busy (ready))
+       5.1. Retrieve current processor status before disabling all external interrupts
+       5.2. Reset the status to 0x0 and disable all interrupts
+       5.3. Pass character to printer device with d_data0 & d_command
+       5.4. Request I/O to print the passed character
+       5.5. Enable the interrupt again by restoring the previous processor status
+       5.6 Increment transmitted character count
+    (cond: printer device is busy)
+       5.7 Return the negative of device status in v0
+    6. Load the transmitted char count into v0 register
+    7. Perform SYS4 to release printer device sempahore
 
     Ref: princOfOperations section 5.1, 5.6
     */
+    
+    /*Check if address we're writing from is outside of the uproc logical address space*/
+
+    /*Check if length of string is within bounds (0-128)*/
+    if (len < 0 || len > 128) /*DEFINE CONSTANTS FOR THESE*/
+    {
+        SYSCALL(SYS9, 0, 0, 0);
+    }
+
+    /*--------------Declare local variables---------------------*/
     int semIndex;
+    int char_printed_count; /*tracks how many characters were printed*/
+    /*----------------------------------------------------------*/
+
     semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
 
     devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
@@ -114,24 +147,25 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
         Ref: princOfOperations section 5.6, table 5.11
              princOfOperations section 2.3
         */
-        if ((printerDevice->d_status & PRINTER_BUSY) == PRINTER_READY)
+        if ((printerDevice->d_status & BUSY) == READY) /*no need to & with BUSY?*/
         {
             memaddr oldStatus = getSTATUS();
 
             /* Need to perform setSTATUS (disable interrupt) to ensure the atomicity */
-            setSTATUS(STATUS_ALL_OFF);
+            setSTATUS(INT_OFF);
 
             printerDevice->d_data0 = (memaddr) * (virtAddr + i);
             printerDevice->d_command = PRINTCHR;
 
             /* Need to perform waitForIO to "truly" request printing the character */
-            SYSCALL(5, semIndex, 0, 0);
+            SYSCALL(SYS5, semIndex, 0, 0);
 
             /* Need to perform setSTATUS (enable interrupt again) to restore previous status & allow I/O request */
-            setSTATUS(oldStatus);
+            setSTATUS(INT_ON);
         }
         else
         {
+            /*If printer device status code is not READY -> have to return negative of device status*/
             break;
         }
     }
@@ -203,3 +237,97 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     SYSCALL(6, semIndex, 0, 0);
     return transmittedChars;
 }
+
+
+/**************************************************************************************************
+ * TO-DO 
+ * Support Level Program Trap Handler
+ * BIG PICTURE
+ **************************************************************************************************/
+void program_trap_handler(){
+    terminate();
+}
+
+/**************************************************************************************************
+ * TO-DO 
+ * Support Level Syscall Exception Handler
+ * BIG PICTURE
+ * Steps:
+ *      1. Check if the syscall number falls within the range 9-13
+ *            If invalid syscall number, handle as program trap
+ *      2. Reads parameters in registers a1,a2,a3
+ *      3. Manually imcrement PC+4 to avoid re-executing Syscall on return
+ *      4. Execute appropriate syscall handler
+ *      5. LDST to return to process that requested SYSCALL
+ **************************************************************************************************/
+void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
+    /*--------------Declare local variables---------------------*/
+    char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
+    int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
+    /*int param3;*/     /*value stored in a3*/
+    /*----------------------------------------------------------*/
+
+
+    /*Step 1: Check syscall number (must fall within syscall 9 to 13)*/
+    if (syscall_num_requested > 13 || syscall_num_requested < 9){
+        program_trap_handler();
+        return;
+    }
+
+    /*Step 2: Read values in registers a1-a3*/
+    virtualAddr = (char *) currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+    /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3*/  
+
+    /*Step 3: Increment PC+4 to execute next instruction on return*/
+    currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
+
+    /*Step 4: Execute appropriate syscall helper method based on requested syscall number*/
+    switch(syscall_num_requested){
+        case SYS9:
+            terminate();
+        case SYS10:
+            get_TOD(&currProc_support_struct->sup_exceptState[GENERALEXCEPT]);
+        case SYS11:
+            /*virtual address of first char in a1, length of string in a2*/
+            write_to_printer(virtualAddr, length, currProc_support_struct);
+        case SYS12:
+            /*virtual address of first char in a1, length of string in a2*/
+            write_to_terminal(virtualAddr, length, currProc_support_struct);
+        case SYS13:
+            read_from_terminal();
+    }
+    return_control(GENERALEXCEPT,currProc_support_struct); /*Context switch*/
+}
+
+/**************************************************************************************************
+ * DONE
+ * TO-DO 
+ * Support Level General Exception Handler
+ * BIG PICTURE
+ *      1. Obtain current process' support structure
+ *      2. Examine Cause register in exceptState field of support structure and extract exception code
+ *      3. Pass control to either the support level syscall handler or the program trap handler
+ **************************************************************************************************/
+void gen_excp_handler(){
+    /*--------------Declare local variables---------------------*/
+    support_t* currProc_supp_struct;    /*current process support structure*/
+    int exception_code;                 /*exception code inside Cause Register*/
+    int requested_syscall_num;          /*syscall number requested by calling process*/
+    /*----------------------------------------------------------*/
+
+    /*Step 1: Obtain current process support structure via syscall number 8*/
+    currProc_supp_struct = (support_t*) SYSCALL(SYS8,0,0,0);
+
+    /*Step 2: Examine Cause register in exceptState field of support structure and extract exception code*/
+    exception_code = (((currProc_supp_struct->sup_exceptState[GENERALEXCEPT].s_cause) & GETEXCPCODE) >> CAUSESHIFT);
+
+    /*Step 3: Pass control to appropriate handler based on exception code*/
+    if (exception_code == SYSCONST){   /*If Cause.ExcCode is set to 8 -> call the syscall handler method [pandOS 3.7.1]*/
+        requested_syscall_num = currProc_supp_struct->sup_exceptState[GENERALEXCEPT].s_a0; /*the syscall number is stored in register a0 [pandOS 3.7.1]*/
+        syscall_excp_handler(currProc_supp_struct,requested_syscall_num);
+    }
+    program_trap_handler(); /*Otherwise, treat the exception as a program trap*/
+}
+
+

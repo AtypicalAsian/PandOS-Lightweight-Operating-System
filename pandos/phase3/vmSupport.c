@@ -50,6 +50,7 @@ HIDDEN void update_tlb_handler(); /*Helper function to perform operations relate
 HIDDEN void flash_read_write(); /*perform read or write to flash device - ALMOST DONE*/
 
 /**************************************************************************************************
+ * DONE
  * Initialize swap pool table and accompanying semaphores
  **************************************************************************************************/
 void init_swap_structs(){
@@ -92,20 +93,20 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
 
 
     /*Method 1: Array indexing (Calculate address of specific flash device register block)*/
-    /*int devIdx = (FLASHINT-DISKINT) * DEVPERINT + deviceNum;
+    int devIdx = (FLASHINT-DISKINT) * DEVPERINT + deviceNum;
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
-    device_t * flashDev = &busRegArea->devreg[devIdx];*/
+    f_device = &busRegArea->devreg[devIdx];
 
     /*Compute pointer to correct device_t struct representing the selected flash device - method 2*/
-    f_device = (device_t *) ((DEV_STARTING_REG + ((FLASHINT - DISKINT) * (DEVPERINT * DEVREGSIZE)) + (deviceNum * DEVREGSIZE)));
+    /*f_device = (device_t *) ((DEV_STARTING_REG + ((FLASHINT - DISKINT) * (DEVPERINT * DEVREGSIZE)) + (deviceNum * DEVREGSIZE)));*/
 
     /*Perform SYS3 to lock flash device semaphore*/
     SYSCALL(SYS3, (int)&deviceSema4s[deviceNum],0,0);
 
-    /*Read DATA1 field to get MAXBLOCK*/
+    /*Read DATA1 field to get max number of blocks the flash device supports*/
     max_block = f_device->d_data1; /*pops - [section 5.4]*/
 
-    /*Bounds check*/
+    /*Check whether the requested block number is out of bounds*/
     if (block_num >= max_block){
         terminate();
     }
@@ -114,11 +115,8 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     if (op_type == WRITEFLASH){ /*If it's a write operation*/
         command = WRITEFLASH | (block_num << HIGH_ORDER_3BYTES_SHIFT);
     }
-    else if (op_type == READFLASH){ /*If it's a read operation*/
+    else { /*If it's a read operation*/
         command = READFLASH | (block_num << HIGH_ORDER_3BYTES_SHIFT);
-    }
-    else{ /*invalid op*/
-        return -1;
     }
 
     /*Write the flash device’s DATA0 field with the starting physical address of the 4kb block to be read (or written)*/
@@ -140,22 +138,56 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
 }
 
 /**************************************************************************************************
+ * DONE
  * TO-DO  
  * BIG PICTURE - Implement Page Replacement Algorithm (using Round Robin approach)
  **************************************************************************************************/
 int find_frame_swapPool(){
-    static int frame_no = 0;    /*use static to retain frame_no value inside of the method, we don't
-    want to declare frame_no as global var*/
+    static int frame_no = 0;    /*use static to retain frame_no value inside of the method*/
     frame_no = (frame_no + 1) % MAXFRAMES;
     return frame_no;
 }
 
 /**************************************************************************************************
+ * DONE
  * TO-DO  
- * Helper function to perform ops to update the tlb (part of 4.10 optimizations)
+ * This function ensures TLB cache consistency after the page table is updated.
+ * Reference: POPS 6.4 and PandOS 4.5.2.
  **************************************************************************************************/
 void update_tlb_handler(pte_entry_t *new_page_table_entry){
-    return;
+
+    /* Save the current value of the CP0 EntryHi register (contains VPN + ASID).
+     * We will restore this later to preserve system state.
+     */
+    unsigned int entry_prev = getENTRYHI();
+
+    /* Load the new page's virtual page number (VPN) and ASID into EntryHi.
+     * This is necessary for TLB to find the matching page table entry
+     */
+    setENTRYHI(new_page_table_entry->entryHI);
+    TLBP(); /*probe the TLB to searches for a matching entry using the current EntryHi*/
+
+    /*Check INDEX.P bit (bit 31 of INDEX)*/
+    if ((KUSEG & getINDEX()) == 0){ /*If P bit == 0 -> found a matching entry*/
+        setENTRYLO(new_page_table_entry->entryLO);  /* Load the updated physical frame number and permissions into EntryLo */
+        setENTRYHI(new_page_table_entry->entryHI);  /* Re-load EntryHi just to be safe before issuing TLBWI (DO WE NEED TO DO THIS?) */
+        TLBWI(); /* Write to the TLB at the index found by TLBP. This updates the cached entry to match the page table*/
+    }
+
+    /* Restore the previously saved EntryHi in CP0 register */
+    setENTRYHI(entry_prev);
+}
+
+
+/**************************************************************************************************
+ * DONE
+ * This function is a wrapper to perform LDST
+ * Can't use LDST directly in phase 3?
+ **************************************************************************************************/
+void return_control(int exception_code, support_t *supportStruct){
+    state_PTR return_state = &(supportStruct->sup_exceptState[exception_code]);
+    /*Perform LDST to return control to the current process*/
+    LDST(return_state);
 }
 
 /**************************************************************************************************
@@ -247,11 +279,8 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
     /*--------------Declare local variables---------------------*/
     support_t* currProc_supp_struct;
     int free_frame_num = 0;
-    int block_id;
-    int device_status;
     int flash_no;
     unsigned int frame_addr;
-    pte_entry_t *pageTB_entry;
     unsigned int exception_cause;
     int asid;
     unsigned int missing_page_no;
@@ -278,7 +307,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
 
         /*Step 6: Pick a frame from the swap pool (Page Replacement Algorithm)*/
         free_frame_num = find_frame_swapPool();
-        frame_addr = (free_frame_num * PAGESIZE) + FRAME_SHIFT; /*Calculate the starting address of the frame (4KB block)*/
+        frame_addr = (free_frame_num * PAGESIZE) + POOLBASEADDR; /*Calculate the starting address of the frame (4KB block)*/
         /*We get frame address by multiplying the page size with the frame number then adding the offset which is the starting address of the swap pool*/
 
 
@@ -309,17 +338,19 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         }
 
         /*If frame is not occupied*/
-        unsigned int free_frame_address;
-        free_frame_address = (free_frame_num * PAGESIZE) + POOLBASEADDR; /*First, we calculate the address of the free frame in swap pool*/
+        
         /*section 4.4.1 - [pandOS]*/
 
         /*Step 9:Load missing page from backing store into the selected frame (at address free_fram_address)*/
         /*For this step, we essentially must do a flash device read operation to load the page into the frame*/
+        asid = currProc_supp_struct->sup_asid; /*Get process asid to map to flash device number*/
+        flash_no = asid - 1; /*Get flash device number associated with the process asid*/
+        missing_page_no = missing_page_no % MAX_PAGES; /*mod to map page to range 0-31*/
 
         /*First, get flash device number that is associated with the current u-proc*/
 
-        /*Perform flash read op (helper function)*/
-        flash_read_write();
+        /*Perform flash read operation*/
+        flash_read_write(flash_no,missing_page_no,READFLASH,frame_addr);
 
         /*Step 10: Update the Swap Pool Table to reflect the new contents (atomic operations)*/
         /*First, we disable Interrupts by getting current status and clearing the IEc (global interrupt) bit*/
@@ -327,15 +358,15 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         
 
         /*Update swap pool table with new entry*/
-        swap_pool[free_frame_num].asid = currProc_supp_struct->sup_asid; /*set asid of the u-proc that now owns this frame*/
+        swap_pool[free_frame_num].asid = asid; /*set asid of the u-proc that now owns this frame*/
         swap_pool[free_frame_num].pg_number = missing_page_no; /*record virtual page number that is now occupying this frame*/
         swap_pool[free_frame_num].ownerEntry = &(currProc_supp_struct->sup_privatePgTbl[missing_page_no]); /*store pointer to page table entry for this page*/
 
 
         /*Step 11: Update the Page Table for the new process, marking the page as valid (V bit)*/
-        currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO = free_frame_address | V_BIT_SET | D_BIT_SET; /*set the valid bit and dirty bit in entryLO*/
+        currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO = frame_addr | V_BIT_SET | D_BIT_SET; /*set the valid bit and dirty bit in entryLO*/
 
-        /*Step 12: Update the TLB to include the new page*/
+        /*Step 12: Update the TLB to include the new page (optimization)*/
         /*update_tlb_handler();*/
 
         TLBCLR(); /*For now, we will do approach 2 - erase ALL the entries in the TLB (OPTIMIZE LATER)*/
@@ -347,6 +378,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         SYSCALL(SYS4,(int)&semaphore_swapPool,0,0);
 
         /*Step 14: Return control (context switch) to the instruction that caused the page fault*/
-        LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));
+        return_control(PGFAULTEXCEPT,currProc_supp_struct);
+        /*LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));*/
     }
 }

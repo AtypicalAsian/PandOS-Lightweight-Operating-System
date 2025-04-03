@@ -103,10 +103,10 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     /*Perform SYS3 to lock flash device semaphore*/
     SYSCALL(SYS3, (int)&deviceSema4s[deviceNum],0,0);
 
-    /*Read DATA1 field to get MAXBLOCK*/
+    /*Read DATA1 field to get max number of blocks the flash device supports*/
     max_block = f_device->d_data1; /*pops - [section 5.4]*/
 
-    /*Bounds check*/
+    /*Check whether the requested block number is out of bounds*/
     if (block_num >= max_block){
         terminate();
     }
@@ -115,11 +115,8 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     if (op_type == WRITEFLASH){ /*If it's a write operation*/
         command = WRITEFLASH | (block_num << HIGH_ORDER_3BYTES_SHIFT);
     }
-    else if (op_type == READFLASH){ /*If it's a read operation*/
+    else { /*If it's a read operation*/
         command = READFLASH | (block_num << HIGH_ORDER_3BYTES_SHIFT);
-    }
-    else{ /*invalid op*/
-        return -1;
     }
 
     /*Write the flash device’s DATA0 field with the starting physical address of the 4kb block to be read (or written)*/
@@ -179,6 +176,17 @@ void update_tlb_handler(pte_entry_t *new_page_table_entry){
 
     /* Restore the previously saved EntryHi in CP0 register */
     setENTRYHI(entry_prev);
+}
+
+
+/**************************************************************************************************
+ * DONE
+ * This function is a wrapper to perform LDST
+ * Can't use LDST directly in phase 3?
+ **************************************************************************************************/
+void return_control(int exception_code, support_t *supportStruct){
+    /*Perform LDST to return control to the current process*/
+    LDST(&(supportStruct->sup_exceptState[exception_code]));
 }
 
 /**************************************************************************************************
@@ -369,6 +377,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         SYSCALL(SYS4,(int)&semaphore_swapPool,0,0);
 
         /*Step 14: Return control (context switch) to the instruction that caused the page fault*/
-        LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));
+        return_control(PGFAULTEXCEPT,currProc_supp_struct);
+        /*LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));*/
     }
 }

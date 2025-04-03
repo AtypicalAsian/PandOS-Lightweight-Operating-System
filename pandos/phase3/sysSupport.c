@@ -171,13 +171,13 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     }
 
     /* Add SYSCALL 6 to unlock the semaphore */
-    SYSCALL(6, 0, 0, 0);
+    SYSCALL(SYS6, 0, 0, 0);
 }
 
 int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
     if (len < 0 || len > 128) {
-        SYSCALL(9, 0, 0, 0);
+        SYSCALL(SYS9, 0, 0, 0);
     }
 
     /* STEPS: Similar to write_to_printer(),
@@ -214,7 +214,7 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
             char transmitChar = *(virtAddr + i);
             terminalDevice->transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
 
-            SYSCALL(5, semIndex, 0, 0);
+            SYSCALL(SYS5, semIndex, 0, 0);
             memaddr newStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
 
             terminalDevice->transm_command = ACK;
@@ -224,17 +224,17 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
             if (newStatus == TERMINAL_STATUS_TRANSMITTED) {
                 transmittedChars ++;
             } else {
-                SYSCALL(6, 0, 0, 0);
+                SYSCALL(SYS6, 0, 0, 0);
                 return -newStatus;
             }
         } else if (transmitterStatus != READY) {
-            SYSCALL(6, semIndex, 0, 0);
+            SYSCALL(SYS6, semIndex, 0, 0);
             return -transmitterStatus;
         }
 
     }
 
-    SYSCALL(6, semIndex, 0, 0);
+    SYSCALL(SYS6, semIndex, 0, 0);
     return transmittedChars;
 }
 

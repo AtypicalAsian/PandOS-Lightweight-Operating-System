@@ -50,6 +50,19 @@ HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport
 HIDDEN int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
 HIDDEN void read_from_terminal(); /*SYS13*/
 
+
+/**************************************************************************************************
+ * DONE
+ * This function is a wrapper to perform LDST
+ * Can't use LDST directly in phase 3?
+ **************************************************************************************************/
+void return_control(int exception_code, support_t *supportStruct){
+    state_PTR return_state = &(supportStruct->sup_exceptState[exception_code]);
+    /*Perform LDST to return control to the current process*/
+    LDST(return_state);
+}
+
+
 /**************************************************************************************************
  * TO-DO 
  * terminate() is a wrapper for the kernel-mode restricted SYS2 service
@@ -67,7 +80,7 @@ void terminate()
  * Returns the number of microseconds since system boot
  * The method calls the hardware TOD clock and stores in register v0
  **************************************************************************************************/
-void get_TOD(state_t *excState)
+void get_TOD(state_PTR excState)
 {
 
     /* Get number of ticks per seconds from the last time the system was booted/reset
@@ -239,15 +252,50 @@ void program_trap_handler(){
  * TO-DO 
  * Support Level Syscall Exception Handler
  * BIG PICTURE
+ * Steps:
+ *      1. Check if the syscall number falls within the range 9-13
+ *            If invalid syscall number, handle as program trap
+ *      2. Reads parameters in registers a1,a2,a3
+ *      3. Manually imcrement PC+4 to avoid re-executing Syscall on return
+ *      4. Execute appropriate syscall handler
+ *      5. LDST to return to process that requested SYSCALL
  **************************************************************************************************/
 void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
-    /*Check syscall number (must fall within syscall 9 to 13)*/
+    /*--------------Declare local variables---------------------*/
+    int param1;
+    int param2;
+    int param3;
+    /*----------------------------------------------------------*/
+
+
+    /*Step 1: Check syscall number (must fall within syscall 9 to 13)*/
     if (syscall_num_requested > 13 || syscall_num_requested < 9){
         program_trap_handler();
         return;
     }
 
-    return;
+    /*Step 2: Read values in registers a1-a3*/
+    param1 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    param2 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+    param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
+
+    /*Step 3: Increment PC+4 to execute next instruction on return*/
+    currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
+
+    /*Step 4: Execute appropriate syscall helper method based on requested syscall number*/
+    switch(syscall_num_requested){
+        case SYS9:
+            terminate();
+        case SYS10:
+            get_TOD(&currProc_support_struct->sup_exceptState[GENERALEXCEPT]);
+        case SYS11:
+            write_to_printer((char *) param1, param2, currProc_support_struct);
+        case SYS12:
+            write_to_terminal((char *) param1, param2, currProc_support_struct);
+        case SYS13:
+            read_from_terminal();
+    }
+    return_control(GENERALEXCEPT,currProc_support_struct); /*Context switch*/
 }
 
 /**************************************************************************************************
@@ -273,8 +321,8 @@ void gen_excp_handler(){
     exception_code = (((currProc_supp_struct->sup_exceptState[GENERALEXCEPT].s_cause) & GETEXCPCODE) >> CAUSESHIFT);
 
     /*Step 3: Pass control to appropriate handler based on exception code*/
-    if (exception_code == SYSCONST){   /*If exception code is 8 -> call the syscall handler method*/
-        requested_syscall_num = currProc_supp_struct->sup_exceptState[GENERALEXCEPT].s_reg[3];
+    if (exception_code == SYSCONST){   /*If Cause.ExcCode is set to 8 -> call the syscall handler method [pandOS 3.7.1]*/
+        requested_syscall_num = currProc_supp_struct->sup_exceptState[GENERALEXCEPT].s_a0; /*the syscall number is stored in register a0 [pandOS 3.7.1]*/
         syscall_excp_handler(currProc_supp_struct,requested_syscall_num);
     }
     program_trap_handler(); /*Otherwise, treat the exception as a program trap*/

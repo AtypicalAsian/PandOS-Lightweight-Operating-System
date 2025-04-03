@@ -185,8 +185,9 @@ void update_tlb_handler(pte_entry_t *new_page_table_entry){
  * Can't use LDST directly in phase 3?
  **************************************************************************************************/
 void return_control(int exception_code, support_t *supportStruct){
+    state_PTR return_state = &(supportStruct->sup_exceptState[exception_code]);
     /*Perform LDST to return control to the current process*/
-    LDST(&(supportStruct->sup_exceptState[exception_code]));
+    LDST(return_state);
 }
 
 /**************************************************************************************************

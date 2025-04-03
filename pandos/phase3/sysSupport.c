@@ -66,7 +66,6 @@ void gen_excp_handler(){
     int exception_code;
     /*----------------------------------------------------------*/
 
-
     /*Step 1: Obtain current process support structure via syscall number 8*/
     currProc_supp_struct = (support_t*) SYSCALL(SYS8,0,0,0);
 
@@ -87,19 +86,26 @@ void gen_excp_handler(){
  * BIG PICTURE
  **************************************************************************************************/
 void program_trap_handler(){
-    return;
+    terminate();
 }
 
+/**************************************************************************************************
+ * TO-DO 
+ * terminate() is a wrapper for the kernel-mode restricted SYS2 service
+ **************************************************************************************************/
 void terminate()
 {
-
     /* Make call to SYS2
-
     Ref: pandos section 4.7.1
     */
     SYSCALL(2, 0, 0, 0);
 }
 
+/**************************************************************************************************
+ * TO-DO 
+ * Returns the number of microseconds since system boot
+ * The method calls the hardware TOD clock and stores in register v0
+ **************************************************************************************************/
 void get_TOD(state_t *excState)
 {
 
@@ -113,6 +119,10 @@ void get_TOD(state_t *excState)
     excState->s_v0 = currTime;
 }
 
+
+/**************************************************************************************************
+ * TO-DO 
+ **************************************************************************************************/
 void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 {
     /*

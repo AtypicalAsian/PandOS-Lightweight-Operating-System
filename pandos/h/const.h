@@ -215,6 +215,11 @@
 #define SYS6              6
 #define SYS7              7
 #define SYS8              8
+#define SYS9              9
+#define SYS10             10
+#define SYS11             11
+#define SYS12             12
+#define SYS13             13
 
 /* Constants for returning values in v0 to the caller */
 #define ERRCONST		-1			/* constant denoting an error occurred in the caller's request */

@@ -262,9 +262,9 @@ void program_trap_handler(){
  **************************************************************************************************/
 void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
     /*--------------Declare local variables---------------------*/
-    int param1;
-    int param2;
-    int param3;
+    char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
+    int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
+    /*int param3;*/     /*value stored in a3*/
     /*----------------------------------------------------------*/
 
 
@@ -275,9 +275,9 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     }
 
     /*Step 2: Read values in registers a1-a3*/
-    param1 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
-    param2 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
-    param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
+    virtualAddr = (char *) currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+    /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3*/  
 
     /*Step 3: Increment PC+4 to execute next instruction on return*/
     currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
@@ -289,9 +289,11 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
         case SYS10:
             get_TOD(&currProc_support_struct->sup_exceptState[GENERALEXCEPT]);
         case SYS11:
-            write_to_printer((char *) param1, param2, currProc_support_struct);
+            /*virtual address of first char in a1, length of string in a2*/
+            write_to_printer(virtualAddr, length, currProc_support_struct);
         case SYS12:
-            write_to_terminal((char *) param1, param2, currProc_support_struct);
+            /*virtual address of first char in a1, length of string in a2*/
+            write_to_terminal(virtualAddr, length, currProc_support_struct);
         case SYS13:
             read_from_terminal();
     }
@@ -309,9 +311,9 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
  **************************************************************************************************/
 void gen_excp_handler(){
     /*--------------Declare local variables---------------------*/
-    support_t* currProc_supp_struct;
-    int exception_code;
-    int requested_syscall_num;
+    support_t* currProc_supp_struct;    /*current process support structure*/
+    int exception_code;                 /*exception code inside Cause Register*/
+    int requested_syscall_num;          /*syscall number requested by calling process*/
     /*----------------------------------------------------------*/
 
     /*Step 1: Obtain current process support structure via syscall number 8*/

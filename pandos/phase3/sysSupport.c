@@ -48,7 +48,7 @@ HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Esse
 HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
 HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
 HIDDEN void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
-HIDDEN int read_from_terminal(char *virtAddr, support_t *currProcSupport); /*SYS13*/
+HIDDEN void read_from_terminal(char *virtAddr, support_t *currProcSupport); /*SYS13*/
 
 
 /**************************************************************************************************
@@ -175,7 +175,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
         }
     }
 
-    /* Add SYSCALL 6 to unlock the semaphore */
+    /* Add SYSCALL 4 to unlock the semaphore */
     SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
 }
@@ -230,21 +230,21 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
             if (newStatus == TERMINAL_STATUS_TRANSMITTED) {
                 transmittedChars ++;
             } else {
-                SYSCALL(SYS6, 0, 0, 0);
-                return -newStatus;
+                currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(newStatus);
+                SYSCALL(SYS4, 0, 0, 0);
             }
         } else if (transmitterStatus != READY) {
-            SYSCALL(SYS6, semIndex, 0, 0);
-            return -transmitterStatus;
+            currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(transmitterStatus);
+            SYSCALL(SYS4, semIndex, 0, 0);
         }
 
     }
 
-    SYSCALL(SYS6, semIndex, 0, 0);
-    return transmittedChars;
+    SYSCALL(SYS4, semIndex, 0, 0);
+    currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;
 }
 
-int read_from_terminal(char *virtAddr, support_t *currProcSupport) {
+void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
     /* Ref: pandos section 4.7.5, princOfOperations chapter 5.7 */
     if (virtAddr == NULL) {
         SYSCALL(SYS9, 0, 0, 0);
@@ -264,8 +264,8 @@ int read_from_terminal(char *virtAddr, support_t *currProcSupport) {
         readStatus = (terminalDevice->recv_status & TERMINAL_STATUS_MASK);
         
         if (readStatus == TERMINAL_STATUS_RECEIVED) {
-            memaddr oldStatus = getSTATUS();
-            setSTATUS(STATUS_ALL_OFF);
+            /* memaddr oldStatus = getSTATUS(); */
+            setSTATUS(INT_OFF);
 
             char receivedChar = (char) (terminalDevice->recv_command & TERMINAL_STATUS_MASK);
             /* Save the read chars to buffer */
@@ -274,17 +274,18 @@ int read_from_terminal(char *virtAddr, support_t *currProcSupport) {
 
             terminalDevice->recv_command = ACK;
 
-            setSTATUS(oldStatus);
+            setSTATUS(INT_ON);
         } else if (readStatus != TERMINAL_STATUS_READY) {
-            SYSCALL(SYS6, 0, 0, 0);
-            return -readStatus;
+            currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(readStatus);
+            SYSCALL(SYS4, 0, 0, 0);
+            /* return -readStatus; */
         } else {
             SYSCALL(SYS5, semIndex, 0, 0);
         }
     }
 
     SYSCALL(SYS6, semIndex, 0, 0);
-    return receivedChars;
+    currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
 }
 
 

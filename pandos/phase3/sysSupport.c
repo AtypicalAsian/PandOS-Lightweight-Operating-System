@@ -231,12 +231,12 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
             if (newStatus == TERMINAL_STATUS_TRANSMITTED) {
                 transmittedChars ++;
             } else {
-                currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(newStatus);
-                SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+                transmittedChars = -(newStatus);
+                break;
             }
         } else if (transmitterStatus != READY) {
-            currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(transmitterStatus);
-            SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+            transmittedChars = -(transmitterStatus);
+            break;
         }
 
     }
@@ -277,11 +277,10 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
 
             setSTATUS(INT_ON);
         } else if (readStatus != TERMINAL_STATUS_READY) {
-            currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(readStatus);
-            SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
-            /* return -readStatus; */
+            receivedChars = -(readStatus);
+            break;
         } else {
-            SYSCALL(SYS5, semIndex, 0, 0);
+            break;
         }
     }
 

@@ -122,8 +122,8 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
     Ref: princOfOperations section 5.1, 5.6
     */
-    
-    /*Check if address we're writing from is outside of the uproc logical address space*/
+
+       /*Check if address we're writing from is outside of the uproc logical address space*/
 
     /*Check if length of string is within bounds (0-128)*/
     if (len < 0 || len > 128) /*DEFINE CONSTANTS FOR THESE*/
@@ -134,17 +134,15 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     /*--------------Declare local variables---------------------*/
     int semIndex;
     int char_printed_count; /*tracks how many characters were printed*/
-    int device_num;
+    char_printed_count = 0;
     /*----------------------------------------------------------*/
 
     semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
-    device_num = currProcSupport->sup_asid-1;
 
     devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
     device_t *printerDevice = &(devRegArea->devreg[semIndex]);
 
-    /*Do SYS3 to lock printer device semaphore*/    
-    SYSCALL(SYS3,printerDevice,0,0);
+    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
 
     int i;
     for (i = 0; i < len; i++)
@@ -153,33 +151,34 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
         Ref: princOfOperations section 5.6, table 5.11
              princOfOperations section 2.3
         */
-        if ((printerDevice->d_status & BUSY) == READY) /*no need to & with BUSY?*/
+        if (printerDevice->d_status == READY) /*no need to & with BUSY?*/
         {
+
             /* Need to perform setSTATUS (disable interrupt) to ensure the atomicity */
             setSTATUS(INT_OFF);
 
             printerDevice->d_data0 = (memaddr) * (virtAddr + i);
             printerDevice->d_command = PRINTCHR;
+            char_printed_count ++;
 
             /* Need to perform waitForIO to "truly" request printing the character */
-            SYSCALL(SYS5, PRINTER_LINE_NUM, device_num, 0);
+            SYSCALL(SYS5, semIndex, 0, 0);
 
             /* Need to perform setSTATUS (enable interrupt again) to restore previous status & allow I/O request */
             setSTATUS(INT_ON);
-            char_printed_count++;
+            
         }
         else
         {
             /*If printer device status code is not READY -> have to return negative of device status*/
+            currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(printerDevice->d_status);
             break;
         }
     }
 
-    /*Load count of transmitted char into register v0*/
+    /* Add SYSCALL 6 to unlock the semaphore */
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
-
-    /* Add SYSCALL 4 to unlock the semaphore */
-    SYSCALL(SYS4, printerDevice, 0, 0);
 }
 
 int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {

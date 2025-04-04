@@ -123,10 +123,10 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     Ref: princOfOperations section 5.1, 5.6
     */
 
-       /*Check if address we're writing from is outside of the uproc logical address space*/
+    /*Check if address we're writing from is outside of the uproc logical address space*/
 
     /*Check if length of string is within bounds (0-128)*/
-    if (len < 0 || len > 128) /*DEFINE CONSTANTS FOR THESE*/
+    if (len < 0 || len > 128 || virtAddr < KUSEG) /*DEFINE CONSTANTS FOR THESE*/
     {
         SYSCALL(SYS9, 0, 0, 0);
     }
@@ -183,7 +183,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
 int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
-    if (len < 0 || len > 128) {
+    if (len < 0 || len > 128 || virtAddr) {
         SYSCALL(9, 0, 0, 0);
     }
 

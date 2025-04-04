@@ -47,7 +47,7 @@ void program_trap_handler(); /*Program Trap Handler*/
 HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
 HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
 HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
-HIDDEN int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
+HIDDEN void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
 HIDDEN void read_from_terminal(); /*SYS13*/
 
 
@@ -92,13 +92,11 @@ void get_TOD(state_PTR excState)
     excState->s_v0 = currTime;
 }
 
-
 /**************************************************************************************************
  * TO-DO 
  **************************************************************************************************/
 void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 {
-    /*exceptState as input?*/
 
     /* 
     Ref: pandos section 4.7.3
@@ -122,11 +120,11 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
     Ref: princOfOperations section 5.1, 5.6
     */
-
+    
     /*Check if address we're writing from is outside of the uproc logical address space*/
 
     /*Check if length of string is within bounds (0-128)*/
-    if (len < 0 || len > 128 || virtAddr < KUSEG) /*DEFINE CONSTANTS FOR THESE*/
+    if (len < 0 || len > 128) /*DEFINE CONSTANTS FOR THESE*/
     {
         SYSCALL(SYS9, 0, 0, 0);
     }
@@ -159,7 +157,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
             printerDevice->d_data0 = (memaddr) * (virtAddr + i);
             printerDevice->d_command = PRINTCHR;
-            char_printed_count++;
+            char_printed_count ++;
 
             /* Need to perform waitForIO to "truly" request printing the character */
             SYSCALL(SYS5, semIndex, 0, 0);
@@ -176,15 +174,16 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
         }
     }
 
-    /* Add SYSCALL 6 to unlock the semaphore */
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+    /* Add SYSCALL 4 to unlock the semaphore */
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
 }
+/* Do we need to ACK? */
 
-int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
+void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
-    if (len < 0 || len > 128 || virtAddr) {
-        SYSCALL(9, 0, 0, 0);
+    if (len < 0 || len > 128 || virtAddr > KUSEG) {
+        SYSCALL(SYS9, 0, 0, 0);
     }
 
     /* STEPS: Similar to write_to_printer(),
@@ -195,8 +194,9 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     5. Set the command for terminal device with bit shift (like the guide in Ref)
     6. Request I/O to pass the character to terminal device
     7. Check terminal transmitted status
-    8. Issue ACK to notify the interrupt
-    9. Unlock the semaphore by calling SYS6 & restore the device status 
+    8. Issue ACK to let the device return to ready state after each iteration
+    9. Save the character count (success) or device's status value (FAIL) to v0
+    10. Unlock the semaphore by calling SYS4 & restore the device status 
 
     Ref: princOfOperations section 5.7
          pandos section 3.5.5, pg 27,28
@@ -207,6 +207,7 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
 
     int transmittedChars;
     transmittedChars = 0;
@@ -215,35 +216,93 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     for (i = 0; i < len; i ++) {
         memaddr transmitterStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
         if (transmitterStatus == TERMINAL_STATUS_READY) {
-            memaddr oldStatus = getSTATUS();
-            setSTATUS(STATUS_ALL_OFF);
+            /* memaddr oldStatus = getSTATUS(); */
+            setSTATUS(INT_OFF);
 
             char transmitChar = *(virtAddr + i);
             terminalDevice->transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
 
-            SYSCALL(5, semIndex, 0, 0);
+            SYSCALL(SYS5, semIndex, 0, 0);
+            terminalDevice->transm_command = ACK;
             memaddr newStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
 
-            terminalDevice->transm_command = ACK;
-
-            setSTATUS(oldStatus);
+            setSTATUS(INT_ON);
 
             if (newStatus == TERMINAL_STATUS_TRANSMITTED) {
                 transmittedChars ++;
             } else {
-                SYSCALL(6, 0, 0, 0);
-                return -newStatus;
+                transmittedChars = -(newStatus);
+                break;
             }
         } else if (transmitterStatus != READY) {
-            SYSCALL(6, semIndex, 0, 0);
-            return -transmitterStatus;
+            transmittedChars = -(transmitterStatus);
+            break;
         }
 
     }
 
-    SYSCALL(6, semIndex, 0, 0);
-    return transmittedChars;
+    currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
 }
+
+void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
+    /* 
+    STEPS:
+    1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
+    2. Modify the base semaphore index since it's terminal device and the operation is READ -> we maintain the same base index
+    3. Use While loop to interate each character received from the device until there is no more character to read
+    4. Before saving the character into the buffer, disable interrupt by setSTATUS and clear all the bits
+    5. Retrieve the received command for terminal device and add bit shift to get character value
+        5.1. If getting char is not successful, save the negative device status to an existing defined variable and get out of the loop
+    6. Perform SYS5 to request I/O
+    7. Issue ACK to let the device return to ready state after each iteration
+    8. Save the character count (success) or device's status value (FAIL) to v0
+    9. Unlock the semaphore by calling SYS4 & restore the device status 
+    Ref: pandos section 4.7.5, princOfOperations chapter 5.7 
+    */
+    if (virtAddr == NULL) {
+        SYSCALL(SYS9, 0, 0, 0);
+    }
+
+    int baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
+    int semIndex = baseTerminalIndex;
+
+    devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
+    termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
+
+    int receivedChars;
+    receivedChars = 0;
+    int readStatus;
+
+    while (1) {
+        readStatus = (terminalDevice->recv_status & TERMINAL_STATUS_MASK);
+        
+        if (readStatus == TERMINAL_STATUS_RECEIVED) {
+            /* memaddr oldStatus = getSTATUS(); */
+            setSTATUS(INT_OFF);
+
+            char receivedChar = (char) (terminalDevice->recv_command & TERMINAL_STATUS_MASK);
+            /* Save the read chars to buffer */
+            *(virtAddr + receivedChars) = receivedChar;
+            receivedChars++;
+
+            SYSCALL(SYS5, semIndex, 0, 0);
+            terminalDevice->recv_command = ACK;
+
+            setSTATUS(INT_ON);
+        } else if (readStatus != TERMINAL_STATUS_READY) {
+            receivedChars = -(readStatus);
+            break;
+        } else {
+            break;
+        }
+    }
+
+    currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+}
+/* Order of each step in WHILE LOOP */
 
 
 /**************************************************************************************************
@@ -302,7 +361,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             /*virtual address of first char in a1, length of string in a2*/
             write_to_terminal(virtualAddr, length, currProc_support_struct);
         case SYS13:
-            read_from_terminal();
+            read_from_terminal(virtualAddr,currProc_support_struct);
     }
     return_control(GENERALEXCEPT,currProc_support_struct); /*Context switch*/
 }

@@ -48,7 +48,7 @@ HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Esse
 HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
 HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
 HIDDEN int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
-HIDDEN void read_from_terminal(); /*SYS13*/
+HIDDEN int read_from_terminal(char *virtAddr, support_t *currProcSupport); /*SYS13*/
 
 
 /**************************************************************************************************
@@ -238,6 +238,49 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     return transmittedChars;
 }
 
+int read_from_terminal(char *virtAddr, support_t *currProcSupport) {
+    /* Ref: pandos section 4.7.5, princOfOperations chapter 5.7 */
+    if (virtAddr == NULL) {
+        SYSCALL(SYS9, 0, 0, 0);
+    }
+
+    int baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
+    int semIndex = baseTerminalIndex;
+
+    devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
+    termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+
+    int receivedChars;
+    receivedChars = 0;
+    int readStatus;
+
+    while (1) {
+        readStatus = (terminalDevice->recv_status & TERMINAL_STATUS_MASK);
+        
+        if (readStatus == TERMINAL_STATUS_RECEIVED) {
+            memaddr oldStatus = getSTATUS();
+            setSTATUS(STATUS_ALL_OFF);
+
+            char receivedChar = (char) (terminalDevice->recv_command & TERMINAL_STATUS_MASK);
+            /* Save the read chars to buffer */
+            *(virtAddr + receivedChars) = receivedChar;
+            receivedChars++;
+
+            terminalDevice->recv_command = ACK;
+
+            setSTATUS(oldStatus);
+        } else if (readStatus != TERMINAL_STATUS_READY) {
+            SYSCALL(SYS6, 0, 0, 0);
+            return -readStatus;
+        } else {
+            SYSCALL(SYS5, semIndex, 0, 0);
+        }
+    }
+
+    SYSCALL(SYS6, semIndex, 0, 0);
+    return receivedChars;
+}
+
 
 /**************************************************************************************************
  * TO-DO 
@@ -295,7 +338,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             /*virtual address of first char in a1, length of string in a2*/
             write_to_terminal(virtualAddr, length, currProc_support_struct);
         case SYS13:
-            read_from_terminal();
+            read_from_terminal(virtualAddr,currProc_support_struct);
     }
     return_control(GENERALEXCEPT,currProc_support_struct); /*Context switch*/
 }

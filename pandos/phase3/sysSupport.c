@@ -176,8 +176,8 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     }
 
     /* Add SYSCALL 4 to unlock the semaphore */
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
 }
 /* Do we need to ACK? */
 
@@ -195,8 +195,9 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     5. Set the command for terminal device with bit shift (like the guide in Ref)
     6. Request I/O to pass the character to terminal device
     7. Check terminal transmitted status
-    8. Issue ACK to notify the interrupt
-    9. Unlock the semaphore by calling SYS6 & restore the device status 
+    8. Issue ACK to let the device return to ready state after each iteration
+    9. Save the character count (success) or device's status value (FAIL) to v0
+    10. Unlock the semaphore by calling SYS4 & restore the device status 
 
     Ref: princOfOperations section 5.7
          pandos section 3.5.5, pg 27,28
@@ -241,12 +242,25 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
     }
 
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
 }
 
 void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
-    /* Ref: pandos section 4.7.5, princOfOperations chapter 5.7 */
+    /* 
+    STEPS:
+    1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
+    2. Modify the base semaphore index since it's terminal device and the operation is READ -> we maintain the same base index
+    3. Use While loop to interate each character received from the device until there is no more character to read
+    4. Before saving the character into the buffer, disable interrupt by setSTATUS and clear all the bits
+    5. Retrieve the received command for terminal device and add bit shift to get character value
+        5.1. If getting char is not successful, save the negative device status to an existing defined variable and get out of the loop
+    6. Perform SYS5 to request I/O
+    7. Issue ACK to let the device return to ready state after each iteration
+    8. Save the character count (success) or device's status value (FAIL) to v0
+    9. Unlock the semaphore by calling SYS4 & restore the device status 
+    Ref: pandos section 4.7.5, princOfOperations chapter 5.7 
+    */
     if (virtAddr == NULL) {
         SYSCALL(SYS9, 0, 0, 0);
     }
@@ -269,11 +283,13 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
             /* memaddr oldStatus = getSTATUS(); */
             setSTATUS(INT_OFF);
 
-            terminalDevice->recv_command = ACK;
             char receivedChar = (char) (terminalDevice->recv_command & TERMINAL_STATUS_MASK);
             /* Save the read chars to buffer */
             *(virtAddr + receivedChars) = receivedChar;
             receivedChars++;
+
+            SYSCALL(SYS5, semIndex, 0, 0);
+            terminalDevice->recv_command = ACK;
 
             setSTATUS(INT_ON);
         } else if (readStatus != TERMINAL_STATUS_READY) {
@@ -284,10 +300,10 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
         }
     }
 
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
 }
-
+/* Order of each step in WHILE LOOP */
 
 /**************************************************************************************************
  * TO-DO 

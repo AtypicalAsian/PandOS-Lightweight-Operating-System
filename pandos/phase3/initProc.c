@@ -141,16 +141,22 @@ void test(){
         suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
 
         /*Set Up process page table*/
+        int k;
+        for (int k=0; k < MAXUPROCESS; k++){
+            suppStruct->sup_privatePgTbl[k].entryHI = 0;
+            suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET;
+        }
+
+        /*Entry 31 of page table = stack*/
+        suppStruct->sup_privatePgTbl[31].entryHI = 0;
+        suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET;
 
         /*Call SYS1*/
         SYSCALL(SYS1,0,0,0);
-
-        /*Wait for all uprocs to finish*/
-
-        /*Terminate current uproc*/
-
-        supp_struct_array[process_id].sup_asid = process_id;  /*set up user process' unique identifier ASID*/
-        return;
     }
+    /*Wait for all uprocs to finish*/
 
+    
+    /*Terminate current uproc*/
+    SYSCALL(SYS2,0,0,0);
 }

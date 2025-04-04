@@ -179,6 +179,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
 }
+/* Do we need to ACK? */
 
 void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
@@ -221,9 +222,8 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
             terminalDevice->transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
 
             SYSCALL(SYS5, semIndex, 0, 0);
-            memaddr newStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
-
             terminalDevice->transm_command = ACK;
+            memaddr newStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
 
             setSTATUS(INT_ON);
 
@@ -267,12 +267,11 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
             /* memaddr oldStatus = getSTATUS(); */
             setSTATUS(INT_OFF);
 
+            terminalDevice->recv_command = ACK;
             char receivedChar = (char) (terminalDevice->recv_command & TERMINAL_STATUS_MASK);
             /* Save the read chars to buffer */
             *(virtAddr + receivedChars) = receivedChar;
             receivedChars++;
-
-            terminalDevice->recv_command = ACK;
 
             setSTATUS(INT_ON);
         } else if (readStatus != TERMINAL_STATUS_READY) {

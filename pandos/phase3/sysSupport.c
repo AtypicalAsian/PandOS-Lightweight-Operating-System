@@ -47,7 +47,7 @@ void program_trap_handler(); /*Program Trap Handler*/
 HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
 HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
 HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
-HIDDEN int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
+HIDDEN void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
 HIDDEN int read_from_terminal(char *virtAddr, support_t *currProcSupport); /*SYS13*/
 
 
@@ -133,12 +133,15 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     /*--------------Declare local variables---------------------*/
     int semIndex;
     int char_printed_count; /*tracks how many characters were printed*/
+    char_printed_count = 0;
     /*----------------------------------------------------------*/
 
     semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
 
     devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
     device_t *printerDevice = &(devRegArea->devreg[semIndex]);
+
+    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
 
     int i;
     for (i = 0; i < len; i++)
@@ -147,34 +150,37 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
         Ref: princOfOperations section 5.6, table 5.11
              princOfOperations section 2.3
         */
-        if ((printerDevice->d_status & BUSY) == READY) /*no need to & with BUSY?*/
+        if (printerDevice->d_status == READY) /*no need to & with BUSY?*/
         {
-            memaddr oldStatus = getSTATUS();
 
             /* Need to perform setSTATUS (disable interrupt) to ensure the atomicity */
             setSTATUS(INT_OFF);
 
             printerDevice->d_data0 = (memaddr) * (virtAddr + i);
             printerDevice->d_command = PRINTCHR;
+            char_printed_count ++;
 
             /* Need to perform waitForIO to "truly" request printing the character */
             SYSCALL(SYS5, semIndex, 0, 0);
 
             /* Need to perform setSTATUS (enable interrupt again) to restore previous status & allow I/O request */
             setSTATUS(INT_ON);
+            
         }
         else
         {
             /*If printer device status code is not READY -> have to return negative of device status*/
+            currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(printerDevice->d_status);
             break;
         }
     }
 
     /* Add SYSCALL 6 to unlock the semaphore */
-    SYSCALL(SYS6, 0, 0, 0);
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+    currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
 }
 
-int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
+void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
     if (len < 0 || len > 128) {
         SYSCALL(SYS9, 0, 0, 0);
@@ -208,8 +214,8 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     for (i = 0; i < len; i ++) {
         memaddr transmitterStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
         if (transmitterStatus == TERMINAL_STATUS_READY) {
-            memaddr oldStatus = getSTATUS();
-            setSTATUS(STATUS_ALL_OFF);
+            /* memaddr oldStatus = getSTATUS(); */
+            setSTATUS(INT_OFF);
 
             char transmitChar = *(virtAddr + i);
             terminalDevice->transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
@@ -219,7 +225,7 @@ int write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
             terminalDevice->transm_command = ACK;
 
-            setSTATUS(oldStatus);
+            setSTATUS(INT_ON);
 
             if (newStatus == TERMINAL_STATUS_TRANSMITTED) {
                 transmittedChars ++;

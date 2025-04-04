@@ -183,7 +183,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
 void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
-    if (len < 0 || len > 128) {
+    if (len < 0 || len > 128 || virtAddr > KUSEG) {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
@@ -207,6 +207,7 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
 
     int transmittedChars;
     transmittedChars = 0;
@@ -231,16 +232,16 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
                 transmittedChars ++;
             } else {
                 currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(newStatus);
-                SYSCALL(SYS4, 0, 0, 0);
+                SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
             }
         } else if (transmitterStatus != READY) {
             currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(transmitterStatus);
-            SYSCALL(SYS4, semIndex, 0, 0);
+            SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
         }
 
     }
 
-    SYSCALL(SYS4, semIndex, 0, 0);
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;
 }
 
@@ -255,6 +256,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
 
     int receivedChars;
     receivedChars = 0;
@@ -276,14 +278,14 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
             setSTATUS(INT_ON);
         } else if (readStatus != TERMINAL_STATUS_READY) {
             currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = -(readStatus);
-            SYSCALL(SYS4, 0, 0, 0);
+            SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
             /* return -readStatus; */
         } else {
             SYSCALL(SYS5, semIndex, 0, 0);
         }
     }
 
-    SYSCALL(SYS4, semIndex, 0, 0);
+    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
 }
 

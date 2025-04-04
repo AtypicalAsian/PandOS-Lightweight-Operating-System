@@ -117,6 +117,8 @@
 #define TERMINAL_CHAR_SHIFT 8
 #define TERMINAL_STATUS_MASK    0xFF
 
+#define TERMINAL_STATUS_RECEIVED 5
+
 /* Memory related constants */
 #define KSEG0           0x00000000
 #define KSEG1           0x20000000

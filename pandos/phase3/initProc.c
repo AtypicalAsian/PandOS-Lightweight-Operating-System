@@ -30,16 +30,54 @@
 /* GLOBAL VARIABLES DECLARATION */
 /*extern int deviceSema4s[MAXSHAREIODEVS];*/ /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
 int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
+int iterator; /*iterator to index into free support stack*/
+support_t *free_support_pool[MAXUPROCESS+1];
+support_t support_structs_pool[MAXUPROCESS];
 
 /*HELPER METHODS*/
 HIDDEN void init_userproc_processorState();
+HIDDEN void summon_process(int pid);
+HIDDEN support_t* allocate();    /*Helper method to allocate a support struct from the free stack*/
+HIDDEN void deallocate(support_t* supportStruct);   /*Helper method to return support structure to the free stack*/
 
+/**************************************************************************************************
+ * TO-DO
+ * Initialize Base (initial) processor state for a user process
+ **************************************************************************************************/
 /*Initialize base processor state for user-process (define a function for this)*/
 void init_userproc_processorState(state_PTR base_state){
     base_state->s_status = STATUS_ALL_OFF; /*needs user-mode, interrupts enabled, PLT clock on*/
     base_state->s_pc = 1; /*initialize PC*/
     base_state->s_t9 = 1; /*have to set t9 register after setting s_pc*/
     base_state->s_reg[26] = 1; /*stack pointer*/
+}
+
+/**************************************************************************************************
+ * TO-DO
+ * Helper method to create a process
+ **************************************************************************************************/
+void summon_process(int pid){
+}
+
+/**************************************************************************************************
+ * TO-DO
+ **************************************************************************************************/
+support_t* allocate(){
+    if (iterator == 0){
+        return NULL;
+    }
+    iterator--;
+    return free_support_pool[iterator];
+}
+
+/**************************************************************************************************
+ * TO-DO
+ **************************************************************************************************/
+void deallocate(support_t* supportStruct){
+    if (iterator < MAXUPROCESS){
+        free_support_pool[iterator] = supportStruct;
+        iterator++;
+    }
 }
 
 
@@ -59,6 +97,8 @@ void test(){
     state_t base_proc_state;
     static support_t supp_struct_array[MAXUPROCESS+1]; /*array of support structures*/
 
+    iterator = 0;
+
     /*Initialize I/O device semaphores to 1*/
     int i;
     for (i=0; i<MAXSHAREIODEVS; i++){
@@ -72,6 +112,7 @@ void test(){
 
     /*Initialize base processor state of a user process*/
     init_userproc_processorState(&base_proc_state);
+    init_swap_structs();
 
     /*create and launch MAXUPROCESS user processes*/
     /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/

@@ -284,7 +284,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
         }
     }
 
-    SYSCALL(SYS6, semIndex, 0, 0);
+    SYSCALL(SYS4, semIndex, 0, 0);
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
 }
 

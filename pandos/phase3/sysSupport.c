@@ -196,7 +196,7 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     6. Request I/O to pass the character to terminal device
     7. Check terminal transmitted status
     8. Issue ACK to let the device return to ready state after each iteration
-    9. Save the character count (success) or device's status value (FAIL) to v0
+    9. Save the character count (SUCCESS) or device's status value (FAIL) to v0
     10. Unlock the semaphore by calling SYS4 & restore the device status 
 
     Ref: princOfOperations section 5.7
@@ -257,7 +257,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
         5.1. If getting char is not successful, save the negative device status to an existing defined variable and get out of the loop
     6. Perform SYS5 to request I/O
     7. Issue ACK to let the device return to ready state after each iteration
-    8. Save the character count (success) or device's status value (FAIL) to v0
+    8. Save the character count (SUCCESS) or device's status value (FAIL) to v0
     9. Unlock the semaphore by calling SYS4 & restore the device status 
     Ref: pandos section 4.7.5, princOfOperations chapter 5.7 
     */

@@ -159,7 +159,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
             printerDevice->d_data0 = (memaddr) * (virtAddr + i);
             printerDevice->d_command = PRINTCHR;
-            char_printed_count ++;
+            char_printed_count++;
 
             /* Need to perform waitForIO to "truly" request printing the character */
             SYSCALL(SYS5, semIndex, 0, 0);

@@ -131,11 +131,13 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
     /*--------------Declare local variables---------------------*/
     int semIndex;
+    int pid;
     int char_printed_count; /*tracks how many characters were printed*/
     char_printed_count = 0;
     /*----------------------------------------------------------*/
 
-    semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
+    pid = currProcSupport->sup_asid - 1;
+    semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + pid;
 
     devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
     device_t *printerDevice = &(devRegArea->devreg[semIndex]);
@@ -160,7 +162,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
             char_printed_count ++;
 
             /* Need to perform waitForIO to "truly" request printing the character */
-            SYSCALL(SYS5, semIndex, 0, 0);
+            SYSCALL(SYS5, semIndex, pid, 0);
 
             /* Need to perform setSTATUS (enable interrupt again) to restore previous status & allow I/O request */
             setSTATUS(INT_ON);
@@ -200,16 +202,21 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
          pandos section 3.5.5, pg 27,28
     */
 
-    int baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
-    int semIndex = baseTerminalIndex + DEVPERINT;
+    int pid;
+    int baseTerminalIndex;
+    int semIndex;
+
+    pid = currProcSupport->sup_asid - 1;
+    baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + pid;
+    semIndex = baseTerminalIndex + DEVPERINT;
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
     SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
 
     int transmittedChars;
-    transmittedChars = 0;
     int i;
+    transmittedChars = 0;
 
     for (i = 0; i < len; i ++) {
         memaddr transmitterStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
@@ -221,7 +228,7 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
             terminalDevice->transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
             memaddr newStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
 
-            SYSCALL(SYS5, semIndex, 0, 0);
+            SYSCALL(SYS5, semIndex, pid, 0);
             setSTATUS(INT_ON);
 
             if (newStatus == TERMINAL_STATUS_TRANSMITTED) {
@@ -259,16 +266,21 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
-    int baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
-    int semIndex = baseTerminalIndex;
+    int pid;
+    int baseTerminalIndex;
+    int semIndex;
+
+    pid = currProcSupport->sup_asid - 1;
+    baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + pid;
+    semIndex = baseTerminalIndex;
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
     SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
 
     int receivedChars;
-    receivedChars = 0;
     int readStatus;
+    receivedChars = 0;
 
     while (1) {
         readStatus = (terminalDevice->recv_status & TERMINAL_STATUS_MASK);
@@ -282,7 +294,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
             *(virtAddr + receivedChars) = receivedChar;
             receivedChars++;
 
-            SYSCALL(SYS5, semIndex, 0, 0);
+            SYSCALL(SYS5, semIndex, pid, 0);
             setSTATUS(INT_ON);
 
         } else if (readStatus != TERMINAL_STATUS_READY) {

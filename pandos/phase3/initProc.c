@@ -133,23 +133,21 @@ void test(){
 
         /*Set Up General Exception Context*/
         suppStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) gen_exception_handler;    /*assign address of general exception handler*/
-        suppStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) tlb_exception_handler;
-        suppStruct->sup_exceptContext[GENERALEXCEPT].c_status = (memaddr) tlb_exception_handler;
-
+        suppStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackGen[STACKSIZE]); /*Set Up stack area for support level exception handler*/
+        suppStruct->sup_exceptContext[GENERALEXCEPT].c_status = STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
         /*Set Up Page Fault Exception Context*/
-        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) tlb_exception_handler;
-        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) tlb_exception_handler;
-        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = (memaddr) tlb_exception_handler;
-
-        /*Set Up General Exception State*/
-
-        /*Set Up Page Fault Exception State*/
+        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) tlb_exception_handler;  /*assign address of tlb exception handler*/
+        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackTLB[STACKSIZE]); /*Set Up stack area for TLB exception handler*/
+        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
 
         /*Set Up process page table*/
 
-        /*Set Up stack area for TLB exception handler*/
+        /*Call SYS1*/
+        SYSCALL(SYS1,0,0,0);
 
-        /*Set Up stack area for support level exception handler*/
+        /*Wait for all uprocs to finish*/
+
+        /*Terminate current uproc*/
 
         supp_struct_array[process_id].sup_asid = process_id;  /*set up user process' unique identifier ASID*/
         return;

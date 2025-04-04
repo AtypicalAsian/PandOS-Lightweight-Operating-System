@@ -192,6 +192,8 @@
 #define TEXT_START    0x800000B0
 #define SP_START      0xC0000000
 
+#define STACKSIZE   499
+
 /* Status Register Bitmask Constants (Processor State) */
 #define STATUS_ALL_OFF   0x0  /* Clears all bits in the Status register (useful for initializing or bitwise-OR operations) */
 #define STATUS_IE_ENABLE 0x00000004  /* Enables global interrupts (IEp, bit 2 = 1) after LDST */

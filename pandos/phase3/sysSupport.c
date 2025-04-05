@@ -177,13 +177,13 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
     /* Add SYSCALL 4 to unlock the semaphore */
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS4,(memaddr) &deviceSema4s[semIndex], 0, 0);
 }
 /* Do we need to ACK? */
 
 void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
-    if (len < 0 || len > 128 || virtAddr < KUSEG) {
+    if (len < 0 || len > 128 || (unsigned int) virtAddr < KUSEG) {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
@@ -214,7 +214,7 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
-    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS3,(memaddr) &deviceSema4s[semIndex], 0, 0);
 
     int transmittedChars;
     transmittedChars = 0;
@@ -248,7 +248,7 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     }
 
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS4,(memaddr) &deviceSema4s[semIndex], 0, 0);
 }
 
 void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
@@ -281,7 +281,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
-    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS3,(memaddr) &deviceSema4s[semIndex], 0, 0);
 
     int receivedChars;
     receivedChars = 0;
@@ -310,7 +310,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
     }
 
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS4,(memaddr) &deviceSema4s[semIndex], 0, 0);
 }
 /* Order of each step in WHILE LOOP */
 

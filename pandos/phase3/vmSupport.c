@@ -178,18 +178,6 @@ void update_tlb_handler(pte_entry_t *new_page_table_entry){
     setENTRYHI(entry_prev);
 }
 
-
-/**************************************************************************************************
- * DONE
- * This function is a wrapper to perform LDST
- * Can't use LDST directly in phase 3?
- **************************************************************************************************/
-void return_control(int exception_code, support_t *supportStruct){
-    state_PTR return_state = &(supportStruct->sup_exceptState[exception_code]);
-    /*Perform LDST to return control to the current process*/
-    LDST(return_state);
-}
-
 /**************************************************************************************************
  * DONE
  * TO-DO  
@@ -203,7 +191,7 @@ void return_control(int exception_code, support_t *supportStruct){
  *      3. Write this Page Table entry into the TLB. This is a three-set process: setENTRYHI, setENTRYLO, TLBWR
  *      4. Return control to current process
  **************************************************************************************************/
-void tlb_refill_handler(){
+void uTLB_RefillHandler(){
     /*Step 1: Determine missing page number*/
     /*virtual addr split into: VPN and Offset -> to isolate the virtual page number, we mask out 
     the offset bits, then shift right by 12 bits to get the page number*/
@@ -217,7 +205,7 @@ void tlb_refill_handler(){
 
     /*Step 2: Get matching page table entry for missing page number of current process*/
     pte_entry_t page_entry = currProc->p_supportStruct->sup_privatePgTbl[missing_virtual_pageNum];
-    /*Technically, tlb_refill_handler method is part of phase 2 so we can access currProc global var?*/
+    /*Technically, uTLB_RefillHandler method is part of phase 2 so we can access currProc global var?*/
     /*Otherwise, we can use sys8 to access the support structure of the current process*/
 
 

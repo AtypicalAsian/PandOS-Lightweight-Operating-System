@@ -213,7 +213,7 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     semIndex = baseTerminalIndex + DEVPERINT;
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
-    termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    device_t *terminalDevice = &(devRegArea->devreg[semIndex]);
     SYSCALL(SYS3,(memaddr) &deviceSema4s[semIndex], 0, 0);
 
     int transmittedChars;
@@ -221,14 +221,14 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     int i;
 
     for (i = 0; i < len; i ++) {
-        memaddr transmitterStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
+        memaddr transmitterStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
         if (transmitterStatus == TERMINAL_STATUS_READY) {
             /* memaddr oldStatus = getSTATUS(); */
             setSTATUS(INT_OFF);
 
             char transmitChar = *(virtAddr + i);
-            terminalDevice->transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
-            memaddr newStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
+            terminalDevice->d_data1 = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
+            memaddr newStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
 
             SYSCALL(SYS5, semIndex, pid, 0);
 
@@ -280,7 +280,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
     semIndex = baseTerminalIndex;
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
-    termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    device_t *terminalDevice = &(devRegArea->devreg[semIndex]);
     SYSCALL(SYS3,(memaddr) &deviceSema4s[semIndex], 0, 0);
 
     int receivedChars;
@@ -288,13 +288,13 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
     int readStatus;
 
     while (1) {
-        readStatus = (terminalDevice->recv_status & TERMINAL_STATUS_MASK);
+        readStatus = (terminalDevice->d_status & TERMINAL_STATUS_MASK);
         
         if (readStatus == TERMINAL_STATUS_RECEIVED) {
             /* memaddr oldStatus = getSTATUS(); */
             setSTATUS(INT_OFF);
 
-            char receivedChar = (char) (terminalDevice->recv_command & TERMINAL_STATUS_MASK);
+            char receivedChar = (char) (terminalDevice->d_command & TERMINAL_STATUS_MASK);
             /* Save the read chars to buffer */
             *(virtAddr + receivedChars) = receivedChar;
             receivedChars++;

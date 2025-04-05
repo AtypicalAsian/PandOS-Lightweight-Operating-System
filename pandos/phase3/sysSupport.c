@@ -49,7 +49,16 @@ HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number o
 HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
 HIDDEN void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
 HIDDEN void read_from_terminal(); /*SYS13*/
+extern void init_deviceSema4s();
 
+
+void init_deviceSema4s(){
+    /*Initialize I/O device semaphores to 1*/
+    int i;
+    for (i=0; i<MAXSHAREIODEVS; i++){
+        deviceSema4s[i] = 1; /*DEFINE CONSTANT FOR 1*/
+    }
+}
 
 /**************************************************************************************************
  * DONE

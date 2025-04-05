@@ -28,7 +28,7 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /* GLOBAL VARIABLES DECLARATION */
-/*extern int deviceSema4s[MAXSHAREIODEVS];*/ /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
+/*int deviceSema4s[MAXSHAREIODEVS];*/ /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
 int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
 int iterator; /*iterator to index into free support stack*/
 support_t *free_support_pool[MAXUPROCESS+1];
@@ -105,11 +105,7 @@ void test(){
     iterator = 0;
     
     /*Initialize I/O device semaphores to 1*/
-    int i;
-    for (i=0; i<MAXSHAREIODEVS; i++){
-        deviceSema4s[i] = 1; /*DEFINE CONSTANT FOR 1*/
-    }
-
+    init_deviceSema4s();
     /*initialize free pool (stack) of support structs*/
     int j;
     for (j=0; j < MAXUPROCESS; j++){

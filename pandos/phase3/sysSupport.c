@@ -41,7 +41,7 @@
 extern int deviceSema4s[MAXSHAREIODEVS];
 
 /*SYSCALL 9-12 function declarations*/
-HIDDEN void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested); /*Syscall exception handler*/
+void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested); /*Syscall exception handler*/
 void gen_excp_handler(); /*General exception handler*/
 void program_trap_handler(); /*Program Trap Handler*/
 void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/

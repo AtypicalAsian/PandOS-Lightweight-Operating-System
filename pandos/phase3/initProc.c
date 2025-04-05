@@ -25,7 +25,7 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 /* GLOBAL VARIABLES DECLARATION */
 /*extern int deviceSema4s[MAXSHAREIODEVS];*/ /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/

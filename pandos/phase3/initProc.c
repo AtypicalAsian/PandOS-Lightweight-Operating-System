@@ -126,7 +126,7 @@ void test(){
     for (process_id=1; process_id < MAXUPROCESS + 1; process_id++){
         /*create and launch MAXUPROCESS user processes*/
         suppStruct = allocate();
-        base_proc_state.s_entryHI = process_id << 6;
+        base_proc_state.s_entryHI = process_id << ID_SHIFT;
 
         /*Create exception context per process*/
         suppStruct->sup_asid = process_id;
@@ -142,19 +142,23 @@ void test(){
 
         /*Set Up process page table*/
         int k;
-        for (int k=0; k < MAXUPROCESS; k++){
-            suppStruct->sup_privatePgTbl[k].entryHI = 0;
+        for (int k=0; k < MAX_PAGES-1; k++){
+            suppStruct->sup_privatePgTbl[k].entryHI = 0x80000000 + (k << VPNSHIFT) + (process_id << ID_SHIFT);
             suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET;
         }
 
         /*Entry 31 of page table = stack*/
-        suppStruct->sup_privatePgTbl[31].entryHI = 0;
+        suppStruct->sup_privatePgTbl[31].entryHI = 0x80000000 + (k << VPNSHIFT) + (process_id << ID_SHIFT);
         suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET;
 
         /*Call SYS1*/
-        SYSCALL(SYS1,0,0,0);
+        SYSCALL(SYS1,(memaddr) &base_proc_state,(memaddr)suppStruct,0);
     }
     /*Wait for all uprocs to finish*/
+    int l;
+    for (l=0;l<MAXUPROCESS;l++){
+        SYSCALL(SYS3,(memaddr) &masterSema4,0,0);
+    }
 
     
     /*Terminate current uproc*/

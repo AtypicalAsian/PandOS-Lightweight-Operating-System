@@ -193,6 +193,7 @@
 #define SP_START      0xC0000000
 
 #define STACKSIZE   499
+#define ID_SHIFT    6
 
 /* Status Register Bitmask Constants (Processor State) */
 #define STATUS_ALL_OFF   0x0  /* Clears all bits in the Status register (useful for initializing or bitwise-OR operations) */

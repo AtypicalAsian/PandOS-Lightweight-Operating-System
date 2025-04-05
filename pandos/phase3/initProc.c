@@ -143,7 +143,7 @@ void test(){
 
         /*Set Up process page table*/
         int k;
-        for (int k=0; k < MAX_PAGES-1; k++){
+        for (k=0; k < MAX_PAGES-1; k++){
             suppStruct->sup_privatePgTbl[k].entryHI = 0x80000000 + (k << VPNSHIFT) + (process_id << ID_SHIFT);
             suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET;
         }

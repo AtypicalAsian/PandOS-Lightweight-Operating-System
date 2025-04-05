@@ -141,7 +141,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
     device_t *printerDevice = &(devRegArea->devreg[semIndex]);
 
-    SYSCALL(SYS3, (int *) &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS3, (memaddr) &deviceSema4s[semIndex], 0, 0);
 
     int i;
     for (i = 0; i < len; i++)

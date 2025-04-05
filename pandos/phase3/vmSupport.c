@@ -40,14 +40,14 @@
 /*#include "/usr/include/umps3/umps/libumps.h"*/
 
 /*Support Level Data Structures*/
-HIDDEN swap_pool_t swap_pool[MAXFRAMES];    /*swap pool table*/
+swap_pool_t swap_pool[MAXFRAMES];    /*swap pool table*/
 HIDDEN int semaphore_swapPool;              /*swap pool sempahore*/
 
 
 /*Helper Methods*/
 HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo) - DONE*/
-HIDDEN void update_tlb_handler(); /*Helper function to perform operations related to updating the TLB (optimization) - NOT DONE*/
 HIDDEN void flash_read_write(); /*perform read or write to flash device - ALMOST DONE*/
+void update_tlb_handler(pte_entry_t *new_page_table_entry); /*Helper function to perform operations related to updating the TLB (optimization) - NOT DONE*/
 
 /**************************************************************************************************
  * DONE

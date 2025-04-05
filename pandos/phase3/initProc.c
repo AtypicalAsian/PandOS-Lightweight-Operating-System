@@ -37,8 +37,8 @@ support_t support_structs_pool[MAXUPROCESS];
 /*HELPER METHODS*/
 HIDDEN void init_base_state(state_t base_state);
 HIDDEN void summon_process(int pid);
-HIDDEN support_t* allocate();    /*Helper method to allocate a support struct from the free stack*/
-HIDDEN void deallocate(support_t* supportStruct);   /*Helper method to return support structure to the free stack*/
+support_t* allocate();    /*Helper method to allocate a support struct from the free stack*/
+void deallocate(support_t* supportStruct);   /*Helper method to return support structure to the free stack*/
 
 /**************************************************************************************************
  * TO-DO

@@ -148,7 +148,7 @@ void test(){
         }
 
         /*Entry 31 of page table = stack*/
-        suppStruct->sup_privatePgTbl[31].entryHI = 0x80000000 + (k << VPNSHIFT) + (process_id << ID_SHIFT);
+        suppStruct->sup_privatePgTbl[31].entryHI = 0xBFFFF000 + (process_id << ID_SHIFT);
         suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET;
 
         /*Call SYS1*/

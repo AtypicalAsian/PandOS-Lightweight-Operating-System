@@ -124,18 +124,19 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     /*Check if address we're writing from is outside of the uproc logical address space*/
 
     /*Check if length of string is within bounds (0-128)*/
-    if (len < 0 || len > 128) /*DEFINE CONSTANTS FOR THESE*/
+    if (len < 0 || len > 128 || virtAddr < KUSEG) /*DEFINE CONSTANTS FOR THESE*/
     {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
     /*--------------Declare local variables---------------------*/
     int semIndex;
+    int pid;
     int char_printed_count; /*tracks how many characters were printed*/
     char_printed_count = 0;
     /*----------------------------------------------------------*/
-
-    semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
+    pid = currProcSupport->sup_asid-1;
+    semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + pid;
 
     devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
     device_t *printerDevice = &(devRegArea->devreg[semIndex]);
@@ -160,7 +161,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
             char_printed_count ++;
 
             /* Need to perform waitForIO to "truly" request printing the character */
-            SYSCALL(SYS5, semIndex, 0, 0);
+            SYSCALL(SYS5, semIndex, pid, 0);
 
             /* Need to perform setSTATUS (enable interrupt again) to restore previous status & allow I/O request */
             setSTATUS(INT_ON);
@@ -182,7 +183,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
 void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
-    if (len < 0 || len > 128 || virtAddr > KUSEG) {
+    if (len < 0 || len > 128 || virtAddr < KUSEG) {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
@@ -202,8 +203,14 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
          pandos section 3.5.5, pg 27,28
     */
 
-    int baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
-    int semIndex = baseTerminalIndex + DEVPERINT;
+    /*Local variables*/
+    int pid;
+    int baseTerminalIndex;
+    int semIndex;
+
+    pid = currProcSupport->sup_asid-1;
+    baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + pid;
+    semIndex = baseTerminalIndex + DEVPERINT;
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
@@ -221,10 +228,9 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
             char transmitChar = *(virtAddr + i);
             terminalDevice->transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
-
-            SYSCALL(SYS5, semIndex, 0, 0);
-            terminalDevice->transm_command = ACK;
             memaddr newStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
+
+            SYSCALL(SYS5, semIndex, pid, 0);
 
             setSTATUS(INT_ON);
 
@@ -264,8 +270,14 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
-    int baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + (currProcSupport->sup_asid - 1);
-    int semIndex = baseTerminalIndex;
+    /*Local variables*/
+    int pid;
+    int baseTerminalIndex;
+    int semIndex;
+
+    pid = currProcSupport->sup_asid-1;
+    baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + pid;
+    semIndex = baseTerminalIndex;
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
     termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
@@ -287,9 +299,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
             *(virtAddr + receivedChars) = receivedChar;
             receivedChars++;
 
-            SYSCALL(SYS5, semIndex, 0, 0);
-            terminalDevice->recv_command = ACK;
-
+            SYSCALL(SYS5, semIndex, pid, 0);
             setSTATUS(INT_ON);
         } else if (readStatus != TERMINAL_STATUS_READY) {
             receivedChars = -(readStatus);
@@ -335,7 +345,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
 
 
     /*Step 1: Check syscall number (must fall within syscall 9 to 13)*/
-    if (syscall_num_requested > 13 || syscall_num_requested < 9){
+    if (syscall_num_requested > SYS13 || syscall_num_requested < SYS9){
         program_trap_handler();
         return;
     }

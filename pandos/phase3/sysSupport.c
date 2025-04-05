@@ -44,7 +44,7 @@ extern int deviceSema4s[MAXSHAREIODEVS];
 HIDDEN void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested); /*Syscall exception handler*/
 void gen_excp_handler(); /*General exception handler*/
 void program_trap_handler(); /*Program Trap Handler*/
-HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
+void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
 HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
 HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
 HIDDEN void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/

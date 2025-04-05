@@ -227,7 +227,7 @@ void tlb_refill_handler(){
     TLBWR();
 
     /*Step 4: Return control to current process (context switch)*/
-    LSDT(saved_except_state);
+    LDST(saved_except_state);
 }
 
 
@@ -303,7 +303,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         SYSCALL(SYS3,(int)&semaphore_swapPool,0,0);
         
         /*Step 5: Compute missing page number*/
-        unsigned int missing_page_no = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & VPNMASK) >> VPNSHIFT;
+        missing_page_no = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & VPNMASK) >> VPNSHIFT;
 
         /*Step 6: Pick a frame from the swap pool (Page Replacement Algorithm)*/
         free_frame_num = find_frame_swapPool();

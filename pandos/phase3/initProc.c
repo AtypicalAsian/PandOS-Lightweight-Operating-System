@@ -3,7 +3,7 @@
  *  
  * 
  * @brief  
- * This module implements test() and exports the Support Level’s global variables.
+ * This module implements test() and exports the Support Level's global variables.
  * 
  * @details  
  * 
@@ -28,7 +28,7 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /* GLOBAL VARIABLES DECLARATION */
-/*int deviceSema4s[MAXSHAREIODEVS];*/ /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
+int deviceSema4s[MAXSHAREIODEVS]; /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
 int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
 int iterator; /*iterator to index into free support stack*/
 support_t *free_support_pool[MAXUPROCESS+1];

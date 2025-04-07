@@ -119,6 +119,7 @@ typedef struct support_t {
 	pte_entry_t		sup_privatePgTbl[32];	/* the user process's page table */
 	int				sup_stackTLB[500];		/* the stack area for the process' TLB exception handler */
 	int				sup_stackGen[500];		/* the stack area for the process' general exception handler */
+	struct support_t *next;
 } support_t;
 
 /* Process Control Block (PCB) type */

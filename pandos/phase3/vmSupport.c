@@ -37,11 +37,14 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 /*Support Level Data Structures*/
-swap_pool_t swap_pool[MAXFRAMES];    /*swap pool table*/
+HIDDEN swap_pool_t swap_pool[MAXFRAMES];    /*swap pool table*/
 HIDDEN int semaphore_swapPool;              /*swap pool sempahore*/
+
+extern int devRegSem[MAXSHAREIODEVS+1];
+extern int masterSema4;
 
 
 /*Helper Methods*/

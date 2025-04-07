@@ -209,6 +209,8 @@
 
 #define	RESINSTRCODE	 0xFFFFFF28
 
+#define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
+
 
 #define STATUS_KUc_SHIFT  1  /* KUc bit is bit 1 in the Status register */
 #define STATUS_KUc_MASK   0x1  /* Mask for extracting the bit (0000...0001) */

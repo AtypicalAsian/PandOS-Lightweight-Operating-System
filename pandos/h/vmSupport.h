@@ -9,6 +9,10 @@
 #include "../h/types.h"
 #include "../h/const.h"
 
+void init_swap_structs();
+void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest);
+int find_frame_swapPool();
+void uTLB_RefillHandler();
 extern void tlb_exception_handler(); /*TLB exception event handler or the pager*/
 extern void init_swap_structs(); /*initialize the swap pool and accompanying sempahore*/
 extern void update_tlb_hanlder(pte_entry_t *new_page_table_entry);

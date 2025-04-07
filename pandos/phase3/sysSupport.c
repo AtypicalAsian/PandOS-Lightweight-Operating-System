@@ -271,11 +271,6 @@ void read_from_terminal(support_t *currProcSupport, state_PTR exceptionState) {
  **************************************************************************************************/
 void syscall_excp_handler(support_t *currProc_support_struct,unsigned int syscall_num_requested,state_t* exceptionState){
     /*--------------Declare local variables---------------------*/
-    char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
-    int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
-    int index;
-    int resp;
-    char char_received;
     /*int param3;*/     /*value stored in a3*/
     /*----------------------------------------------------------*/
 

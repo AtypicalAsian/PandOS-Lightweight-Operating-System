@@ -54,10 +54,6 @@ void supexHandler(){
 }
 
 void sysHandler(support_t* except_supp, state_t* exc_state, unsigned int sysNum){
-    char* toRead;
-    int index;
-    int response;
-    char recvChar;
     switch(sysNum){
         case SYS9:
             terminate();

@@ -290,7 +290,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         IEDISABLE;
         swap_pool[free_frame_num].asid = currProc_supp_struct->sup_asid;
         swap_pool[free_frame_num].pg_number = missing_page_no;
-        swap_pool[free_frame_num].asid = &(currProc_supp_struct->sup_privatePgTbl[missing_page_no]);
+        swap_pool[free_frame_num].asid = (int) &(currProc_supp_struct->sup_privatePgTbl[missing_page_no]);
 
         currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO |= VALID_BIT_ON;
         currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO = (currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO & ~ENTRYLO_PFN_MASK) | ((free_frame_num << 12) + POOLBASEADDR);

@@ -25,7 +25,7 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 /*pool of sup structs to allocate*/
 static support_t supPool[MAXUPROCESS];

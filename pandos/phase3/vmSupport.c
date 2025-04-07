@@ -255,10 +255,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
     /*--------------Declare local variables---------------------*/
     support_t* currProc_supp_struct;
     int free_frame_num = 0;
-    int flash_no;
-    unsigned int frame_addr;
     unsigned int exception_cause;
-    int asid;
     unsigned int missing_page_no;
     /*----------------------------------------------------------*/
 

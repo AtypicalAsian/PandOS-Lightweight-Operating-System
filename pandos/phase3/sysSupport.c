@@ -111,10 +111,6 @@ void write_to_printer(support_t *currProcSupport, state_PTR exceptionState)
     }
     else{
         /*--------------Declare local variables---------------------*/
-        int semIndex;
-        int pid;
-        int char_printed_count; /*tracks how many characters were printed*/
-        char_printed_count = 0;
         /*----------------------------------------------------------*/
         /*semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + asid;*/
         /*devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR;*/ /* Pointer to the device register area */

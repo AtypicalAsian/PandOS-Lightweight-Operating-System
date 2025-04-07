@@ -37,7 +37,7 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 /*Support Level Data Structures*/
 HIDDEN swap_pool_t swap_pool[MAXFRAMES];    /*swap pool table*/
@@ -48,9 +48,6 @@ extern int masterSema4;
 
 
 /*Helper Methods*/
-HIDDEN int find_frame_swapPool(); /*find frame from swap pool (page replacement algo) - DONE*/
-HIDDEN void flash_read_write(); /*perform read or write to flash device - ALMOST DONE*/
-void update_tlb_handler(pte_entry_t *new_page_table_entry); /*Helper function to perform operations related to updating the TLB (optimization) - NOT DONE*/
 
 /**************************************************************************************************
  * DONE
@@ -95,10 +92,10 @@ void flash_read_write(unsigned int read_write_bool, unsigned int device_no, unsi
     dtpreg_t* flashaddr = (dtpreg_t*) DEV_REG_ADDR(4,device_no);
     flashaddr->data0 = pfn;
 
-    setSTATUS(INT_OFF);
+    IEDISABLE;
     flashaddr->command = command;
     unsigned int device_status = SYSCALL(SYS5,4,device_no,FALSE);
-    setSTATUS(INT_ON);
+    IEENABLE;
 
     SYSCALL(SYS4,(memaddr) &devRegSem[DEV_INDEX(4,device_no,FALSE)],0,0);
     if (device_status != READY){
@@ -107,10 +104,10 @@ void flash_read_write(unsigned int read_write_bool, unsigned int device_no, unsi
 }
 
 void occupied_handler(unsigned int asid, unsigned int occp_pageNo, unsigned int swap_pool_index){
-    setSTATUS(INT_OFF);
+    IEDISABLE;
     swap_pool[swap_pool_index].ownerEntry->entryLO &= VALIDBITOFF;
     update_tlb_handler(swap_pool[swap_pool_index].ownerEntry);
-    setSTATUS(INT_ON);
+    IEENABLE;
     flash_read_write(WRITEFLASH,asid-1,occp_pageNo,swap_pool_index);
 }
 
@@ -140,9 +137,15 @@ void nuke_til_it_glows(int *semaphore){
  * BIG PICTURE - Implement Page Replacement Algorithm (using Round Robin approach)
  **************************************************************************************************/
 int find_frame_swapPool(){
-    static int frame_no = 0;    /*use static to retain frame_no value inside of the method*/
-    frame_no = (frame_no + 1) % MAXFRAMES;
-    return frame_no;
+    static int currentReplacementIndex = 0;
+    int i = 0;
+    //SEARCHING FOR A FREE SWAP PAGE
+    while((swap_pool[(currentReplacementIndex + i) % MAXFRAMES].asid != FREEFRAME) && (i < MAXFRAMES))
+        ++i;
+    //CASE == NO FREE SWAP PAGE    
+    i = (i == MAXFRAMES) ? 1 : i;
+    
+    return currentReplacementIndex = (currentReplacementIndex + i) % MAXFRAMES;
 }
 
 /**************************************************************************************************
@@ -167,7 +170,6 @@ void update_tlb_handler(pte_entry_t *new_page_table_entry){
     /*Check INDEX.P bit (bit 31 of INDEX)*/
     if ((KUSEG & getINDEX()) == 0){ /*If P bit == 0 -> found a matching entry*/
         setENTRYLO(new_page_table_entry->entryLO);  /* Load the updated physical frame number and permissions into EntryLo */
-        setENTRYHI(new_page_table_entry->entryHI);  /* Re-load EntryHi just to be safe before issuing TLBWI (DO WE NEED TO DO THIS?) */
         TLBWI(); /* Write to the TLB at the index found by TLBP. This updates the cached entry to match the page table*/
     }
 
@@ -290,7 +292,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
             occupied_handler(occp_asid,occp_pageNo,free_frame_num);
         }
         flash_read_write(READFLASH,currProc_supp_struct->sup_asid-1,missing_page_no,free_frame_num);
-        setSTATUS(INT_OFF);
+        IEDISABLE;
         swap_pool[free_frame_num].asid = currProc_supp_struct->sup_asid;
         swap_pool[free_frame_num].pg_number = missing_page_no;
         swap_pool[free_frame_num].asid = &(currProc_supp_struct->sup_privatePgTbl[missing_page_no]);
@@ -299,7 +301,7 @@ void tlb_exception_handler(){ /*--> Otherwise known as the Pager*/
         currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO = (currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO & ~ENTRYLO_PFN_MASK) | ((free_frame_num << 12) + POOLBASEADDR);
 
         update_tlb_handler(&(currProc_supp_struct->sup_privatePgTbl[missing_page_no]));
-        setSTATUS(INT_ON);
+        IEENABLE;
         SYSCALL(SYS4,(memaddr) &semaphore_swapPool,0,0);
         LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));        
     }

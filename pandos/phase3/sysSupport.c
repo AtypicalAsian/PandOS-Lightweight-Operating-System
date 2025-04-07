@@ -36,19 +36,9 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 extern int devRegSem[MAXSHAREIODEVS+1];
-
-/*SYSCALL 9-12 function declarations*/
-void syscall_excp_handler(support_t *currProc_support_struct,unsigned int syscall_num_requested,state_t* exceptionState); /*Syscall exception handler*/
-void gen_excp_handler(); /*General exception handler*/
-void program_trap_handler(); /*Program Trap Handler*/
-void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
-HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
-HIDDEN void write_to_printer(support_t *currProcSupport, state_PTR exceptionState); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
-HIDDEN void write_to_terminal(support_t *currProcSupport, state_PTR exceptionState); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
-HIDDEN void read_from_terminal(support_t *currProcSupport, state_PTR exceptionState); /*SYS13*/
 
 /**************************************************************************************************
  * TO-DO 
@@ -135,11 +125,11 @@ void write_to_printer(support_t *currProcSupport, state_PTR exceptionState)
         int idx = 0;
         int response = 1;
         while (idx < len){
-            setSTATUS(INT_OFF);
+            IEDISABLE;
             printerDevice->data0 = *virtAddr;
             printerDevice->command = TERMINAL_COMMAND_TRANSMITCHAR;
             response = SYSCALL(SYS5,PRINTER_LINE_NUM,asid,FALSE);
-            setSTATUS(INT_ON);
+            IEENABLE;
 
             if ((response & 0x000000FF) == READY){
                 virtAddr++;
@@ -231,8 +221,7 @@ void read_from_terminal(support_t *currProcSupport, state_PTR exceptionState) {
     */
    int asid = currProcSupport->sup_asid-1;
    char* virtAddr = (char*) exceptionState->s_a1;
-   int idx = 0;
-   int response = 1;
+   int idx = 0, response;
    if ((int) virtAddr < KUSEG){
         nuke_til_it_glows(NULL);
     }
@@ -274,15 +263,6 @@ void read_from_terminal(support_t *currProcSupport, state_PTR exceptionState) {
 
 /**************************************************************************************************
  * TO-DO 
- * Support Level Program Trap Handler
- * BIG PICTURE
- **************************************************************************************************/
-void program_trap_handler(){
-    terminate();
-}
-
-/**************************************************************************************************
- * TO-DO 
  * Support Level Syscall Exception Handler
  * BIG PICTURE
  * Steps:
@@ -302,10 +282,6 @@ void syscall_excp_handler(support_t *currProc_support_struct,unsigned int syscal
     char char_received;
     /*int param3;*/     /*value stored in a3*/
     /*----------------------------------------------------------*/
-
-    if (syscall_num_requested < 9 || syscall_num_requested > 13){
-        nuke_til_it_glows(NULL);
-    }
 
     switch(syscall_num_requested){
         case SYS9:

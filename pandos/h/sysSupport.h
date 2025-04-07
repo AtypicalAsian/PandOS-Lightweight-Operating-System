@@ -10,12 +10,14 @@
 
 extern int deviceSema4s[MAXSHAREIODEVS];
 
-extern void gen_excp_handler();
-extern void program_trap_handler();
-extern void init_deviceSema4s();
-void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested);
-extern void return_control(int exception_code, support_t *supportStruct);
+void gen_excp_handler();
+void syscall_excp_handler(support_t *currProc_support_struct,unsigned int syscall_num_requested,state_t* exceptionState);
+
 void terminate();
+void get_TOD(state_PTR excState);
+void write_to_printer(support_t *currProcSupport, state_PTR exceptionState);
+void write_to_terminal(support_t *currProcSupport, state_PTR exceptionState);
+void read_from_terminal(support_t *currProcSupport, state_PTR exceptionState);
 
 
 #endif

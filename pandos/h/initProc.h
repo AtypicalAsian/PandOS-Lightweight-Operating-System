@@ -12,9 +12,8 @@
 #include "../h/const.h"
 
 /*extern int masterSema4;*/ /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
-extern void test(); 
-void summonProc();
-void init_base_state(state_t base_state);
+void test(); 
+void summonProc(int pid);
 void init_supp_struct_Sema4();
 void deallocate(support_t* supportStruct);
 support_t* allocate();

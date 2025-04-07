@@ -25,7 +25,7 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 /* GLOBAL VARIABLES DECLARATION */
 /*int deviceSema4s[MAXSHAREIODEVS];*/ /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
@@ -38,19 +38,6 @@ static support_t supportStruct_pool[MAXUPROCESS];
 int masterSema4;
 support_t* supp_struct_free;
 int devRegSem[MAXSHAREIODEVS];
-
-
-/**************************************************************************************************
- * TO-DO
- * Initialize Base (initial) processor state for a user process
- **************************************************************************************************/
-/*Initialize base processor state for user-process (define a function for this)*/
-void init_base_state(state_t base_state){
-    base_state.s_status = STATUS_USERPON | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
-    base_state.s_pc = TEXT_START; /*initialize PC*/
-    base_state.s_t9 = TEXT_START; /*have to set t9 register after setting s_pc*/
-    base_state.s_sp = SP_START; /*stack pointer*/
-}
 
 /**************************************************************************************************
  * TO-DO
@@ -109,8 +96,10 @@ void summonProc(int pid){
 
     /*Init process state*/
     state_t newState;
-    init_base_state(newState);
     newState.s_entryHI = pid << 6;
+    newState.s_pc = newState.s_t9 = TEXT_START;
+    newState.s_status = STATUS_USERPON | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
+    newState.s_sp = SP_START; /*stack pointer*/
 
     /*go to free list -> alloc free support struct*/
     support_t* supportStruct = allocate();
@@ -131,7 +120,7 @@ void summonProc(int pid){
 
         /*TLB ENTRY INIT*/
         int i;
-        for (i=0;i<MAX_PAGES;i++){
+        for (i=0;i<MAX_PAGES-1;i++){
             supportStruct->sup_privatePgTbl[i].entryHI = 0x80000000 + (i << VPNSHIFT) + (pid << 6);
             supportStruct->sup_privatePgTbl[i].entryLO = D_BIT_SET;
         }

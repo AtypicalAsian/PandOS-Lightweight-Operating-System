@@ -288,5 +288,7 @@
 
 /* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
-
+#define IEDISABLE setSTATUS(getSTATUS() & (~IECON))
+#define IEENABLE setSTATUS(getSTATUS() | IECON)
+#define IECON       0x00000001
 #endif

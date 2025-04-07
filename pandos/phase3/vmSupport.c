@@ -139,10 +139,8 @@ void nuke_til_it_glows(int *semaphore){
 int find_frame_swapPool(){
     static int currentReplacementIndex = 0;
     int i = 0;
-    //SEARCHING FOR A FREE SWAP PAGE
     while((swap_pool[(currentReplacementIndex + i) % MAXFRAMES].asid != FREEFRAME) && (i < MAXFRAMES))
         ++i;
-    //CASE == NO FREE SWAP PAGE    
     i = (i == MAXFRAMES) ? 1 : i;
     
     return currentReplacementIndex = (currentReplacementIndex + i) % MAXFRAMES;

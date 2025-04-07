@@ -8,8 +8,6 @@
 #include "../h/types.h"
 #include "../h/const.h"
 
-extern int deviceSema4s[MAXSHAREIODEVS];
-
 void gen_excp_handler();
 void syscall_excp_handler(support_t *currProc_support_struct,unsigned int syscall_num_requested,state_t* exceptionState);
 

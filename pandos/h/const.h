@@ -206,10 +206,18 @@
 
 #define INT_OFF     getSTATUS() & (STATUS_IECOFF)
 #define INT_ON      getSTATUS() | STATUS_IECON | STATUS_INT_ON
+#define VALID_BIT_ON 0x00000200
 
 #define	RESINSTRCODE	 0xFFFFFF28
 
+#define GETPAGENO     0x3FFFF000
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
+#define DEV_INDEX(lineNum, devNum, RoT) ((lineNum - 3) * 8 + (lineNum == 7 ? devNum * 2 + RoT : devNum))
+#define GETVPN030(T) (T & GETPAGENO) >> VPNSHIFT
+#define GETVPN(T) ((T >= KUSEG && T < 0xBFFFF000) ? GETVPN030(T) : 31)
+
+#define TRANSM_MASK 0x000000FF
+#define RECV_MASK 0x000000FF
 
 
 #define STATUS_KUc_SHIFT  1  /* KUc bit is bit 1 in the Status register */

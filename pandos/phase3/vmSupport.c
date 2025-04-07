@@ -43,7 +43,7 @@
 HIDDEN swap_pool_t swapTable[POOLSIZE];
 
 /*swap pool semaphore*/
-HIDDEN unsigned int swapSem;
+HIDDEN int swapSem;
 
 extern int devRegSem[49];
 extern pcb_t* currProc;
@@ -72,7 +72,8 @@ int findReplace(){
 }
 
 void init_swap(){
-    for(int i= 0;i < 16; i++){
+    int i;
+    for(i= 0;i < 16; i++){
         swapTable[i].asid = -1; 
     }
     swapSem = 1;
@@ -109,7 +110,8 @@ void dirtyPage(unsigned int currASID, unsigned int occupiedPageNumber, unsigned 
 
 
 void clearSwap(int asid){
-    for(int i = 0; i < POOLSIZE; i++){
+    int i;
+    for(i = 0; i < POOLSIZE; i++){
         if(swapTable[i].asid == asid){
             swapTable[i].asid = -1;
         }

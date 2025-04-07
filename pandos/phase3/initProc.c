@@ -70,7 +70,8 @@ support_t* allocate(){
 }
 
 void init_supLevSem(){
-    for (int i = 0; i < 49; i += 1)
+    int i;
+    for (i = 0; i < 49; i += 1)
         devRegSem[i] = 1;
 }
 
@@ -103,7 +104,8 @@ void createProc(int id){
         supStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) (topStack + PAGESIZE);
 
         /*init TLB entries*/
-        for (int i = 0; i < 31; i++)
+        int i;
+        for (i = 0; i < 31; i++)
         {
             supStruct->sup_privatePgTbl[i].entryHI = 0x80000000 + (i << VPNSHIFT) + (id << 6);
             supStruct->sup_privatePgTbl[i].entryLO = 0x00000400;
@@ -126,18 +128,20 @@ void InstantiatorProcess(){
     masterSem = 0;
     suppFree = NULL;
 
-    for(int i=0; i < 8; i++){
+    int i;
+    for(i=0; i < 8; i++){
         deallocate(&supPool[i]);
         
     }
-
-    for(int id=0; id < 8; id++)
+    int id;
+    for(id=0; id < 8; id++)
     {
 		createProc(id+1);
 	}
 
     /*do P op on master semaphore for each process*/
-    for(int i=0; i < 8; i++)
+    int j;
+    for(j=0; j < 8; j++)
     {
 		SYSCALL(SYS3, (int) &masterSem, 0, 0);
 	}

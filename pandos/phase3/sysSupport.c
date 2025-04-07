@@ -126,17 +126,18 @@ void write_to_printer(support_t *currProcSupport, state_PTR exceptionState)
         int char_printed_count; /*tracks how many characters were printed*/
         char_printed_count = 0;
         /*----------------------------------------------------------*/
-        semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + asid;
-        devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
-        device_t *printerDevice = &(devRegArea->devreg[semIndex]);
+        /*semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + asid;*/
+        /*devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR;*/ /* Pointer to the device register area */
+        /*device_t *printerDevice = &(devRegArea->devreg[semIndex]);*/
+        dtpreg_t* printerDevice = (dtpreg_t*) DEV_REG_ADDR(PRINTER_LINE_NUM,asid);
 
         SYSCALL(SYS3, (memaddr) &devRegSem[DEV_INDEX(PRINTER_LINE_NUM,asid,FALSE)], 0, 0);
         int idx = 0;
         int response = 1;
         while (idx < len){
             setSTATUS(INT_OFF);
-            printerDevice->d_data0 = *virtAddr;
-            printerDevice->d_command = TERMINAL_COMMAND_TRANSMITCHAR;
+            printerDevice->data0 = *virtAddr;
+            printerDevice->command = TERMINAL_COMMAND_TRANSMITCHAR;
             response = SYSCALL(SYS5,PRINTER_LINE_NUM,asid,FALSE);
             setSTATUS(INT_ON);
 

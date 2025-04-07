@@ -215,6 +215,7 @@
 #define DEV_INDEX(lineNum, devNum, RoT) ((lineNum - 3) * 8 + (lineNum == 7 ? devNum * 2 + RoT : devNum))
 #define GETVPN030(T) (T & GETPAGENO) >> VPNSHIFT
 #define GETVPN(T) ((T >= KUSEG && T < 0xBFFFF000) ? GETVPN030(T) : 31)
+#define DEV_REG_ADDR(lineNum, devNum) ((devreg_t*)(0x10000054 + (((lineNum) - 3) * 0x80) + ((devNum) * 0x10)))
 
 #define TRANSM_MASK 0x000000FF
 #define RECV_MASK 0x000000FF

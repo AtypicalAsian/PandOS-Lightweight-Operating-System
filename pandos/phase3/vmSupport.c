@@ -92,7 +92,7 @@ void flash_read_write(unsigned int read_write_bool, unsigned int device_no, unsi
     unsigned int command = (occp_pageNo << 8) | read_write_bool;
     SYSCALL(SYS3,(memaddr) &devRegSem[DEV_INDEX(4, device_no, FALSE)],0,0);
 
-    dtpreg_t* flashaddr = (dtpreg_t*) REG_ADDRS_DEVICE(4,device_no);
+    dtpreg_t* flashaddr = (dtpreg_t*) DEV_REG_ADDR(4,device_no);
     flashaddr->data0 = pfn;
 
     setSTATUS(INT_OFF);

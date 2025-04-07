@@ -12,11 +12,15 @@
 #include "../h/const.h"
 
 /*extern int masterSema4;*/ /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
-void test(); 
-void summonProc(int pid);
-void init_supp_struct_Sema4();
-void deallocate(support_t* supportStruct);
+void deallocate(support_t*  toDeallocate);
+
 support_t* allocate();
+
+void init_supLevSem();
+
+void createProc(int id);
+
+void test();
 
 
 #endif

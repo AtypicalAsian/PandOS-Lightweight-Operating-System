@@ -124,6 +124,11 @@
 #define DEV_STARTING_REG  0x10000054 /*device register starting address - [figure 5.2 pops section 5.2]*/
 #define FRAME_SHIFT 0x20020000 /*starting address of the swap pool*/
 
+
+#define POOLSTART (RAMSTART + (32 * PAGESIZE))
+#define VALIDON  0x00000200
+#define POOLSIZE (MAXUPROCESS * 2)
+
 /* Exceptions related constants */
 #define	PGFAULTEXCEPT	  0
 #define GENERALEXCEPT	  1
@@ -216,6 +221,7 @@
 #define GETVPN030(T) (T & GETPAGENO) >> VPNSHIFT
 #define GETVPN(T) ((T >= KUSEG && T < 0xBFFFF000) ? GETVPN030(T) : 31)
 #define DEV_REG_ADDR(lineNum, devNum) ((devreg_t*)(0x10000054 + (((lineNum) - 3) * 0x80) + ((devNum) * 0x10)))
+#define CAUSE_GET_EXCCODE(cause) (((cause) & 0x0000007C) >> 2)
 
 #define TRANSM_MASK 0x000000FF
 #define RECV_MASK 0x000000FF

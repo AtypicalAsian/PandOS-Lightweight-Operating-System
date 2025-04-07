@@ -25,146 +25,122 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
-/* GLOBAL VARIABLES DECLARATION */
-/*int deviceSema4s[MAXSHAREIODEVS];*/ /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
-/*int masterSema4;*/ /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
-/*int iterator;*/ /*iterator to index into free support stack*/
-/*support_t *free_support_pool[MAXUPROCESS+1];*/
-/*support_t support_structs_pool[MAXUPROCESS];*/
+/*pool of sup structs to allocate*/
+static support_t supPool[MAXUPROCESS];
+int masterSem;
 
-static support_t supportStruct_pool[MAXUPROCESS];
-int masterSema4;
-support_t* supp_struct_free;
-int devRegSem[MAXSHAREIODEVS];
+/*sup_struct free list*/
+support_t* suppFree;
 
-/**************************************************************************************************
- * TO-DO
- * Helper method to create a process
- **************************************************************************************************/
-/*void summon_process(int pid){
-    return;
-}*/
+/*sup level device semaphores*/
+int devRegSem[48];
 
-/**************************************************************************************************
- * TO-DO
- **************************************************************************************************/
+extern void TLB_exceptionHandler();
+extern void exceptionHandler();
+extern void supexHandler();
+
+
+void deallocate(support_t*  toDeallocate){
+    support_t *tmp;
+    tmp = suppFree;
+    if(tmp == NULL){
+        suppFree = toDeallocate;
+        suppFree->next = NULL;
+    }
+    else{
+        while(tmp->next != NULL)    tmp = tmp->next;
+        tmp->next = toDeallocate;
+        tmp = tmp->next;
+        tmp->next = NULL;
+    }    
+}
+
 support_t* allocate(){
-    support_t* temp;
-    temp = supp_struct_free;
-    if (temp == NULL){
+    support_t* tmp;
+    tmp = suppFree;
+    if(tmp == NULL)
         return NULL;
-    }
     else{
-        supp_struct_free = supp_struct_free->next;
-        temp->next = NULL;
-        return temp;
-    }
+        suppFree = suppFree->next;
+        tmp->next = NULL;
+        return tmp;
+    }    
 }
 
-/**************************************************************************************************
- * TO-DO
- * Helper method to return support structure to the free stack
- **************************************************************************************************/
-void deallocate(support_t* supportStruct){
-    support_t *temp;
-    temp = supp_struct_free;
-    if (temp == NULL){
-        supp_struct_free = supportStruct;
-        supp_struct_free->next = NULL;
-    }
-    else{
-        while (temp->next != NULL){ temp = temp->next;}
-        temp->next = supportStruct;
-        temp = temp->next;
-        temp->next = NULL;
-    }
-}
-
-void init_supp_struct_Sema4(){
-    int i;
-    for (i=0; i<MAXDEVICECNT;i++){
+void init_supLevSem(){
+    for (int i = 0; i < 49; i += 1)
         devRegSem[i] = 1;
-    }
 }
 
-void summonProc(int pid){
+
+void createProc(int id){
     memaddr ramTOP;
     RAMTOP(ramTOP);
-    memaddr topStack = ramTOP - (2*pid*PAGESIZE);
+    memaddr topStack = ramTOP - (2*id*PAGESIZE);
 
-    /*Init process state*/
+   /*init process state*/
     state_t newState;
-    newState.s_entryHI = pid << 6;
-    newState.s_pc = newState.s_t9 = TEXT_START;
-    newState.s_status = STATUS_USERPON | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
-    newState.s_sp = SP_START; /*stack pointer*/
+    newState.s_entryHI = id <<6;
+    newState.s_pc = newState.s_t9 = 0x800000B0;
+    newState.s_sp = 0xC0000000;
+    newState.s_status = 0x0000FF00 | 0x00000004 | 0x08000000 | 0x00000008;
 
-    /*go to free list -> alloc free support struct*/
-    support_t* supportStruct = allocate();
-    if (supportStruct != NULL){
-        supportStruct->sup_asid = pid;
+    /*get one supp struct from free list*/
+    support_t* supStruct = allocate();
+    if(supStruct != NULL){
+        supStruct->sup_asid = id;
+        
+        /*init general exception context*/
+        supStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) supexHandler;
+        supStruct->sup_exceptContext[GENERALEXCEPT].c_status = 0x0000FF00 | 0x00000004 | 0x08000000;
+        supStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) topStack;
 
-        /*General Exception Init*/
-        supportStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) gen_excp_handler;
-        supportStruct->sup_exceptContext[GENERALEXCEPT].c_status= STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
-        supportStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) topStack;
+        /*init page fault exception context*/
+        supStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) TLB_exceptionHandler;
+        supStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = 0x0000FF00 | 0x00000004 | 0x08000000;
+        supStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) (topStack + PAGESIZE);
 
-
-        /*Page Exception Init*/
-        supportStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) tlb_exception_handler;
-        supportStruct->sup_exceptContext[PGFAULTEXCEPT].c_status= STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
-        supportStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) (topStack + PAGESIZE);
-
-
-        /*TLB ENTRY INIT*/
-        int i;
-        for (i=0;i<MAX_PAGES-1;i++){
-            supportStruct->sup_privatePgTbl[i].entryHI = 0x80000000 + (i << VPNSHIFT) + (pid << 6);
-            supportStruct->sup_privatePgTbl[i].entryLO = D_BIT_SET;
+        /*init TLB entries*/
+        for (int i = 0; i < 31; i++)
+        {
+            supStruct->sup_privatePgTbl[i].entryHI = 0x80000000 + (i << VPNSHIFT) + (id << 6);
+            supStruct->sup_privatePgTbl[i].entryLO = 0x00000400;
         }
-        supportStruct->sup_privatePgTbl[MAX_PAGES-1].entryHI = 0xBFFFF000 + (pid << 6);
-        supportStruct->sup_privatePgTbl[MAX_PAGES-1].entryHI = D_BIT_SET;
+        supStruct->sup_privatePgTbl[31].entryHI = 0xBFFFF000 + (id << 6);
+        supStruct->sup_privatePgTbl[31].entryLO = 0x00000400;
+        
+        int status = SYSCALL(SYS1, (memaddr) &newState, (memaddr) supStruct, 0);
 
-        /*Run SYS1 to create process after init support struct*/
-        int status = SYSCALL(SYS1,(memaddr) &newState, (memaddr) supportStruct, 0);
-        if (status != 0){
-            SYSCALL(SYS2,0,0,0);
+        if (status != 1)
+        {
+            SYSCALL(SYS2, 0, 0, 0);
         }
     }
 }
 
+void InstantiatorProcess(){
+    init_swap();
+    init_supLevSem();    
+    masterSem = 0;
+    suppFree = NULL;
 
-/**************************************************************************************************
- * TO-DO  
- * Implement test() function 
- *      1. Initialize I/O device semaphores + master semaphore (done)
- *      2. Initialize Virtual Memory (swap pool table) (working on it!!!)
- *      3. Initialize base processor state for all user processes (working on it!!!)
- *      4. Create and launch max number of processes (working on it!!!)
- *      5. Optimization (perform P op on master sema4 MAXUPROCESS times) (working on it!!!)
- *      6. Terminate test() (working on it!!!)
- **************************************************************************************************/
-void test(){
-    init_swap_structs();
-    init_supp_struct_Sema4();
-    masterSema4 = 0;
-    supp_struct_free = NULL;
-
-    int i;
-    for (i=0;i<MAXUPROCESS;i++){
-        deallocate(&supportStruct_pool[i]);
+    for(int i=0; i < 8; i++){
+        deallocate(&supPool[i]);
+        
     }
 
-    int id;
-    for (id=0;id<MAXUPROCESS;id++){
-        summonProc(id+1);
-    }
-    
-    int j;
-    for (j=0;j<MAXUPROCESS;j++){
-        SYSCALL(SYS3, (int) &masterSema4, 0,0);
-    }
-    SYSCALL(SYS2,0,0,0);
+    for(int id=0; id < 8; id++)
+    {
+		createProc(id+1);
+	}
+
+    /*do P op on master semaphore for each process*/
+    for(int i=0; i < 8; i++)
+    {
+		SYSCALL(SYS3, (int) &masterSem, 0, 0);
+	}
+    SYSCALL(SYS2, 0, 0, 0);
 }
+

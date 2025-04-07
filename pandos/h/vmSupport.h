@@ -9,13 +9,23 @@
 #include "../h/types.h"
 #include "../h/const.h"
 
-void init_swap_structs();
-void uTLB_RefillHandler();
-void nuke_til_it_glows(int *semaphore);
-void reset_swap(int asid);
-void update_tlb_handler(pte_entry_t *new_page_table_entry);
-int find_frame_swapPool();
-void flash_read_write(unsigned int read_write_bool, unsigned int device_no, unsigned int occp_pageNo, int swap_pool_index);
-void occupied_handler(unsigned int asid, unsigned int occp_pageNo, unsigned int swap_pool_index);
-void tlb_exception_handler(); 
+void init_swap();
+
+void TLB_exceptionHandler();
+
+void killProc(int *sem);
+
+void clearSwap(int asid);
+
+void updateTLB(pte_entry_t *updatedEntry);
+
+int findReplace();
+
+void writeReadFlash(unsigned int RoW, unsigned int devNumber, unsigned int occupiedPageNumber, int swap_pool_index);
+
+void dirtyPage(unsigned int currASID, unsigned int occupiedPageNumber, unsigned int swap_pool_index);
+
+pte_entry_t *findEntry(unsigned int pageNumber);
+
+void uTLB_refillHandler();
 #endif

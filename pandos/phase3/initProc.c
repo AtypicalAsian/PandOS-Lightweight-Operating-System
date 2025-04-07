@@ -25,20 +25,22 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 /* GLOBAL VARIABLES DECLARATION */
-int deviceSema4s[MAXSHAREIODEVS]; /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
-int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
-int iterator; /*iterator to index into free support stack*/
-support_t *free_support_pool[MAXUPROCESS+1];
+int masterSema4;/* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
 support_t support_structs_pool[MAXUPROCESS];
+support_t *free_support_pool[MAXUPROCESS+1];
+int stk_iterator; /*iterator to index into free support stack*/
+int devRegSem[48];
 
-/*HELPER METHODS*/
-HIDDEN void init_base_state(state_t base_state);
-/*HIDDEN void summon_process(int pid);*/
-support_t* allocate();    /*Helper method to allocate a support struct from the free stack*/
-void deallocate(support_t* supportStruct);   /*Helper method to return support structure to the free stack*/
+void init_devRegSem(){
+    int i;
+    for (i=0;i<49;i++){
+        devRegSem[i] = 1;
+    }
+}
+
 
 /**************************************************************************************************
  * TO-DO
@@ -54,21 +56,14 @@ void init_base_state(state_t base_state){
 
 /**************************************************************************************************
  * TO-DO
- * Helper method to create a process
- **************************************************************************************************/
-/*void summon_process(int pid){
-    return;
-}*/
-
-/**************************************************************************************************
- * TO-DO
  **************************************************************************************************/
 support_t* allocate(){
-    if (iterator == 0){
-        return NULL;
+    support_t *temp = NULL;
+    if (stk_iterator != 0){
+        stk_iterator--;
+        temp = free_support_pool[stk_iterator];
     }
-    iterator--;
-    return free_support_pool[iterator];
+    return temp;
 }
 
 /**************************************************************************************************
@@ -76,12 +71,18 @@ support_t* allocate(){
  * Helper method to return support structure to the free stack
  **************************************************************************************************/
 void deallocate(support_t* supportStruct){
-    if (iterator < MAXUPROCESS){
-        free_support_pool[iterator] = supportStruct;
-        iterator++;
-    }
+    free_support_pool[stk_iterator] = supportStruct;
+    stk_iterator++;
 }
 
+/*Initialize the support structure free list (stack)*/
+void initSupportStruct(){
+    stk_iterator = 0;
+    int i;
+    for (i=0;i<MAXUPROCESS;i++){
+        deallocate(&support_structs_pool[i]);
+    }
+}
 
 /**************************************************************************************************
  * TO-DO  
@@ -94,70 +95,50 @@ void deallocate(support_t* supportStruct){
  *      6. Terminate test() (working on it!!!)
  **************************************************************************************************/
 void test(){
-    /*Declare local variables*/
-    int process_id; /*unique process id (asid) associated with each user process that's created (instantiated)*/
+    init_swap_structs();
+    initSupportStruct();
+
     state_t base_proc_state;
-    /*static support_t supp_struct_array[MAXUPROCESS+1]*/; /*array of support structures*/
-    support_t *suppStruct;
+    init_base_state(base_proc_state);
 
-    /*Initialize master semaphore to 0*/
-    masterSema4 = 0; /*DEFINE CONSTANT FOR 0*/
-    iterator = 0;
-    
-    /*Initialize I/O device semaphores to 1*/
-    init_deviceSema4s();
-    /*initialize free pool (stack) of support structs*/
-    int j;
-    for (j=0; j < MAXUPROCESS; j++){
-        deallocate(&support_structs_pool[j]);
-    }
+    support_t *supportStruct;
+    int pid;
+    for (pid=1;pid<=MAXUPROCESS;pid++){
+        base_proc_state.s_entryHI = (pid << SHIFT_ASID);
+        supportStruct = allocate();
 
-
-    /*Initialize virtual memory*/
-    init_base_state(base_proc_state); /*Initialize base processor state of a user process*/
-    init_swap_structs(); /*Initialize swap pool & swap pool semaphore*/
-
-    /*create and launch MAXUPROCESS user processes*/
-    /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/
-
-    for (process_id=1; process_id < MAXUPROCESS + 1; process_id++){
-        /*create and launch MAXUPROCESS user processes*/
-        suppStruct = allocate();
-        base_proc_state.s_entryHI = process_id << ID_SHIFT;
-
-        /*Create exception context per process*/
-        suppStruct->sup_asid = process_id;
+        /*Init exception context*/
+        supportStruct->sup_asid = pid;
 
         /*Set Up General Exception Context*/
-        suppStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) gen_exception_handler;    /*assign address of general exception handler*/
-        suppStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackGen[STACKSIZE]); /*Set Up stack area for support level exception handler*/
-        suppStruct->sup_exceptContext[GENERALEXCEPT].c_status = STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
+        supportStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) sp_level_gen_handler;    /*assign address of general exception handler*/
+        supportStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) &(supportStruct->sup_stackGen[STACKSIZE]); /*Set Up stack area for support level exception handler*/
+        supportStruct->sup_exceptContext[GENERALEXCEPT].c_status = STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
         /*Set Up Page Fault Exception Context*/
-        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) tlb_exception_handler;  /*assign address of tlb exception handler*/
-        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackTLB[STACKSIZE]); /*Set Up stack area for TLB exception handler*/
-        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
+        supportStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) tlb_exception_handler;  /*assign address of tlb exception handler*/
+        supportStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) &(supportStruct->sup_stackTLB[STACKSIZE]); /*Set Up stack area for TLB exception handler*/
+        supportStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON;
 
+        /*Set Up uproc page table*/
         /*Set Up process page table*/
         int k;
         for (k=0; k < MAX_PAGES-1; k++){
-            suppStruct->sup_privatePgTbl[k].entryHI = 0x80000000 + (k << VPNSHIFT) + (process_id << ID_SHIFT);
-            suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET;
+            supportStruct->sup_privatePgTbl[k].entryHI = 0x80000000 + (k << VPNSHIFT) + (pid << ID_SHIFT);
+            supportStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET;
         }
 
         /*Entry 31 of page table = stack*/
-        suppStruct->sup_privatePgTbl[31].entryHI = 0xBFFFF000 + (process_id << ID_SHIFT);
-        suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET;
+        supportStruct->sup_privatePgTbl[31].entryHI = 0xBFFFF000 + (pid << ID_SHIFT);
+        supportStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET;
 
         /*Call SYS1*/
-        SYSCALL(SYS1,(memaddr) &base_proc_state,(memaddr)suppStruct,0);
+        SYSCALL(SYS1,(memaddr) &base_proc_state,(memaddr)supportStruct,0);
     }
     /*Wait for all uprocs to finish*/
     int l;
     for (l=0;l<MAXUPROCESS;l++){
         SYSCALL(SYS3,(memaddr) &masterSema4,0,0);
     }
-
-    
     /*Terminate current uproc*/
     SYSCALL(SYS2,0,0,0);
 }

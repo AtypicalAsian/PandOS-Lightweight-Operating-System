@@ -36,13 +36,13 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
-extern int deviceSema4s[MAXSHAREIODEVS];
+extern int devRegSem[49];
 
 /*SYSCALL 9-12 function declarations*/
 void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested); /*Syscall exception handler*/
-void gen_excp_handler(); /*General exception handler*/
+void sp_level_gen_handler(); /*General exception handler*/
 void program_trap_handler(); /*Program Trap Handler*/
 void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
 HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
@@ -52,12 +52,8 @@ HIDDEN void read_from_terminal(); /*SYS13*/
 extern void init_deviceSema4s();
 
 
-void init_deviceSema4s(){
-    /*Initialize I/O device semaphores to 1*/
-    int i;
-    for (i=0; i<MAXSHAREIODEVS; i++){
-        deviceSema4s[i] = 1; /*DEFINE CONSTANT FOR 1*/
-    }
+void return_control(){
+    LDST(EXCSTATE);
 }
 
 /**************************************************************************************************
@@ -65,7 +61,7 @@ void init_deviceSema4s(){
  * This function is a wrapper to perform LDST
  * Can't use LDST directly in phase 3?
  **************************************************************************************************/
-void return_control(int exception_code, support_t *supportStruct){
+void return_control_ss(int exception_code, support_t *supportStruct){
     state_PTR return_state = &(supportStruct->sup_exceptState[exception_code]);
     /*Perform LDST to return control to the current process*/
     LDST(return_state);
@@ -76,12 +72,33 @@ void return_control(int exception_code, support_t *supportStruct){
  * TO-DO 
  * terminate() is a wrapper for the kernel-mode restricted SYS2 service
  **************************************************************************************************/
-void terminate()
+void terminate(support_t *supportStruct)
 {
-    /* Make call to SYS2
-    Ref: pandos section 4.7.1
-    */
-    SYSCALL(2, 0, 0, 0);
+    int dev_num = supportStruct->sup_asid - 1;
+
+    /* Check if the process holds a mutex semaphore */
+    int i;
+    for (i = 0; i < DEVICE_TYPES; i++) {
+        if (support_device_sems[i][dev_num] == 0) {
+            SYSCALL(SYS4, (memaddr) &support_device_sems[i][dev_num], 0, 0);
+        }
+    }
+
+    /* Mark all pages as unused */
+    for (i = 0; i < MAXPAGES; i++) {
+        if(support_struct->sup_privatePgTbl[i].pte_entryLO & VALIDON){
+            setSTATUS(INTSOFF);
+
+            /* This could be changed according to mikey*/
+            support_struct->sup_privatePgTbl[i].pte_entryLO &= ~VALIDON;
+            updateTLB(&(support_struct->sup_privatePgTbl[i]));
+
+            setSTATUS(INTSON);
+        }
+    }
+    SYSCALL(VERHOGEN, (memaddr) &testSem, 0, 0);
+    dealocate_sup(support_struct);
+    SYSCALL(TERMINATEPROCESS, 0, 0, 0);
 }
 
 /**************************************************************************************************
@@ -329,8 +346,8 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
  * Support Level Program Trap Handler
  * BIG PICTURE
  **************************************************************************************************/
-void program_trap_handler(){
-    terminate();
+void program_trap_handler(support_t *supportStruct){
+    terminate(supportStruct);
 }
 
 /**************************************************************************************************
@@ -394,7 +411,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
  *      2. Examine Cause register in exceptState field of support structure and extract exception code
  *      3. Pass control to either the support level syscall handler or the program trap handler
  **************************************************************************************************/
-void gen_excp_handler(){
+void sp_level_gen_handler(){
     /*--------------Declare local variables---------------------*/
     support_t* currProc_supp_struct;    /*current process support structure*/
     int exception_code;                 /*exception code inside Cause Register*/

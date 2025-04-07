@@ -195,6 +195,9 @@
 #define STACKSIZE   499
 #define ID_SHIFT    6
 
+
+#define SHIFT_ASID  6
+
 /* Status Register Bitmask Constants (Processor State) */
 #define STATUS_ALL_OFF   0x0  /* Clears all bits in the Status register (useful for initializing or bitwise-OR operations) */
 #define STATUS_IE_ENABLE 0x00000004  /* Enables global interrupts (IEp, bit 2 = 1) after LDST */
@@ -241,6 +244,7 @@
 #define NULL_PTR_ERROR   -1
 #define NO_INTERRUPTS    -1
 #define INTERRUPT_BITMASK_INITIAL  1
+#define MISSINGPAGESHIFT 0xFFFFF000
 
 #define SEM4BLOCKED     0
 #define OFFSET          3
@@ -277,5 +281,7 @@
 
 /* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
+#define EXCSTATE ((state_t *) BIOSDATAPAGE)
+
 
 #endif

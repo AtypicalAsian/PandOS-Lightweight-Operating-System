@@ -64,7 +64,7 @@ void nonTimerInterrupt(int deviceType) {
 		unblockLoad(deviceType, deviceInstance, status);
 	}
 	if (currProc == NULL)
-		scheduler();
+		switchProcess();
 	else
 		LDST(EXCSTATE);
 }
@@ -76,7 +76,7 @@ void pltInterrupt() {
 	currProc->p_time += timePassed();
 	insertProcQ(&ReadyQueue, currProc);
 	currProc = NULL;
-	scheduler();
+	switchProcess();
 }
 
 
@@ -92,7 +92,7 @@ void intervalTimerInterrupt() {
 	semIntTimer = 0;
 
 	if (currProc == NULL)
-		scheduler();
+		switchProcess();
 	else
 		LDST(EXCSTATE);
 }

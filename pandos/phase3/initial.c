@@ -163,12 +163,12 @@ void populate_passUpVec(){
 
  *****************************************************************************/
 void init_proc_state(pcb_PTR firstProc){
-	unsigned int ramBase;
-	unsigned int ramSize;
-	ramBase = *((int *)RAMBASEADDR);
-	ramSize = *((int *)RAMBASESIZE);
+	unsigned int ramBase;  /* Variable to store the base address of RAM */
+	unsigned int ramSize; /* Variable to store the total size of RAM */
+	ramBase = *((int *)RAMBASEADDR); /* Read the RAM base address */
+	ramSize = *((int *)RAMBASESIZE); /* Read the RAM size */
     memaddr topRAM;                         /* the address of the last RAM frame */
-	topRAM = ramBase + ramSize;
+	topRAM = ramBase + ramSize; /* Calculate top of RAM by adding the base address and the total RAM size */
 
     /*Initialize the process state*/
     firstProc->p_s.s_sp = topRAM;           /*Stack pointer set to top of RAM*/
@@ -241,12 +241,13 @@ int main() {
 	first_proc = allocPcb(); /*allocate a PCB from the PCB free list for the first process*/
 
 	if (first_proc != NULL){
-		procCnt++;
-		init_proc_state(first_proc);
-		insertProcQ(&ReadyQueue, first_proc);
-		scheduler();
+		procCnt++; /*increment process count*/
+		init_proc_state(first_proc); /* Initialize the process state for the new process (stack, PC, t9, status) */
+		insertProcQ(&ReadyQueue, first_proc); /* Insert the new process into the ready queue */
+		switchProcess();  /* Invoke the scheduler */
 		return 1;
 	}
+	/*If no PCB is available, the system calls PANIC() to halt execution*/
 	PANIC();
 	return (0);
 }

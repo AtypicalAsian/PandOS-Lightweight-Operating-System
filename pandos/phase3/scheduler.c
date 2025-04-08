@@ -13,7 +13,7 @@
 
 volatile cpu_t timeSlice;
 
-void scheduler() {
+void switchProcess() {
 	if (emptyProcQ(ReadyQueue)) {
 		if (procCnt == 0) {
 			HALT();

@@ -94,7 +94,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 				break;
 			}
 			if (currProc == NULL)
-				scheduler();
+			switchProcess();
 			else
 				LDST(EXCSTATE);
 		}
@@ -149,7 +149,7 @@ void terminateProc() {
 
 	currProc = NULL;
 
-	scheduler();
+	switchProcess();
 }
 
 
@@ -188,7 +188,7 @@ void passeren(int *semAdd) {
 		currProc->p_time += timePassed();
 		insertBlocked((int *) semAdd, currProc);
 		currProc = NULL;
-		scheduler();
+		switchProcess();
 	}
 }
 

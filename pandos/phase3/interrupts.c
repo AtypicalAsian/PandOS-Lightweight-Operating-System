@@ -8,7 +8,7 @@
 #include "../h/initial.h"
 #include "../h/interrupts.h"
 #include "../h/scheduler.h"
-#include "../h/syscalls.h"
+#include "../h/exceptions.h"
 
 #include <umps3/umps/libumps.h>
 

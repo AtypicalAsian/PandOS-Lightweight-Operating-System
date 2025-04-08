@@ -15,6 +15,8 @@
 #define UPROCMAX 8
 #define POOLSIZE (UPROCMAX * 2)
 #define STACKSIZE 499
+#define DEVINTNUM 5
+#define DEVPERINT 8
 
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR   0x10000000
@@ -138,7 +140,7 @@
 #define INTIMER  100000UL     
 #define MAXPLT   0xFFFFFFFFUL 
 
-/* Phase 3 Constants - Unsorted*/
+/* Phase 3 Constants*/
 #define FLASHADDRSHIFT 8
 #define MISSINGPAGESHIFT 0xFFFFF000
 #define FRAMEADDRSHIFT 0x20020000
@@ -148,7 +150,7 @@
 #define TERMTRANSHIFT 8
 #define EXCODE_NUM 20
 
-/* Phase 5 constants*/
+
 #define NEVER 0xFFFFFFFF
 #define DELAYASID 0
 

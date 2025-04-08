@@ -9,15 +9,9 @@
 #include "const.h"
 
 typedef signed int cpu_t;
-
 typedef unsigned int memaddr;
 
-typedef unsigned int size_t;
-
-typedef int bool;
-
-typedef int semaphore;
-
+/* Device Register */
 typedef struct {
 	unsigned int d_status;
 	unsigned int d_command;
@@ -30,6 +24,7 @@ typedef struct {
 #define t_transm_status		d_data0
 #define t_transm_command	d_data1
 
+/*Bus Register Area*/
 typedef struct devregarea {
 	unsigned int rambase;
 	unsigned int ramsize;
@@ -42,8 +37,8 @@ typedef struct devregarea {
 	unsigned int intervaltimer;
 	unsigned int timescale;
 	unsigned int tlb_floor_addr;
-	unsigned int inst_dev[5];
-	unsigned int interrupt_dev[5];
+	unsigned int inst_dev[DEVINTNUM];
+	unsigned int interrupt_dev[DEVINTNUM];
 	device_t devreg[5][8];
 } devregarea_t;
 
@@ -55,6 +50,19 @@ typedef struct passupvector {
     unsigned int exception_stackPtr;
 } passupvector_t;
 
+/* single page table entry */
+typedef struct pteEntry_t {
+    unsigned int pte_entryHI;
+    unsigned int pte_entryLO;
+} pteEntry_t;
+
+/* process context type */
+typedef struct context_t {
+    unsigned int c_stackPtr;
+    unsigned int c_status;
+    unsigned int c_pc;
+} context_t;
+
 #define STATEREGNUM	31
 typedef struct state_t {
 	unsigned int	s_entryHI;
@@ -65,67 +73,57 @@ typedef struct state_t {
 
 } state_t, *state_PTR;
 
-typedef struct context_t {
-    unsigned int c_stackPtr;
-    unsigned int c_status;
-    unsigned int c_pc;
-} context_t;
-
-typedef struct pteEntry_t {
-    unsigned int pte_entryHI;
-    unsigned int pte_entryLO;
-} pteEntry_t;
+/*define the swap pool struct*/
+typedef struct swap_pool {
+    int         sw_asid;  
+    int         sw_pageNo;
+    pteEntry_t *sw_pte;  
+} swap_pool_t;
 
 typedef struct support_t {
     int       sup_asid;            
     state_t   sup_exceptState[2];  
     context_t sup_exceptContext[2];
-    pteEntry_t sup_privatePgTbl[USERPGTBLSIZE]; 
+    pteEntry_t sup_privatePgTbl[32]; 
     int sup_stackTLB[500];
     int sup_stackGen[500];
-	int sup_privateSem;
 } support_t;
 
-typedef struct delayd_t {
-	struct delayd_t *d_next;
-	cpu_t d_wakeTime;
-	support_t *d_supStruct;
-} delayd_t, *delay_PTR;
 
-/* Process control block type */
+/* Process Control Block (PCB) type */
 typedef struct pcb_t {
 	/* process queue fields */
-	struct pcb_t    *p_next,          /* pointer to next entry */
-					*p_prev,          /* pointer to prev entry */
-	/* process tree fields */
-					*p_prnt,          /* pointer to parent */
-					*p_child,         /* pointer to 1st child */
-					*p_prev_sib,         /* pointer to sibling */
-					*p_next_sib;           /* pointer to sibling */
-	/* process status information */
-	state_t			 p_s;             /* processor state */
-	cpu_t            p_time;          /* cpu time used by proc */
-	int             *p_semAdd;        /* pointer to sema4 on */
-					                  /* which process blocked */
-	/* support layer information */
-	support_t 		*p_supportStruct; /* ptr to support struct */
+	struct pcb_t *p_next;  /* Pointer to next entry */
+    struct pcb_t *p_prev;  /* Pointer to previous entry */
+
+    /* Process tree fields */
+    struct pcb_t *p_prnt;  /* Pointer to parent process */
+    struct pcb_t *p_child; /* Pointer to first child process */
+    struct pcb_t *p_sib;   /* Pointer to sibling process */
+	struct pcb_t *p_lsib;  /* Pointer to left sibling (for doubly linked list)*/
+	struct pcb_t *p_rsib;  /* Pointer to right sibling (for doubly linked list)*/
+
+	/* Process status information */
+    state_t p_s;           /* Processor state */
+    cpu_t p_time;          /* CPU time used by the process */
+    int *p_semAdd;         /* Pointer to semaphore on which the process is blocked */
+
+    /* Support layer information */
+    support_t *p_supportStruct; /* Pointer to support structure */
 } pcb_t, *pcb_PTR;
 
-/* Semaphore descriptor type */
+
 typedef struct semd_t {
 
 struct semd_t *s_next;   /* next element on the ASL */
 int 		  *s_semAdd; /* pointer to the semaphore*/
-pcb_t 		   *s_procQ;  /* tail pointer to a */
-						 /* process queue */
+pcb_t 		   *s_procQ;  /* procQ tail ptr */
 
-} semd_t;
+} semd_t, *semd_PTR;
 
-typedef struct swap_t {
-    int         sw_asid;  
-    int         sw_pageNo;
-    pteEntry_t *sw_pte;  
-} swap_t;
+typedef unsigned int size_t;
+typedef int bool;
+typedef int semaphore;
 
 #define	s_at	s_reg[0]
 #define	s_v0	s_reg[1]

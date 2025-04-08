@@ -56,7 +56,7 @@ void test() {
         supportStruct = allocate_sup();
         
         /* Set up exception context */
-        supportStruct->sup_privateSem = 0;
+        /*supportStruct->sup_privateSem = 0;*/
 
         supportStruct->sup_asid = proc;
         supportStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) &pager;

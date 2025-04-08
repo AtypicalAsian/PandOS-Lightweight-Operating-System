@@ -32,7 +32,7 @@ void unblockLoad(int deviceType, int deviceInstance, unsigned int status) {
 
 	if (unblockedProc != NULL) {
 		unblockedProc->p_s.s_v0 = status;
-		soft_block_count--;
+		softBlockCnt--;
 	}
 }
 
@@ -63,7 +63,7 @@ void nonTimerInterrupt(int deviceType) {
 		DEVREGADDR->devreg[deviceType][deviceInstance].d_command = ACK;
 		unblockLoad(deviceType, deviceInstance, status);
 	}
-	if (current_proc == NULL)
+	if (currProc == NULL)
 		scheduler();
 	else
 		LDST(EXCSTATE);
@@ -72,10 +72,10 @@ void nonTimerInterrupt(int deviceType) {
 
 void pltInterrupt() {
 	setTIMER(TICKCONVERT(MAXPLT));
-	current_proc->p_s = *EXCSTATE;
-	current_proc->p_time += timePassed();
-	insertProcQ(&ready_tp, current_proc);
-	current_proc = NULL;
+	currProc->p_s = *EXCSTATE;
+	currProc->p_time += timePassed();
+	insertProcQ(&ReadyQueue, currProc);
+	currProc = NULL;
 	scheduler();
 }
 
@@ -84,14 +84,14 @@ void intervalTimerInterrupt() {
 	LDIT(INTIMER);
 	pcb_t *blockedProcess = NULL;
 
-	while ((blockedProcess = removeBlocked(&IntervalTimerSem)) != NULL) {
-		insertProcQ(&ready_tp, blockedProcess);
+	while ((blockedProcess = removeBlocked(&semIntTimer)) != NULL) {
+		insertProcQ(&ReadyQueue, blockedProcess);
 	}
 
-	soft_block_count += IntervalTimerSem;
-	IntervalTimerSem = 0;
+	softBlockCnt += semIntTimer;
+	semIntTimer = 0;
 
-	if (current_proc == NULL)
+	if (currProc == NULL)
 		scheduler();
 	else
 		LDST(EXCSTATE);

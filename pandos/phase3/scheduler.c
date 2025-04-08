@@ -14,12 +14,12 @@
 volatile cpu_t timeSlice;
 
 void scheduler() {
-	if (emptyProcQ(ready_tp)) {
-		if (process_count == 0) {
+	if (emptyProcQ(ReadyQueue)) {
+		if (procCnt == 0) {
 			HALT();
 		}
 
-		if (process_count > 0 && soft_block_count > 0) {
+		if (procCnt > 0 && softBlockCnt > 0) {
 			unsigned int status = getSTATUS();
             setTIMER(TICKCONVERT(MAXPLT));
             setSTATUS((status) | IECON | IMON);
@@ -29,17 +29,17 @@ void scheduler() {
 			setSTATUS(status);
 		}
 
-		if (process_count > 0 && soft_block_count == 0) {
+		if (procCnt > 0 && softBlockCnt == 0) {
 			PANIC();
 		}
 	}
 
-	current_proc = removeProcQ(&ready_tp);
+	currProc = removeProcQ(&ReadyQueue);
 
 	setTIMER(TICKCONVERT(TIMESLICE));
 
 	STCK(timeSlice);
 
-	LDST(&(current_proc->p_s));
+	LDST(&(currProc->p_s));
 }
 

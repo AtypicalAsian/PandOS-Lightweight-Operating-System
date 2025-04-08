@@ -9,7 +9,7 @@
 *  Written by Mikeyg
 */
 
-#include "types.h"
+#include "../h/types.h"
 
 int insertBlocked(int *semAdd, pcb_PTR p);
 pcb_PTR removeBlocked(int *semAdd);

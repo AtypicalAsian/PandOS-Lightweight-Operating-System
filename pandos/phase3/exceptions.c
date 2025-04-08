@@ -6,6 +6,8 @@
 #include "../h/initial.h"
 #include "../h/interrupts.h"
 #include "../h/scheduler.h"
+#include "../h/pcb.h"
+#include "../h/asl.h"
 
 #include <umps3/umps/libumps.h>
 

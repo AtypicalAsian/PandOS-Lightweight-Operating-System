@@ -74,11 +74,11 @@ typedef struct state_t {
 } state_t, *state_PTR;
 
 /*define the swap pool struct*/
-typedef struct swap_pool {
+typedef struct swap_t {
     int         sw_asid;  
     int         sw_pageNo;
     pteEntry_t *sw_pte;  
-} swap_pool_t;
+} swap_t;
 
 typedef struct support_t {
     int       sup_asid;            

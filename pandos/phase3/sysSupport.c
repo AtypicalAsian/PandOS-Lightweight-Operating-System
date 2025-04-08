@@ -36,20 +36,29 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 extern int deviceSema4s[MAXSHAREIODEVS];
 
 /*SYSCALL 9-12 function declarations*/
-HIDDEN void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested); /*Syscall exception handler*/
+void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested); /*Syscall exception handler*/
 void gen_excp_handler(); /*General exception handler*/
 void program_trap_handler(); /*Program Trap Handler*/
-HIDDEN void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
+void terminate();    /*SYS9 - terminates the executing user process. Essentially a user-mode wrapper for SYS2 (terminate running process)*/
 HIDDEN void get_TOD(state_t *excState);      /*SYS10 - retrieve the the number of microseconds since the system was last booted/reset to be placed*/
 HIDDEN void write_to_printer(char *virtAddr, int len, support_t *currProcSupport); /*SYS11 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the printer device associated with that U-proc*/
 HIDDEN void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport); /*SYS12 - suspend requesting user proc until a line of output (string of characters) has been transmitted to the terminal device associated with that U-proc*/
-HIDDEN void read_from_terminal(char *virtAddr, support_t *currProcSupport); /*SYS13*/
+HIDDEN void read_from_terminal(); /*SYS13*/
+extern void init_deviceSema4s();
 
+
+void init_deviceSema4s(){
+    /*Initialize I/O device semaphores to 1*/
+    int i;
+    for (i=0; i<MAXSHAREIODEVS; i++){
+        deviceSema4s[i] = 1; /*DEFINE CONSTANT FOR 1*/
+    }
+}
 
 /**************************************************************************************************
  * DONE
@@ -124,7 +133,7 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     /*Check if address we're writing from is outside of the uproc logical address space*/
 
     /*Check if length of string is within bounds (0-128)*/
-    if (len < 0 || len > 128) /*DEFINE CONSTANTS FOR THESE*/
+    if (len < 0 || len > 128 || (unsigned int) virtAddr < KUSEG) /*DEFINE CONSTANTS FOR THESE*/
     {
         SYSCALL(SYS9, 0, 0, 0);
     }
@@ -135,14 +144,13 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
     int char_printed_count; /*tracks how many characters were printed*/
     char_printed_count = 0;
     /*----------------------------------------------------------*/
-
-    pid = currProcSupport->sup_asid - 1;
+    pid = currProcSupport->sup_asid-1;
     semIndex = ((PRINTER_LINE_NUM - OFFSET) * DEVPERINT) + pid;
 
     devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
     device_t *printerDevice = &(devRegArea->devreg[semIndex]);
 
-    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS3, (memaddr) &deviceSema4s[semIndex], 0, 0);
 
     int i;
     for (i = 0; i < len; i++)
@@ -178,12 +186,12 @@ void write_to_printer(char *virtAddr, int len, support_t *currProcSupport)
 
     /* Add SYSCALL 4 to unlock the semaphore */
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS4,(memaddr) &deviceSema4s[semIndex], 0, 0);
 }
 
 void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
 
-    if (len < 0 || len > 128 || virtAddr > KUSEG) {
+    if (len < 0 || len > 128 || (unsigned int) virtAddr < KUSEG) {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
@@ -202,31 +210,34 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
          pandos section 3.5.5, pg 27,28
     */
 
+    /*Local variables*/
     int pid;
     int baseTerminalIndex;
     int semIndex;
 
-    pid = currProcSupport->sup_asid - 1;
+    pid = currProcSupport->sup_asid-1;
     baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + pid;
     semIndex = baseTerminalIndex + DEVPERINT;
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
-    termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
-    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
+    device_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    SYSCALL(SYS3,(memaddr) &deviceSema4s[semIndex], 0, 0);
 
     int transmittedChars;
     int i;
     transmittedChars = 0;
 
     for (i = 0; i < len; i ++) {
-        memaddr transmitterStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
+        memaddr transmitterStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
         if (transmitterStatus == TERMINAL_STATUS_READY) {
             /* memaddr oldStatus = getSTATUS(); */
             setSTATUS(INT_OFF);
 
             char transmitChar = *(virtAddr + i);
-            terminalDevice->transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
-            memaddr newStatus = (terminalDevice->transm_status & TERMINAL_STATUS_MASK);
+            terminalDevice->d_data1 = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
+            memaddr newStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
+
+            SYSCALL(SYS5, semIndex, pid, 0);
 
             SYSCALL(SYS5, semIndex, pid, 0);
             setSTATUS(INT_ON);
@@ -245,7 +256,7 @@ void write_to_terminal(char *virtAddr, int len, support_t *currProcSupport) {
     }
 
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS4,(memaddr) &deviceSema4s[semIndex], 0, 0);
 }
 
 void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
@@ -266,30 +277,31 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
+    /*Local variables*/
     int pid;
     int baseTerminalIndex;
     int semIndex;
 
-    pid = currProcSupport->sup_asid - 1;
+    pid = currProcSupport->sup_asid-1;
     baseTerminalIndex = ((TERMINAL_LINE_NUM - OFFSET) * DEVPERINT) + pid;
     semIndex = baseTerminalIndex;
 
     devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
-    termreg_t *terminalDevice = &(devRegArea->devreg[semIndex]);
-    SYSCALL(SYS3, &deviceSema4s[semIndex], 0, 0);
+    device_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    SYSCALL(SYS3,(memaddr) &deviceSema4s[semIndex], 0, 0);
 
     int receivedChars;
     int readStatus;
     receivedChars = 0;
 
     while (1) {
-        readStatus = (terminalDevice->recv_status & TERMINAL_STATUS_MASK);
+        readStatus = (terminalDevice->d_status & TERMINAL_STATUS_MASK);
         
         if (readStatus == TERMINAL_STATUS_RECEIVED) {
             /* memaddr oldStatus = getSTATUS(); */
             setSTATUS(INT_OFF);
 
-            char receivedChar = (char) (terminalDevice->recv_command & TERMINAL_STATUS_MASK);
+            char receivedChar = (char) (terminalDevice->d_command & TERMINAL_STATUS_MASK);
             /* Save the read chars to buffer */
             *(virtAddr + receivedChars) = receivedChar;
             receivedChars++;
@@ -306,7 +318,7 @@ void read_from_terminal(char *virtAddr, support_t *currProcSupport) {
     }
 
     currProcSupport->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
-    SYSCALL(SYS4, &deviceSema4s[semIndex], 0, 0);
+    SYSCALL(SYS4,(memaddr) &deviceSema4s[semIndex], 0, 0);
 }
 
 /**************************************************************************************************
@@ -339,7 +351,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
 
 
     /*Step 1: Check syscall number (must fall within syscall 9 to 13)*/
-    if (syscall_num_requested > 13 || syscall_num_requested < 9){
+    if (syscall_num_requested > SYS13 || syscall_num_requested < SYS9){
         program_trap_handler();
         return;
     }

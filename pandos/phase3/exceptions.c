@@ -21,7 +21,7 @@ cpu_t timePassed() {
 }
 
 HIDDEN void passUpOrDie(int index) {
-	support_t *supportStructure = current_proc->p_supportStruct;
+	support_t *supportStructure = currProc->p_supportStruct;
 	if (supportStructure == NULL) {
 		terminateProc();
 	}
@@ -93,7 +93,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 				terminateProc();
 				break;
 			}
-			if (current_proc == NULL)
+			if (currProc == NULL)
 				scheduler();
 			else
 				LDST(EXCSTATE);
@@ -133,21 +133,21 @@ void createProc(state_t * statep, support_t * supportp) {
 	unsigned int retValue = -1;
 
 	if (newProc != NULL) {
-		process_count++;
+		procCnt++;
 		newProc->p_supportStruct = supportp;
 		newProc->p_s = *statep;
-		insertChild(current_proc, newProc);
-		insertProcQ(&ready_tp, newProc);
+		insertChild(currProc, newProc);
+		insertProcQ(&ReadyQueue, newProc);
 		retValue = 0;
 	}
 	EXCSTATE->s_v0 = retValue;
 }
 
 void terminateProc() {
-	outChild(current_proc);
-	termProcRecursive(current_proc);
+	outChild(currProc);
+	termProcRecursive(currProc);
 
-	current_proc = NULL;
+	currProc = NULL;
 
 	scheduler();
 }
@@ -157,7 +157,7 @@ HIDDEN void termProcRecursive(pcb_t *p) {
 	pcb_PTR child;
 
 	while ((child = removeChild(p)) != NULL) {
-		outProcQ(&ready_tp, child);
+		outProcQ(&ReadyQueue, child);
 		termProcRecursive(child);
 	}
 
@@ -167,7 +167,7 @@ HIDDEN void termProcRecursive(pcb_t *p) {
 		 p->p_semAdd <
 		 ((int *) deviceSemaphores +
 		  (sizeof(int) * DEVICE_TYPES * DEVICE_INSTANCES)))
-		|| (p->p_semAdd == (int *) &IntervalTimerSem);
+		|| (p->p_semAdd == (int *) &semIntTimer);
 
 	pcb_PTR removedPcb = outBlocked(p);
 
@@ -176,7 +176,7 @@ HIDDEN void termProcRecursive(pcb_t *p) {
 	}
 
 	freePcb(p);
-	process_count--;
+	procCnt--;
 }
 
 
@@ -184,10 +184,10 @@ void passeren(int *semAdd) {
 	(*semAdd)--;
 
 	if (*semAdd < 0) {
-		current_proc->p_s = *EXCSTATE;
-		current_proc->p_time += timePassed();
-		insertBlocked((int *) semAdd, current_proc);
-		current_proc = NULL;
+		currProc->p_s = *EXCSTATE;
+		currProc->p_time += timePassed();
+		insertBlocked((int *) semAdd, currProc);
+		currProc = NULL;
 		scheduler();
 	}
 }
@@ -202,7 +202,7 @@ pcb_PTR verhogen(int *semAdd) {
 
 		unblockedProcess = removeBlocked(semAdd);
 		if (unblockedProcess != NULL) {
-			insertProcQ(&ready_tp, unblockedProcess);
+			insertProcQ(&ReadyQueue, unblockedProcess);
 		}
 	}
 	return unblockedProcess;
@@ -211,8 +211,8 @@ pcb_PTR verhogen(int *semAdd) {
 
 void waitIO(int intLine, int deviceNum, bool waitForTermRead) {
 	
-	current_proc->p_s = *EXCSTATE;
-	soft_block_count++;
+	currProc->p_s = *EXCSTATE;
+	softBlockCnt++;
 
 	switch (intLine) {
 	case DISKINT:
@@ -236,16 +236,16 @@ void waitIO(int intLine, int deviceNum, bool waitForTermRead) {
 
 
 void cpuTime(cpu_t *resultAddress) {
-	*resultAddress = current_proc->p_time + timePassed();
+	*resultAddress = currProc->p_time + timePassed();
 }
 
 
 void waitClk() {
-	soft_block_count++;
-	passeren(&IntervalTimerSem);
+	softBlockCnt++;
+	passeren(&semIntTimer);
 }
 
 
 void getSupportData(support_t **resultAddress) {
-	*resultAddress = current_proc->p_supportStruct;
+	*resultAddress = currProc->p_supportStruct;
 }

@@ -1,21 +1,21 @@
-/**************************************************************************** 
- * Nicolas & Tran
- * Declaration File for sysSupport.c module
- * 
- ****************************************************************************/
-#ifndef SYSSUPPORT
-#define SYSSUPPORT
-#include "../h/types.h"
-#include "../h/const.h"
+#ifndef SYSUPPORT_H
+#define SYSUPPORT_H
 
-void supexHandler();
-void sysHandler(support_t* except_supp, state_t* exc_state, unsigned int sysNum);
 
-void terminate();
-void get_tod(state_t* exc_state);
-void write_printer(support_t* except_supp, state_t* exc_state);
-void write_terminal(support_t* except_supp, state_t* exc_state);
-void read_terminal(support_t* except_supp, state_t* exc_state);
+#include "const.h"
+#include "types.h"
 
+extern int support_device_sems[DEVICE_TYPES][DEVICE_INSTANCES];
+
+void returnControl();
+void returnControlSup(support_t *support, int exc_code);
+extern void sysSupportGenHandler();
+extern void trapExcHandler(support_t *currentSupport);
+void supportSyscallHandler(int exc_code, support_t *support_struct);
+void terminate(support_t *support_struct);
+void getTOD(support_t *support_struct);
+void writeToPrinter(char *virtualAddr, int len, support_t *support_struct);
+void writeToTerminal(char *virtualAddr, int len, support_t *support_struct);
+void readTerminal(char *virtualAddr, support_t *support_struct);
 
 #endif

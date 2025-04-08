@@ -9,24 +9,22 @@
 *  Written by Mikeyg
 */
 
-#include "../h/types.h"
+#include "const.h"
+#include "types.h"
 
-extern void freePcb (pcb_PTR p);
-extern pcb_PTR allocPcb ();
-extern void initPcbs ();
+void initPcbs();
+void freePcb(pcb_PTR p);
+pcb_PTR allocPcb();
+pcb_PTR mkEmptyProcQ();
+int emptyProcQ(pcb_t *tp);
+void insertProcQ(pcb_PTR *tp, pcb_PTR p);
+pcb_PTR headProcQ(pcb_PTR tp);
+pcb_PTR removeProcQ(pcb_PTR *tp);
+pcb_PTR outProcQ(pcb_PTR *tp, pcb_PTR p);
 
-extern pcb_PTR mkEmptyProcQ ();
-extern int emptyProcQ (pcb_PTR tp);
-extern void insertProcQ (pcb_PTR *tp, pcb_PTR p);
-extern pcb_PTR removeProcQ (pcb_PTR *tp);
-extern pcb_PTR outProcQ (pcb_PTR *tp, pcb_PTR p);
-extern pcb_PTR headProcQ (pcb_PTR tp);
-
-extern int emptyChild (pcb_PTR p);
-extern void insertChild (pcb_PTR prnt, pcb_PTR p);
-extern pcb_PTR removeChild (pcb_PTR p);
-extern pcb_PTR outChild (pcb_PTR p);
-
-/***************************************************************/
+int emptyChild(pcb_PTR p);
+void insertChild(pcb_PTR prnt, pcb_PTR p);
+pcb_PTR removeChild(pcb_PTR p);
+pcb_PTR outChild(pcb_PTR p);
 
 #endif

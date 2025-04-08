@@ -1,26 +1,14 @@
-/**************************************************************************** 
- * Nicolas & Tran
- * Declaration File for initProc.c module
- * 
- ****************************************************************************/
-
 #ifndef INITPROC
 #define INITPROC
 
 
-#include "../h/types.h"
-#include "../h/const.h"
+#include "types.h"
 
-/*extern int masterSema4;*/ /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
-void deallocate(support_t*  toDeallocate);
+extern int testSem;
+extern void test(void);
 
-support_t* allocate();
-
-void init_supLevSem();
-
-void createProc(int id);
-
-void test();
-
-
+support_t* allocate_sup();
+void initSupport();
+void dealocate_sup(support_t *support);
+ 
 #endif

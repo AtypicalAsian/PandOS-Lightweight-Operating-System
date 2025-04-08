@@ -9,14 +9,12 @@
 *  Written by Mikeyg
 */
 
-#include "../h/types.h"
+#include "types.h"
 
-extern int insertBlocked (int *semAdd, pcb_PTR p);
-extern pcb_PTR removeBlocked (int *semAdd);
-extern pcb_PTR outBlocked (pcb_PTR p);
-extern pcb_PTR headBlocked (int *semAdd);
-extern void initASL ();
-
-/***************************************************************/
+int insertBlocked(int *semAdd, pcb_PTR p);
+pcb_PTR removeBlocked(int *semAdd);
+pcb_PTR outBlocked(pcb_PTR p);
+pcb_PTR headBlocked(int *semAdd);
+void initASL();
 
 #endif

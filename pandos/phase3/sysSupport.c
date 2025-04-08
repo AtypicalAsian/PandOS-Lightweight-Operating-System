@@ -1,180 +1,220 @@
-/**************************************************************************************************  
- * @file sysSupport.c  
- *  
- * 
- * @brief  
- * This module implements the Support Level’s:
- *      - general exception handler. [Section 4.6]
- *      - SYSCALL exception handler. [Section 4.7]
- *      - Program Trap exception handler. [Section 4.8]
- * 
- * @details  
- * 
- *  
- * @note  
- * 
- *  
- * @authors  
- * Nicolas & Tran  
- * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
- * 
- * TODO
- * This module implements
- *       general exception handler. [Section 4.6]
- *       SYSCALL exception handler. [Section 4.7]
- *       Program Trap exception handler. [Section 4.8] - vmSupport pass control here if page fault is a modification type (should not happen in pandOS)
- * 
- **************************************************************************************************/
-#include "../h/types.h"
-#include "../h/const.h"
-#include "../h/asl.h"
-#include "../h/pcb.h"
-#include "../h/initial.h"
-#include "../h/scheduler.h"
-#include "../h/exceptions.h"
-#include "../h/interrupts.h"
+#include <umps3/umps/libumps.h>
 #include "../h/initProc.h"
-#include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-#include "/usr/include/umps3/umps/libumps.h"
-
-extern int devRegSem[49];
-extern pcb_PTR currentProcess;
+#include "../h/vmSupport.h"
+#include "../h/deviceSupportDMA.h"
 
 
-void supexHandler(){
-    support_t* except_supp = (support_t*) SYSCALL(SYS8, 0, 0, 0);
-    state_t* exc_state = (state_t*) &(except_supp->sup_exceptState[GENERALEXCEPT]);
-    if(CAUSE_GET_EXCCODE(exc_state->s_cause) == 8){
-        sysHandler(except_supp,  exc_state, exc_state->s_a0);
+/* 2D Array of support level device semaphores */
+int support_device_sems[DEVICE_TYPES][DEVICE_INSTANCES];
+
+
+
+void returnControl()
+{
+    LDST(EXCSTATE);
+}
+
+
+void returnControlSup(support_t *support, int exc_code)
+{
+    LDST(&(support->sup_exceptState[exc_code]));
+}
+
+
+void trapExcHandler(support_t *support_struct)
+{
+    terminate(support_struct);
+}
+
+
+void sysSupportGenHandler() {
+
+    support_t *support_struct = (support_t *) SYSCALL(GETSUPPORTPTR, 0, 0, 0);
+    int cause = support_struct->sup_exceptState[GENERALEXCEPT].s_cause;
+    int exc_code = EXCCODE(cause);
+    if (exc_code == 8) {
+        int syscall_num = support_struct->sup_exceptState[GENERALEXCEPT].s_a0;
+        supportSyscallHandler(syscall_num, support_struct);
     }
-    else{
-        killProc(NULL);
+    else {
+        trapExcHandler(support_struct);
     }
 }
 
-void sysHandler(support_t* except_supp, state_t* exc_state, unsigned int sysNum){
-    switch(sysNum){
-        case SYS9:
-            terminate();
+void supportSyscallHandler(int exc_code, support_t *support_struct)
+{
+    if (exc_code < TERMINATE || exc_code > DELAY) {
+        trapExcHandler(support_struct);
+        return;
+    }
+
+    int arg1 = support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    int arg2 = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+
+    switch(exc_code) {
+        case TERMINATE:
+            terminate(support_struct);
             break;
-        case SYS10:
-            get_tod(exc_state);
+
+        case GET_TOD:
+            getTOD(support_struct);
             break;
-        case SYS11:
-            write_printer(except_supp, exc_state);
+
+        case WRITEPRINTER:
+            writeToPrinter((char *) arg1, arg2, support_struct);
             break;
-        case SYS12:
-            write_terminal(except_supp, exc_state);
+
+        case WRITETERMINAL:
+            writeToTerminal((char *) arg1, arg2, support_struct);  
             break;
-        case SYS13:
-            read_terminal(except_supp, exc_state);
+
+        case READTERMINAL:
+            readTerminal((char *) arg1, support_struct);
             break;
         default:
-            killProc(NULL);
+            trapExcHandler(support_struct);
             break;
     }
-    LDST(exc_state);
+
+
+    support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
+    returnControlSup(support_struct, GENERALEXCEPT);
+
 }
 
+void terminate(support_t *support_struct)
+{
+    int dev_num = support_struct->sup_asid - 1;
 
-void terminate(){
-    killProc(NULL);
+    int i;
+    for (i = 0; i < DEVICE_TYPES; i++) {
+        if (support_device_sems[i][dev_num] == 0) {
+            SYSCALL(VERHOGEN, (memaddr) &support_device_sems[i][dev_num], 0, 0);
+        }
+    }
+
+    for (i = 0; i < MAXPAGES; i++) {
+        if(support_struct->sup_privatePgTbl[i].pte_entryLO & VALIDON){
+            setSTATUS(INTSOFF);
+            support_struct->sup_privatePgTbl[i].pte_entryLO &= ~VALIDON;
+            updateTLB(&(support_struct->sup_privatePgTbl[i]));
+            setSTATUS(INTSON);
+        }
+    }
+    SYSCALL(VERHOGEN, (memaddr) &testSem, 0, 0);
+    dealocate_sup(support_struct);
+    SYSCALL(TERMINATEPROCESS, 0, 0, 0);
 }
 
-
-void get_tod(state_t* exc_state){
-    cpu_t tod;
-    STCK(tod);
-    exc_state->s_v0 = tod;
+void getTOD(support_t *support_struct)
+{
+    STCK(support_struct->sup_exceptState[GENERALEXCEPT].s_v0);
 }
 
+void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
+    int device_instance = support_struct->sup_asid - 1;
+    int charCount = 0;
 
-void write_printer(support_t* except_supp, state_t* exc_state){
-    int asid = except_supp->sup_asid - 1;
-    char* toPrint = (char*) exc_state->s_a1;
-    int len = exc_state->s_a2;
-    if((int)toPrint < KUSEG || len < 0 || len > 128)
-        killProc(NULL);
-    else{
-        dtpreg_t* currDev = (dtpreg_t*) DEV_REG_ADDR(PRNTINT, asid);
-        SYSCALL(SYS3, (memaddr) &devRegSem[DEV_INDEX(PRNTINT, asid, FALSE)], 0, 0);
-        int index = 0;
-        int response = 1;
-        while(index < len){
-            IEDISABLE;
-            currDev->data0 = *toPrint;
-            currDev->command = 2;
-            response = SYSCALL(SYS5, PRNTINT, asid, FALSE);
-            IEENABLE;
-            if((response & 0x000000FF) == READY){
-                index++;
-                toPrint++;  
-            }
-            else{
-                index = -(response & 0x000000FF);
-                break;
+    SYSCALL(PASSEREN, (memaddr) &support_device_sems[PRINTSEM][device_instance], 0, 0);
+
+    device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
+    
+    int i;
+    for (i = 0; i < len; i++) {
+        if(device_int->d_status == READY) {
+
+            setSTATUS(INTSOFF);
+            device_int->d_data0 = ((int) *(virtualAddr + i));
+            device_int->d_command = PRINTCHR;
+            SYSCALL(WAITIO, PRNTINT, device_instance, 0);
+            setSTATUS(INTSON);
+
+            charCount++;
+        }
+        else {
+            charCount = -(device_int->d_status);
+            i = len;
+        }
+    }
+
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
+    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[PRINTSEM][device_instance], 0, 0);  
+
+}
+
+void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
+    int device_instance = support_struct->sup_asid - 1;
+    unsigned int charCount = 0;
+    
+    SYSCALL(PASSEREN, (memaddr) &support_device_sems[TERMWRSEM][device_instance], 0, 0);
+
+    device_t *device_int = (device_t *) (DEVICEREGSTART + ((TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
+    int status = OKCHARTRANS;
+
+
+    int i;
+    for (i = 0; i < len; i++) {
+        if(((device_int->d_data0 & TERMSTATUSMASK) == READY) && ((status & TERMSTATUSMASK) == OKCHARTRANS)) {
+            setSTATUS(INTSOFF);
+
+            device_int->d_data1 = (((int) *(virtualAddr + i)) << TERMTRANSHIFT) | TRANSMITCHAR;
+            status = SYSCALL(WAITIO, TERMINT, device_instance, 0);
+
+            setSTATUS(INTSON);
+            charCount++;
+        }
+        else{
+            charCount = -(status);
+            i = len;
+        }
+    }
+
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
+
+    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[TERMWRSEM][device_instance], 0, 0);  
+
+}
+
+void readTerminal(char *virtualAddr, support_t *support_struct){
+    int device_instance = support_struct->sup_asid - 1;
+    int charCount = 0;
+    int status;
+    char string = ' ';
+
+    SYSCALL(PASSEREN, (memaddr) &support_device_sems[TERMSEM][device_instance], 0, 0);
+
+    device_t* device_int = (device_t *)(DEVICEREGSTART + ((TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
+
+    while(((device_int->d_status & TERMSTATUSMASK) == READY) && (string != EOS)) {
+        
+        setSTATUS(INTSOFF);
+
+        device_int->d_command = TRANSMITCHAR;
+
+        status = SYSCALL(WAITIO, TERMINT, device_instance, TRUE);
+
+        setSTATUS(INTSON);
+
+        if((status & TERMSTATUSMASK) == OKCHARTRANS) {
+            
+            string = (status >> DEVICE_INSTANCES);
+
+            if(string != EOS) {
+                *virtualAddr = string;
+                virtualAddr++;
+                charCount++;
             }
         }
-        SYSCALL(SYS4, (memaddr) &devRegSem[DEV_INDEX(PRNTINT, asid, FALSE)], 0, 0);
-        exc_state->s_v0 = index;
-    }
-} 
-
-void write_terminal(support_t* except_supp, state_t* exc_state){
-    int asid = except_supp->sup_asid - 1;
-    char* toWrite = (char*) exc_state->s_a1;
-    int len = exc_state->s_a2;
-    if(len <= 0 || (int)toWrite < KUSEG || len >= 128){
-        killProc(NULL);
-    }
-    else{
-        devreg_t* currDev = (devreg_t*) DEV_REG_ADDR(TERMINT, asid);
-        SYSCALL(SYS3, (memaddr) &devRegSem[DEV_INDEX(TERMINT, asid, FALSE)], 0, 0);
-        int index = 0;
-        int response = 1;
-        while(index < len){
-            currDev->term.transm_command =  (*toWrite<<8) | 2;
-            response = SYSCALL(SYS5, 7, asid, FALSE);
-            if((response & TRANSM_MASK) == 5){
-                index++;
-                toWrite++;
-            }
-            else{
-                index = -(response & TRANSM_MASK);
-                break;
-            }
+        else {
+            string = EOS;
         }
-        SYSCALL(SYS4, (memaddr) &devRegSem[DEV_INDEX(TERMINT, asid, FALSE)], 0, 0);
-        exc_state->s_v0 = index;
     }
-}
 
-void read_terminal(support_t* except_supp, state_t* exc_state){
-    int asid = except_supp->sup_asid - 1;
-    char* toRead = (char*) exc_state->s_a1;
-    int index = 0, response;
-    if((int) toRead < KUSEG)
-        killProc(NULL);
-    else{
-        devreg_t* currDev = (devreg_t*) DEV_REG_ADDR(TERMINT, asid);
-        SYSCALL(SYS3, (memaddr) &devRegSem[DEV_INDEX(TERMINT, asid, TRUE)], 0, 0);
-        while(TRUE){
-            currDev->term.recv_command = 2;
-            response = SYSCALL(SYS5, TERMINT, asid, TRUE);
-            if((response & RECV_MASK) == 5){
-                *toRead = (response & 0x0000FF00) >> 8;
-                toRead++;
-                index++;
-                if(((response & 0x0000FF00) >> 8) == '\n'){
-                    break;
-                }
-            } else {
-                index = -(response & RECV_MASK);
-                break;
-            }
-        }
-        SYSCALL(SYS4, (memaddr) &devRegSem[DEV_INDEX(TERMINT, asid, TRUE)], 0, 0);
-        exc_state->s_v0 = index;
+    if((device_int->d_status & TERMSTATUSMASK) != READY || (status & TERMSTATUSMASK) != OKCHARTRANS) {
+        charCount = -(status);
     }
+    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[TERMSEM][device_instance], 0, 0);
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
+
 }

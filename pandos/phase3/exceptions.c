@@ -163,9 +163,9 @@ HIDDEN void termProcRecursive(pcb_t *p) {
 
 
 	bool blockedOnDevice =
-		(p->p_semAdd >= (int *) device_sems &&
+		(p->p_semAdd >= (int *) deviceSemaphores &&
 		 p->p_semAdd <
-		 ((int *) device_sems +
+		 ((int *) deviceSemaphores +
 		  (sizeof(int) * DEVICE_TYPES * DEVICE_INSTANCES)))
 		|| (p->p_semAdd == (int *) &IntervalTimerSem);
 
@@ -219,13 +219,13 @@ void waitIO(int intLine, int deviceNum, bool waitForTermRead) {
 	case FLASHINT:
 	case NETWINT:
 	case PRNTINT:
-		passeren(&device_sems[intLine - DISKINT][deviceNum]);
+		passeren(&deviceSemaphores[intLine - DISKINT][deviceNum]);
 		break;
 	case TERMINT:
 		if (waitForTermRead)
-			passeren(&device_sems[4][deviceNum]);
+			passeren(&deviceSemaphores[4][deviceNum]);
 		else
-			passeren(&device_sems[5][deviceNum]);
+			passeren(&deviceSemaphores[5][deviceNum]);
 		break;
 	default:
 		terminateProc();

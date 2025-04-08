@@ -39,6 +39,7 @@
 #define STACKSTART    0x20001000
 #define VPNBASE 0x80000000
 #define UPROCSTACKPG 0xBFFFF000
+#define TOPSTKPAGE 0x20001000
 
 /* utility constants */
 #define NULL 			    ((void *)0xFFFFFFFF)
@@ -51,6 +52,8 @@
 #define ON         1
 #define OK         0
 #define NOPROC     -1
+#define INITPROCCNT 0
+#define INITSBLOCKCNT 0
 
 /* device interrupts */
 #define TIMERINT          1
@@ -67,6 +70,7 @@
 #define TRANS_CHAR 5
 #define RECVD_CHAR 5
 #define TERMSTATUSMASK 0x000000FF
+
 
 /* syscall exceptions */
 #define CREATEPROCESS 1

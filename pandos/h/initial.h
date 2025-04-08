@@ -1,12 +1,21 @@
 #ifndef INITIAL
 #define INITIAL
 
-extern unsigned int process_count;
-extern unsigned int soft_block_count;
-extern pcb_PTR ready_tp;
-extern pcb_PTR current_proc;
-extern int device_sems[DEVICE_TYPES][DEVICE_INSTANCES];
-extern int IntervalTimerSem;
-int main(void);
+#include "../h/const.h"
+#include "../h/types.h"
 
+/**************************************************************************** 
+ * Written by: Nicolas & Tran
+ * The declaration file for the initial.c module
+ ****************************************************************************/
+int main(); /*main function which is entrypoint to phase 2*/
+extern int procCnt; /*integer indicating the number of started, but not yet terminated processes.*/
+extern int softBlockCnt; /*Integer representing the number of started, but not terminated processes that in are the “blocked” state due to an I/O or timer request.*/
+extern pcb_PTR ReadyQueue; /*Tail pointer to a queue of pcbs that are in the “ready” state.*/
+extern pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. the current executing process.*/
+extern int deviceSemaphores[DEVICE_TYPES][DEVICE_INSTANCES]; /* semaphore integer array that represents each external (sub) device, plus one semd for the Pseudo-clock */
+extern int semIntTimer; /* semaphore used by the interval timer (pseudo-clock) for timer-related blocking operations */
+extern void debug_fxn(int i, int p1, int p2, int p3);
+void populate_passUpVec(); /*helper method to set up pass up vector*/
+void init_proc_state(pcb_PTR firstProc); /*helper method to set up initial state of first proccess*/
 #endif

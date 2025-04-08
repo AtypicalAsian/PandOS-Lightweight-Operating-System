@@ -28,7 +28,7 @@ int findIntLine(unsigned int map) {
 void unblockLoad(int deviceType, int deviceInstance, unsigned int status) {
 	pcb_PTR unblockedProc;
 
-	unblockedProc = verhogen(&(device_sems[deviceType][deviceInstance]));
+	unblockedProc = verhogen(&(deviceSemaphores[deviceType][deviceInstance]));
 
 	if (unblockedProc != NULL) {
 		unblockedProc->p_s.s_v0 = status;

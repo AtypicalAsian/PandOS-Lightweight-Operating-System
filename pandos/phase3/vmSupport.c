@@ -57,8 +57,8 @@ void uTLB_RefillHandler() {
     int missingPageNum = (EXCSTATE->s_entryHI & MISSINGPAGESHIFT) >> VPNSHIFT;
     missingPageNum %= MAXPAGES;
 
-    setENTRYHI(current_proc->p_supportStruct->sup_privatePgTbl[missingPageNum].pte_entryHI);
-    setENTRYLO(current_proc->p_supportStruct->sup_privatePgTbl[missingPageNum].pte_entryLO);
+    setENTRYHI(currProc->p_supportStruct->sup_privatePgTbl[missingPageNum].pte_entryHI);
+    setENTRYLO(currProc->p_supportStruct->sup_privatePgTbl[missingPageNum].pte_entryLO);
 
     TLBWR();
     returnControl();

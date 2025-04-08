@@ -17,7 +17,7 @@ cpu_t timePassed() {
 	volatile cpu_t clockTime;
 
 	STCK(clockTime);
-	return clockTime - timeSlice;
+	return clockTime - quantum;
 }
 
 HIDDEN void passUpOrDie(int index) {

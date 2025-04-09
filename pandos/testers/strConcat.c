@@ -33,17 +33,17 @@ void main() {
     }
 
 	i = 0;
-	for( i = 0; i < status-1; i++ )
+	for( i = 0; i < copyLen; i++ )
 	{
 		buf3[i] = buf[i];
 	}
 
 	for( i = 0; i < status2; i++ )
 	{
-		buf3[status-1 + i] = buf2[i];
+		buf3[copyLen + i] = buf2[i];
 	}
 
-	buf3[status + status2 - 1] = EOS;
+	buf3[copyLen + status2] = EOS;
 
 	print(WRITETERMINAL, &buf3[0]);
 	

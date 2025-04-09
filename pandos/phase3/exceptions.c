@@ -133,13 +133,11 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
         insertProcQ(&ReadyQueue, newProc);           /* Add the new process to the Ready Queue for scheduling */
 
         currProc->p_s.s_v0 = 0;                		 /* Indicate success (0) in the caller's v0 register */
-		((state_t *) BIOSDATAPAGE)->s_v0 = 0;
         procCnt++;                                   /* Increment the active process count */
     }
     /* If no PCB was available (Free PCB Pool exhausted) */
     else{
         currProc->p_s.s_v0 = -1;         /* Indicate failure (assign -1) in v0 */
-		((state_t *) BIOSDATAPAGE)->s_v0 = -1;
     }
 }
 

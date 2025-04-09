@@ -1,5 +1,5 @@
-#ifndef CONST_H
-#define CONST_H
+#ifndef CONST
+#define CONST
 /**************************************************************************** 
  *
  * This header file contains utility constants & macro definitions.

@@ -1,5 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef TYPES
+#define TYPES
 /**************************************************************************** 
  *
  * This header file contains utility types definitions.

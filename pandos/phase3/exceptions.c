@@ -65,7 +65,7 @@
  #include "../h/interrupts.h"
  #include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given semaphore (helper method) */
 int syscallNo; /*stores the syscall number (1-8)*/
@@ -87,6 +87,47 @@ void* memcpy(void *dest, const void *src, size_t len) {
 		*d++ = *s++;
 	}
 	return dest;
+}
+
+void blockCurrProc(int *sem){
+	currProc->p_s = *((state_t *) BIOSDATAPAGE);
+	currProc->p_time += timePassed();
+	insertBlocked((int *) sem, currProc);
+	currProc = NULL;
+}
+
+/*Recurisve function - helper to SYS2 terminateProcess()*/
+void recursive_terminate(pcb_PTR proc){
+	pcb_PTR child_proc; /*point to current child (pcb) of process to be terminated*/
+	int *processSem;
+	processSem = proc->p_semAdd;
+
+	/* Terminate all child processes of proc */
+    while ((child_proc = removeChild(proc)) != NULL) {
+        outProcQ(&ReadyQueue, child_proc);  // Remove child from the Ready Queue
+        recursive_terminate(child_proc);       // Recursively terminate the child process
+    }
+
+	/* Check if process p is blocked on a device semaphore.
+       It is considered blocked on a device if its semaphore pointer (p->p_semAdd)
+       falls within the range of deviceSemaphores[] or is equal to the address of semIntTimer. */
+	   bool blockedOnDevice = 
+	   ((processSem >= (int *) deviceSemaphores) &&
+		(processSem < ((int *) deviceSemaphores + (sizeof(int) * DEVICE_TYPES * DEVICE_INSTANCES))))
+		|| (processSem == (int *) &semIntTimer);
+
+   /* Remove p from its blocked queue (if it is currently blocked) */
+   pcb_PTR removedPcb = outBlocked(proc);
+
+   /* If the process was removed from a blocking queue and is not blocked on a device,
+	  then increment the associated semaphore value (signaling that a resource has been freed). */
+   if (!blockedOnDevice && removedPcb != NULL) {
+	   (*(processSem))++;
+   }
+
+   /* Free the process control block for p and update the global process count */
+   freePcb(proc);
+   procCnt--;
 }
 
 
@@ -141,6 +182,72 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
     }
 }
 
+
+
+/****************************************************************************  
+ * terminateProcess() - SYS2  
+ *  
+ * 
+ * @brief  
+ * Recursively terminates a process and all of its children, removing them  
+ * from the system and freeing their PCBs.  
+ *  
+ * 
+ * @details  
+ * - If the process has children, it recursively terminates them first.  
+ * - If the process is running (currProc), it is detached from its parent.  
+ * - If the process is blocked, it is removed from the ASL.  
+ * - If the process is waiting on a device semaphore, it decrements softBlockCnt.  
+ * - If the process is in the Ready Queue, it is removed from the queue.  
+ * - Frees the process PCB and decrements procCnt.  
+ * - If terminating currProc, it calls switchProcess() to schedule a new process.  
+ *  
+ * 
+ * @param pcb_PTR proc - Pointer to the process control block of the process to terminate.  
+ *  
+ * @return None  
+ *****************************************************************************/
+void terminateProcess() {
+    outChild(currProc);
+	termProcRecursive(currProc);
+	currProc = NULL;
+	switchProcess();
+}
+
+
+/****************************************************************************  
+ * passeren() - SYS3  
+ *  
+ * 
+ * @brief  
+ * Performs a P (wait) operation on a semaphore. If the semaphore value is  
+ * negative, the calling process is blocked and moved to the ASL.  
+ * 
+ *  
+ * @details  
+ * - Decrements the semaphore value.  
+ * - If the value is negative, the process is blocked and inserted into the ASL.  
+ * - The process is removed from execution and switchProcess() is called.  
+ * - If the process is not blocked, execution resumes immediately.  
+ * 
+ *  
+ * @param int *sem - Pointer to the semaphore to be decremented.  
+ * 
+ *  
+ * @return None  
+ *****************************************************************************/
+void passeren(int *sem){
+    (*sem)--;  /* Decrement the semaphore */
+    
+    /*If semaphore value < 0, process is blocked on the ASL (transitions from running to blocked)*/
+    if (*sem < 0) {
+        blockCurrProc(sem); /*block the current process and perform the necessary steps associated with blocking a process*/  
+        switchProcess();  /* Call the scheduler to run another process */
+    }
+}
+
+
+
 HIDDEN void passUpOrDie(int index) {
 	support_t *supportStructure = currProc->p_supportStruct;
 	if (supportStructure == NULL) {
@@ -180,7 +287,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 				createProcess((state_t *) arg1, (support_t *) arg2);
 				break;
 			case TERMINATEPROCESS:
-				terminateProc();
+				terminateProcess();
 				break;
 			case PASSEREN:
 				passeren((semaphore *) arg1);
@@ -238,55 +345,6 @@ void exceptionHandler()
     }
 }
 
-
-void terminateProc() {
-	outChild(currProc);
-	termProcRecursive(currProc);
-
-	currProc = NULL;
-
-	switchProcess();
-}
-
-
-HIDDEN void termProcRecursive(pcb_t *p) {
-	pcb_PTR child;
-
-	while ((child = removeChild(p)) != NULL) {
-		outProcQ(&ReadyQueue, child);
-		termProcRecursive(child);
-	}
-
-
-	bool blockedOnDevice =
-		(p->p_semAdd >= (int *) deviceSemaphores &&
-		 p->p_semAdd <
-		 ((int *) deviceSemaphores +
-		  (sizeof(int) * DEVICE_TYPES * DEVICE_INSTANCES)))
-		|| (p->p_semAdd == (int *) &semIntTimer);
-
-	pcb_PTR removedPcb = outBlocked(p);
-
-	if (!blockedOnDevice && removedPcb != NULL) {
-		(*(p->p_semAdd))++;
-	}
-
-	freePcb(p);
-	procCnt--;
-}
-
-
-void passeren(int *semAdd) {
-	(*semAdd)--;
-
-	if (*semAdd < 0) {
-		currProc->p_s = *EXCSTATE;
-		currProc->p_time += timePassed();
-		insertBlocked((int *) semAdd, currProc);
-		currProc = NULL;
-		switchProcess();
-	}
-}
 
 
 pcb_PTR verhogen(int *semAdd) {

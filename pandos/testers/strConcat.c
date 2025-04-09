@@ -8,6 +8,7 @@
 
 void main() {
 	int status, status2, i;
+	int copyLen;
 	char buf[20];
 	char buf2[20];
 	char buf3[40];

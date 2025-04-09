@@ -36,7 +36,7 @@
 #include "../h/exceptions.h"
 #include "../h/interrupts.h"
 
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 volatile cpu_t quantum;
 #define LARGETIME        0xFFFFFFFF

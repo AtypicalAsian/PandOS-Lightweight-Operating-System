@@ -22,7 +22,7 @@ void waitForIO(int lineNum, int deviceNum, int readBool); /*SYS5*/
 void getCPUTime(); /*SYS6*/
 void waitForClock(); /*SYS7*/
 void getSupportData(); /*SYS8*/
-cpu_t updateTime(); /*helper method to */
+cpu_t get_elapsed_time(); /*helper method to calculate elapsed time since process quantum began*/
 #define EXCODESHIFT   10
 
 #endif

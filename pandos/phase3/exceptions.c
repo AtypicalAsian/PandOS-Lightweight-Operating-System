@@ -75,7 +75,7 @@ HIDDEN void recursive_terminate(pcb_PTR proc);
 /**************** HELPER METHODS ***************************/
 
 /*Helper method to calculate elapsed time since process quantum began*/
-cpu_t updateTime() {
+cpu_t get_elapsed_time() {
 	volatile cpu_t clockTime;
 	STCK(clockTime); /*Read the current clock tick*/
 	return clockTime - quantum; /*Return the elapsed time relative to the process's quantum*/
@@ -94,7 +94,7 @@ void* memcpy(void *dest, const void *src, size_t len) {
 /*Helper method to block the currently running process (currProc) on a specified semaphore.*/
 void blockCurrProc(int *sem){
 	currProc->p_s = *((state_t *) BIOSDATAPAGE); /*get current processor state*/
-	currProc->p_time += updateTime(); /*update process's accumulated CPU time by adding elapsed time since quantum began*/
+	currProc->p_time += get_elapsed_time(); /*update process's accumulated CPU time by adding elapsed time since quantum began*/
 	insertBlocked((int *) sem, currProc); /*insert current proc into blocked queue associated with the given semaphore*/
 	currProc = NULL; /*reset currProc global variable*/
 }
@@ -353,7 +353,7 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
 void getCPUTime(){
-	currProc->p_s.s_v0 = currProc->p_time + updateTime();
+	currProc->p_s.s_v0 = currProc->p_time + get_elapsed_time();
 }
 
 

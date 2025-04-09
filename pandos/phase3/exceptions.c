@@ -241,10 +241,7 @@ void passeren(int *sem){
     
     /*If semaphore value < 0, process is blocked on the ASL (transitions from running to blocked)*/
     if (*sem < 0) {
-        currProc->p_s = *EXCSTATE;
-		currProc->p_time += timePassed();
-		insertBlocked((int *) sem, currProc);
-		currProc = NULL;
+        blockCurrProc(sem);
         switchProcess();  /* Call the scheduler to run another process */
     }
 }

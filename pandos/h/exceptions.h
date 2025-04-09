@@ -19,9 +19,9 @@ void terminateProcess(); /*SYS2*/
 void passeren(int *sem); /*SYS3*/
 pcb_PTR verhogen(int *sem); /*SYS4*/
 void waitForIO(int lineNum, int deviceNum, int readBool); /*SYS5*/
-HIDDEN void getCPUTime(); /*SYS6*/
-HIDDEN void waitForClock(); /*SYS7*/
-HIDDEN void getSupportData(); /*SYS8*/
+void getCPUTime(); /*SYS6*/
+void waitForClock(); /*SYS7*/
+void getSupportData(); /*SYS8*/
 cpu_t updateTime();
 #define EXCODESHIFT   10
 

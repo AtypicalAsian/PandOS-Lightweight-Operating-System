@@ -69,7 +69,7 @@
 
 HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given semaphore (helper method) */
 int syscallNo; /*stores the syscall number (1-8)*/
-HIDDEN void termProcRecursive(pcb_t *p);
+HIDDEN void recursive_terminate(pcb_PTR proc);
 
 
 /**************** HELPER METHODS ***************************/ 
@@ -209,7 +209,7 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
  *****************************************************************************/
 void terminateProcess() {
     outChild(currProc);
-	termProcRecursive(currProc);
+	recursive_terminate(currProc);
 	currProc = NULL;
 	switchProcess();
 }

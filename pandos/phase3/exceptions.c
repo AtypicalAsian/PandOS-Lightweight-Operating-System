@@ -246,7 +246,80 @@ void passeren(int *sem){
     }
 }
 
+/****************************************************************************  
+ * verhogen() - SYS4  
+ *  
+ * 
+ * @brief  
+ * Performs a V (signal) operation on a semaphore. If there are blocked  
+ * processes, the first one is unblocked and added to the Ready Queue.  
+ *  
+ * 
+ * @details  
+ * - Increments the semaphore value.  
+ * - If a process is blocked on the semaphore, it is removed from the ASL.  
+ * - The unblocked process is added to the Ready Queue for execution.  
+ *  
+ * 
+ * @param int *sem - Pointer to the semaphore to be incremented.  
+ *  
+ * @return None  
+ *****************************************************************************/
+pcb_PTR verhogen(int *sem) {
+	pcb_PTR p = NULL;
+    (*sem)++; /* Increment the semaphore value, signaling that a resource is available */
+    /* Check if there were processes blocked on this semaphore */
 
+    if (*sem <= 0) { 
+        pcb_PTR p = removeBlocked(sem); /* Unblock the first process waiting on this semaphore */
+		if (p != NULL){insertProcQ(&ReadyQueue,p);}    /* Add the unblocked process to the Ready Queue */
+    }
+    return p; /*return pointer to unblocked process pcb*/
+}
+
+/****************************************************************************  
+ * waitForIO(int lineNum, int deviceNum, int readBool) - SYS5  
+ *  
+ * 
+ * @brief  
+ * Blocks a process until an I/O operation on a specific device completes.  
+ * 
+ *  
+ * @details  
+ * - Computes the semaphore index for the given device.  
+ * - If the device is a terminal, determines if it's a read or write request.  
+ * - The process performs a P operation on the device semaphore.  
+ * - The process is blocked and inserted into the ASL.  
+ * - The scheduler switches to another process while waiting for I/O completion.  
+ * - Once the I/O operation completes, the process is unblocked and resumes execution.  
+ * 
+ * @note
+ *  Many I/O devices can cause a process to be blocked while waiting for I/O to complete.
+ *  Each interrupt line (3–7) has up to 8 devices, requiring us to compute `semIndex` to find the correct semaphore.
+ *  Terminal devices (line 7) have two independent sub-devices: read (input) and write (output), requiring an extra adjustment (add 8 to semIndex)
+ * 
+ * @param int lineNum - The interrupt line number (3-7).  
+ * @param int deviceNum - The device number (0-7).  
+ * @param int readBool - 1 if waiting for a read operation, 0 if writing.  
+ *  
+ * @return None  
+ *****************************************************************************/
+void waitForIO(int lineNum, int deviceNum, int readBool) {
+	softBlockCnt++;
+	currProc->p_s = *((state_t *) BIOSDATAPAGE);
+
+	if (lineNum == 6){
+		passeren(&deviceSemaphores[lineNum - DISKINT][deviceNum]);
+	}
+	else if (lineNum == 7)
+	{
+		if (readBool == TRUE) {passeren(&deviceSemaphores[4][deviceNum]);}
+		else{passeren(&deviceSemaphores[5][deviceNum]);}
+	}
+	else{
+		terminateProcess();
+	}
+}
 
 HIDDEN void passUpOrDie(int index) {
 	support_t *supportStructure = currProc->p_supportStruct;
@@ -345,47 +418,6 @@ void exceptionHandler()
     }
 }
 
-
-
-pcb_PTR verhogen(int *semAdd) {
-	(*semAdd)++;
-
-	pcb_PTR unblockedProcess = NULL;
-
-	if (*semAdd <= 0) {
-
-		unblockedProcess = removeBlocked(semAdd);
-		if (unblockedProcess != NULL) {
-			insertProcQ(&ReadyQueue, unblockedProcess);
-		}
-	}
-	return unblockedProcess;
-}
-
-
-void waitForIO(int intLine, int deviceNum, bool waitForTermRead) {
-	
-	currProc->p_s = *EXCSTATE;
-	softBlockCnt++;
-
-	switch (intLine) {
-	case DISKINT:
-	case FLASHINT:
-	case NETWINT:
-	case PRNTINT:
-		passeren(&deviceSemaphores[intLine - DISKINT][deviceNum]);
-		break;
-	case TERMINT:
-		if (waitForTermRead)
-			passeren(&deviceSemaphores[4][deviceNum]);
-		else
-			passeren(&deviceSemaphores[5][deviceNum]);
-		break;
-	default:
-		terminateProcess();
-		break;
-	}
-}
 
 
 

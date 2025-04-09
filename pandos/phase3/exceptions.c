@@ -353,10 +353,13 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
  *  
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
-void getCPUTime(state_t *savedState){
+void getCPUTime(){
 	cpu_t totalTime;
-	totalTime = currProc->p_time + get_elapsed_time();
-	savedState->s_v0 = totalTime;
+    totalTime = currProc->p_time + get_elapsed_time();
+    EXCSTATE->s_v0 = totalTime;
+    currProc->p_s.s_v0 = totalTime;
+
+	/*savedState->s_v0 = totalTime;*/
 }
 
 
@@ -392,8 +395,9 @@ void waitForClock() {
  *  
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
-void getSupportData(state_t *savedState) {
-	savedState->s_v0 = currProc->p_supportStruct;
+void getSupportData() {
+	EXCSTATE->s_v0 = currProc->p_supportStruct;
+	/*savedState->s_v0 = currProc->p_supportStruct;*/
 }
 
 
@@ -537,13 +541,13 @@ HIDDEN void sysTrapHandler(unsigned int KUp) {
 				waitForIO(arg1, arg2, arg3);
 				break;
 			case GETTIME:
-				getCPUTime((state_t) *savedState);
+				getCPUTime();
 				break;
 			case CLOCKWAIT:
 				waitForClock();
 				break;
 			case GETSUPPORTPTR:
-				getSupportData((state_t) *savedState);
+				getSupportData();
 				break;
 			default:
 				terminateProcess();

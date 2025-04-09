@@ -393,32 +393,55 @@ void waitForClock() {
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
 void getSupportData(state_t *savedState) {
-	/*currProc->p_s.s_v0 = (int) (currProc->p_supportStruct);*/
 	savedState->s_v0 = currProc->p_supportStruct;
 }
 
 
 
-
-HIDDEN void passUpOrDie(int index) {
-	support_t *supportStructure = currProc->p_supportStruct;
-	if (supportStructure == NULL) {
-		terminateProcess();
+/****************************************************************************  
+ * exceptionPassUpHandler()  
+ *  
+ * @brief  
+ * Implements the pass up or die mechanism, which means we handle exceptions 
+ * by either passing control to the user-level exception handler  
+ * (if one is defined) or terminating the process if no handler exists.  
+ *  
+ * @details  
+ * - If the current process has a support structure, the exception is "passed up"  
+ *   to the corresponding user-defined handler.  
+ * - The function copies the saved processor state from the BIOS Data Page into  
+ *   the appropriate exception state field of the process's support structure.  
+ * - CPU time used up to the exception is recorded and charged to the process.  
+ * - The process context is then switched to the user-level exception handler.  
+ * - If the process does not have a support structure, it is terminated  
+ *   along with any of its child processes.  
+ *  
+ * @param exceptionCode - The type of exception that occurred (e.g., TLB, SYSCALL, Program Trap).  
+ *  
+ * @return None (This function either transfers control to the user-level handler  
+ *               or terminates the process and schedules another one).  
+ *****************************************************************************/
+HIDDEN void exceptionPassUpHandler(int exceptionCode) {
+	/*If current process has a support structure -> pass up exception to the exception handler */
+	if (currProc->p_supportStruct != NULL){
+		copyState(((state_t *) BIOSDATAPAGE),&(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
+		/*currProc->p_supportStruct->sup_exceptState[exceptionCode] = *EXCSTATE;*/
+		context_t *ctx = &(currProc->p_supportStruct->sup_exceptContext[exceptionCode]);
+		LDCXT(ctx->c_stackPtr, ctx->c_status, ctx->c_pc);
 	}
-	else {
-		supportStructure->sup_exceptState[index] = *EXCSTATE;
-		context_t *context = &(supportStructure->sup_exceptContext[index]);
-		LDCXT(context->c_stackPtr, context->c_status, context->c_pc);
+	/* No user-level handler defined, so terminate the process */
+	else{
+		terminateProcess();
 	}
 }
 
 HIDDEN void TLBExceptionHandler() {
-	passUpOrDie(PGFAULTEXCEPT);
+	exceptionPassUpHandler(PGFAULTEXCEPT);
 }
 
 
 HIDDEN void trapHandler() {
-	passUpOrDie(GENERALEXCEPT);
+	exceptionPassUpHandler(GENERALEXCEPT);
 }
 
 
@@ -477,7 +500,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 		}
 	}
 	else {
-		passUpOrDie(GENERALEXCEPT);
+		exceptionPassUpHandler(GENERALEXCEPT);
 	}
 }
 

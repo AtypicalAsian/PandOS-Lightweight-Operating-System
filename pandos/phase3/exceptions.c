@@ -65,7 +65,7 @@
  #include "../h/interrupts.h"
  #include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given semaphore (helper method) */
 int syscallNo; /*stores the syscall number (1-8)*/
@@ -241,7 +241,10 @@ void passeren(int *sem){
     
     /*If semaphore value < 0, process is blocked on the ASL (transitions from running to blocked)*/
     if (*sem < 0) {
-        blockCurrProc(sem); /*block the current process and perform the necessary steps associated with blocking a process*/  
+        currProc->p_s = *EXCSTATE;
+		currProc->p_time += timePassed();
+		insertBlocked((int *) sem, currProc);
+		currProc = NULL;
         switchProcess();  /* Call the scheduler to run another process */
     }
 }
@@ -271,7 +274,7 @@ pcb_PTR verhogen(int *sem) {
     /* Check if there were processes blocked on this semaphore */
 
     if (*sem <= 0) { 
-        pcb_PTR p = removeBlocked(sem); /* Unblock the first process waiting on this semaphore */
+        p = removeBlocked(sem); /* Unblock the first process waiting on this semaphore */
 		if (p != NULL){insertProcQ(&ReadyQueue,p);}    /* Add the unblocked process to the Ready Queue */
     }
     return p; /*return pointer to unblocked process pcb*/

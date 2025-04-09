@@ -305,19 +305,34 @@ pcb_PTR verhogen(int *sem) {
  * @return None  
  *****************************************************************************/
 void waitForIO(int lineNum, int deviceNum, int readBool) {
-	softBlockCnt++;
-	currProc->p_s = *((state_t *) BIOSDATAPAGE);
+	softBlockCnt++;  /*Increment count of soft-blocked (waiting) processes*/
+    
+    /*Save the current process state from the BIOS Data Page*/
+    currProc->p_s = *((state_t *) BIOSDATAPAGE);
 
-	if (lineNum >=3 && lineNum <= 6){
-		passeren(&deviceSemaphores[lineNum - DISKINT][deviceNum]);
-	}
-	else if (lineNum == 7){
-		if(readBool) { passeren(&deviceSemaphores[4][deviceNum]); }
-		else { passeren(&deviceSemaphores[5][deviceNum]); }
-	}
-	else{
-		terminateProcess();
-	}
+    int semIndex;  /*This will hold the index into the deviceSemaphores array*/
+
+    /*For device interrupts (assumed to be in the range [DISKINT, ...]),*/
+    /*compute semIndex based on lineNum. For example, if DISKINT is defined as 3,*/
+    /*lineNum values 3-6 correspond to indices 0-3*/
+    if (lineNum >= 3 && lineNum <= 6) {
+        semIndex = lineNum - DISKINT;  
+    }
+    /*If lineNum corresponds to a terminal interrupt (e.g., TERMINT == 7),*/
+    /*choose the semaphore index based on the readBool flag:*/
+    /* - If readBool is true, use index 4.*/
+    /* - Otherwise, use index 5.*/
+    else if (lineNum == 7) {
+        semIndex = (readBool) ? 4 : 5;
+    }
+    /*If the lineNum doesn't match expected values, terminate the process.*/
+    else {
+        terminateProcess();
+        return;
+    }
+
+    /*Perform the "passeren" (P or wait) operation on the chosen device semaphore.*/
+    passeren(&deviceSemaphores[semIndex][deviceNum]);
 }
 
 HIDDEN void passUpOrDie(int index) {

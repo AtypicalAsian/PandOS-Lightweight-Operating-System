@@ -24,6 +24,13 @@ void main() {
 	status2 = SYSCALL(READTERMINAL, (int)&buf2[0], 0, 0);
 	buf2[status2] = EOS;
 
+	/* Check if the last character of the first string is a newline */
+    if (status > 0 && buf[status - 1] == '\n') {
+        copyLen = status - 1;   /* Exclude the newline */
+    } else {
+        copyLen = status;       /* Use the full length */
+    }
+
 	i = 0;
 	for( i = 0; i < status-1; i++ )
 	{

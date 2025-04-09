@@ -104,7 +104,7 @@ void recursive_terminate(pcb_PTR proc){
 
 	/* Terminate all child processes of proc */
     while ((child_proc = removeChild(proc)) != NULL) {
-        outProcQ(&ReadyQueue, child_proc);  /Remove child from the Ready Queue*/
+        outProcQ(&ReadyQueue, child_proc);  /*Remove child from the Ready Queue*/
         recursive_terminate(child_proc);       /*Recursively terminate the child process*/
     }
 

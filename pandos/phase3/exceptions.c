@@ -335,6 +335,64 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
     passeren(&deviceSemaphores[semIndex][deviceNum]);
 }
 
+/****************************************************************************  
+ * getCPUTime() - SYS6  
+ *  
+ * @brief  
+ * Returns the total CPU time used by the calling process.  
+ *  
+ * @details  
+ * - The process's CPU time is stored in its PCB (p_time).  
+ * - The function reads the current Time of Day (TOD) clock and calculates  
+ *   the time since the process last started executing.  
+ * - The result is returned in the v0 register.  
+ *  
+ * @return None (CPU time is stored in v0).  
+ *****************************************************************************/
+void getCPUTime(){
+	currProc->p_s.s_v0 = currProc->p_time + timePassed();
+}
+
+
+/****************************************************************************  
+ * waitForClock() - SYS7  
+ *  
+ * @brief  
+ * Blocks the calling process until the next interval timer interrupt occurs.  
+ *  
+ * @details  
+ * - Performs a P operation on the clock semaphore (decrement semaphore by 1)  
+ * - The process is inserted into the ASL and blocked.  
+ * - The scheduler switches to another process.  
+ * - The blocked process will be unblocked at the next interval timer interrupt.  
+ *  
+ * @return None  
+ *****************************************************************************/
+void waitForClock() {
+	passeren(&semIntTimer);
+	softBlockCnt++;
+}
+
+/****************************************************************************  
+ * getSupportData() - SYS8  
+ *  
+ * @brief  
+ * Retrieves the support structure pointer for the calling process.  
+ *  
+ * @details  
+ * - The support_t structure contains exception-handling information for user-mode processes.  
+ * - The pointer to this structure is stored in the process's PCB (p_supportStruct).  
+ * - This function simply returns the pointer in v0.  
+ *  
+ * @return None (Support structure pointer is stored in `v0`).  
+ *****************************************************************************/
+void getSupportData(support_t **resultAddress) {
+	*resultAddress = currProc->p_supportStruct;
+}
+
+
+
+
 HIDDEN void passUpOrDie(int index) {
 	support_t *supportStructure = currProc->p_supportStruct;
 	if (supportStructure == NULL) {
@@ -386,7 +444,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 				waitForIO(arg1, arg2, arg3);
 				break;
 			case GETTIME:
-				getCPUTime((cpu_t *) resultAddress);
+				getCPUTime();
 				break;
 			case CLOCKWAIT:
 				waitForClock();
@@ -430,20 +488,4 @@ void exceptionHandler()
     } else {
         trapHandler();
     }
-}
-
-
-void getCPUTime(cpu_t *resultAddress) {
-	*resultAddress = currProc->p_time + timePassed();
-}
-
-
-void waitForClock() {
-	softBlockCnt++;
-	passeren(&semIntTimer);
-}
-
-
-void getSupportData(support_t **resultAddress) {
-	*resultAddress = currProc->p_supportStruct;
 }

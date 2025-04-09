@@ -65,7 +65,7 @@
  #include "../h/interrupts.h"
  #include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given semaphore (helper method) */
 int syscallNo; /*stores the syscall number (1-8)*/
@@ -353,7 +353,10 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
 void getCPUTime(){
-	currProc->p_s.s_v0 = currProc->p_time + get_elapsed_time();
+	cpu_t totalTime;
+	totalTime = currProc->p_time + get_elapsed_time();
+	((state_t *) BIOSDATAPAGE)->s_v0 = totalTime;
+	currProc->p_s.s_v0 = totalTime;
 }
 
 
@@ -389,8 +392,9 @@ void waitForClock() {
  *  
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
-void getSupportData() {
-	currProc->p_s.s_v0 = (int) (currProc->p_supportStruct);
+void getSupportData(support_t **resultAddress) {
+	/*currProc->p_s.s_v0 = (int) (currProc->p_supportStruct);*/
+	*resultAddress = currProc->p_supportStruct;
 }
 
 
@@ -453,7 +457,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 				waitForClock();
 				break;
 			case GETSUPPORTPTR:
-				getSupportData();
+				getSupportData((support_t **) resultAddress);
 				break;
 			default:
 				terminateProcess();

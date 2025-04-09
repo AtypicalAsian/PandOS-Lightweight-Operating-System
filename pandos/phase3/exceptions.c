@@ -305,25 +305,18 @@ pcb_PTR verhogen(int *sem) {
  * @return None  
  *****************************************************************************/
 void waitForIO(int lineNum, int deviceNum, int readBool) {
-	currProc->p_s = *EXCSTATE;
 	softBlockCnt++;
+	currProc->p_s = *((state_t *) BIOSDATAPAGE);
 
-	switch (lineNum) {
-	case DISKINT:
-	case FLASHINT:
-	case NETWINT:
-	case PRNTINT:
+	if (lineNum >=3 && lineNum <= 6){
 		passeren(&deviceSemaphores[lineNum - DISKINT][deviceNum]);
-		break;
-	case TERMINT:
-		if (readBool)
-			passeren(&deviceSemaphores[4][deviceNum]);
-		else
-			passeren(&deviceSemaphores[5][deviceNum]);
-		break;
-	default:
+	}
+	elif (lineNum == 7){
+		if(readBool) { passeren(&deviceSemaphores[4][deviceNum]); }
+		else { passeren(&deviceSemaphores[5][deviceNum]); }
+	}
+	else{
 		terminateProcess();
-		break;
 	}
 }
 

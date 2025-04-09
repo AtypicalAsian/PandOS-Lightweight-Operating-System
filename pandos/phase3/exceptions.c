@@ -435,17 +435,79 @@ HIDDEN void exceptionPassUpHandler(int exceptionCode) {
 	}
 }
 
-HIDDEN void TLBExceptionHandler() {
+
+/****************************************************************************  
+ * prgmTrapHandler()  
+ *  
+ * @brief  
+ * Handles program-related exceptions, including illegal operations,  
+ * invalid memory accesses, and arithmetic errors.  
+ *  
+ * @details  
+ * - This function is called when a General Exception occurs.  
+ * - Instead of resolving the exception itself, it delegates the task to  
+ *   exceptionPassUpHandler(), which determines if the process has a  
+ *   user-defined exception handler using the GENERALEXCEPT index value  
+ * - If a handler is available, the exception is passed up for processing.  
+ * - If no handler exists, the process is terminated.  
+ *  
+ * @return None (This function does not return, as it either transfers control  
+ *               to a user-defined handler or terminates the process).  
+ *****************************************************************************/  
+HIDDEN void prgmTrapHandler() {
+	exceptionPassUpHandler(GENERALEXCEPT);
+}
+
+/****************************************************************************  
+ * tlbTrapHandler()  
+ *  
+ * 
+ * @brief  
+ * Handles TLB exceptions, typically triggered when a process accesses an 
+ * invalid or unmapped virtual address.  
+ *  
+ * 
+ * @details  
+ * - This function is called when a Page Fault Exception occurs.  
+ * - Instead of handling the exception directly, it delegates the handling  
+ *   to exceptionPassUpHandler(), which determines whether the process  
+ *   has a user-defined exception handler using the PGFAULTEXCEPT index value
+ * - If a handler exists, the exception state is passed up to user space.  
+ * - If no handler is present, the process is terminated.  
+ *  
+ * 
+ * @return None  
+ *****************************************************************************/ 
+HIDDEN void tlbTrapHanlder() {
 	exceptionPassUpHandler(PGFAULTEXCEPT);
 }
 
 
-HIDDEN void trapHandler() {
-	exceptionPassUpHandler(GENERALEXCEPT);
-}
-
-
-HIDDEN void syscallHandler(unsigned int KUp) {
+/****************************************************************************  
+ * sysTrapHandler()  
+ *  
+ * @brief  
+ * Handles system call (SYSCALL) exceptions by determining the system call number  
+ * and executing the corresponding system call function.  
+ *  
+ * 
+ * @details  
+ * - Retrieves the saved processor state from the BIOS data page to analyze the exception.  
+ * - Extracts the system call number from register a0 to determine the requested SYSCALL.  
+ * - Increments the program counter (PC) to prevent infinite loops.  
+ * - Checks if the SYSCALL was made in user mode:  
+ *   - If true, it is considered an illegal instruction and is handled as a program trap.  
+ * - Validates the system call number:  
+ *   - If it is not between SYS1 and SYS8, it is treated as a program trap.  
+ * - If valid, updates the current process state and executes the corresponding system call.  
+ *  
+ * @note  
+ * SYSCALL requests should only be made in kernel mode. If a user-mode process attempts  
+ * a system call, the process is terminated via the program trap handler.  
+ *  
+ * @return None  
+ *****************************************************************************/  
+HIDDEN void sysTrapHandler(unsigned int KUp) {
 	state_t *savedState = ((state_t *) BIOSDATAPAGE);
 	volatile unsigned int sysId = EXCSTATE->s_a0;
 
@@ -496,7 +558,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 
 			EXCSTATE->s_cause &= ~GETEXECCODE;
 			EXCSTATE->s_cause |= EXCODESHIFT << CAUSESHIFT;
-			trapHandler();
+			prgmTrapHandler();
 		}
 	}
 	else {
@@ -504,19 +566,42 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 	}
 }
 
-
+/****************************************************************************  
+ * exceptionHandler()  
+ *  
+ * @brief  
+ * Handles all general exceptions that occur in the system by determining  
+ * the exception type and delegating it to the appropriate handler.  
+ *  
+ * @details  
+ * - The function retrieves the saved processor state from the BIOS data page.  
+ * - It extracts the exception code from the cause register to identify  
+ *   the type of exception that occurred.  
+ * - Based on the exception type, it redirects control to the corresponding  
+ *   handler function:  
+ *     - Interrupts (Code 0) → interruptsHandler() (handles device I/O)  
+ *     - TLB Exceptions (Codes 1-3) → tlbTrapHandler() (handles memory page faults)  
+ *     - System Calls (Code 8) → sysTrapHandler() (handles user mode system calls)  
+ *     - Program Traps (Codes 4-7) → prgmTrapHandler() (handles invalid operations)  
+ *  
+ * @note  
+ * This function does not return to the caller. Instead, control is  
+ * passed to the appropriate exception handler. If an exception occurs  
+ * in a process without an appropriate handler, the process is terminated.  
+ *  
+ * @return None  
+ *****************************************************************************/
 void exceptionHandler()
 {
-
     int exc_code = EXCCODE(EXCSTATE->s_cause);
     if (exc_code == 0) {
         intExceptionHandler(EXCSTATE);
     } else if (((exc_code >= 1) && (exc_code <= TLBS))) {
-        TLBExceptionHandler();
+        tlbTrapHanlder();
     } else if (exc_code == 8) {
 		unsigned int KUp = KUP(EXCSTATE->s_status);
-        syscallHandler(KUp);
+        sysTrapHandler(KUp);
     } else {
-        trapHandler();
+        prgmTrapHandler();
     }
 }

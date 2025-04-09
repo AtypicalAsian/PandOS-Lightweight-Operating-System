@@ -10,7 +10,7 @@
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
 
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 
 int findIntLine(unsigned int map) {

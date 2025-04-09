@@ -22,7 +22,7 @@ void waitForIO(int lineNum, int deviceNum, int readBool); /*SYS5*/
 void getCPUTime(); /*SYS6*/
 void waitForClock(); /*SYS7*/
 void getSupportData(); /*SYS8*/
-cpu_t updateTime();
+cpu_t updateTime(); /*helper method to */
 #define EXCODESHIFT   10
 
 #endif

@@ -72,28 +72,31 @@ int syscallNo; /*stores the syscall number (1-8)*/
 HIDDEN void recursive_terminate(pcb_PTR proc);
 
 
-/**************** HELPER METHODS ***************************/ 
-cpu_t timePassed() {
+/**************** HELPER METHODS ***************************/
+
+/*Helper method to calculate elapsed time since process quantum began*/
+cpu_t updateTime() {
 	volatile cpu_t clockTime;
-	STCK(clockTime);
-	return clockTime - quantum;
+	STCK(clockTime); /*Read the current clock tick*/
+	return clockTime - quantum; /*Return the elapsed time relative to the process's quantum*/
 }
 
+/*Helper method to copy 'len' bytes from the source memory block 'src' to the destination memory block 'dest' */
 void* memcpy(void *dest, const void *src, size_t len) {
 	char *d = dest;
 	const char *s = src;
-
 	while (len--) {
 		*d++ = *s++;
 	}
 	return dest;
 }
 
+/*Helper method to block the currently running process (currProc) on a specified semaphore.*/
 void blockCurrProc(int *sem){
-	currProc->p_s = *((state_t *) BIOSDATAPAGE);
-	currProc->p_time += timePassed();
-	insertBlocked((int *) sem, currProc);
-	currProc = NULL;
+	currProc->p_s = *((state_t *) BIOSDATAPAGE); /*get current processor state*/
+	currProc->p_time += updateTime(); /*update process's accumulated CPU time by adding elapsed time since quantum began*/
+	insertBlocked((int *) sem, currProc); /*insert current proc into blocked queue associated with the given semaphore*/
+	currProc = NULL; /*reset currProc global variable*/
 }
 
 /*Recurisve function - helper to SYS2 terminateProcess()*/
@@ -350,7 +353,7 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
 void getCPUTime(){
-	currProc->p_s.s_v0 = currProc->p_time + timePassed();
+	currProc->p_s.s_v0 = currProc->p_time + updateTime();
 }
 
 

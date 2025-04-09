@@ -19,9 +19,9 @@ void terminateProcess(); /*SYS2*/
 void passeren(int *sem); /*SYS3*/
 pcb_PTR verhogen(int *sem); /*SYS4*/
 void waitForIO(int lineNum, int deviceNum, int readBool); /*SYS5*/
-void getCPUTime((state_t) *savedState); /*SYS6*/
+void getCPUTime(state_t *savedState); /*SYS6*/
 void waitForClock(); /*SYS7*/
-void getSupportData((state_t) *savedState); /*SYS8*/
+void getSupportData(state_t *savedState); /*SYS8*/
 cpu_t get_elapsed_time(); /*helper method to calculate elapsed time since process quantum began*/
 #define EXCODESHIFT   10
 

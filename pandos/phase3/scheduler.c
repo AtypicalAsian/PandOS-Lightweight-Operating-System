@@ -126,26 +126,31 @@ void copyState(state_PTR src, state_PTR dst){
  *****************************************************************************/
 
 void switchProcess() {
-	if (emptyProcQ(ReadyQueue)) { /* Check if the ReadyQueue is empty */
-		if (procCnt == 0) { /* If no processes are active, halt the system */
-			HALT(); /* System halt: no processes to run */
-		}
-		/* If there are active processes but none are blocked, deadlock has occurred */
-		if (procCnt > 0 && softBlockCnt == 0) {
-			PANIC();
-		}
-		/* If there are active processes but some are blocked, wait for an external interrupt */
-		if (procCnt > 0 && softBlockCnt > 0) {
-			unsigned int status = getSTATUS();
-            setTIMER(TIME_TO_TICKS(PLT_HIGHEST_VAL));
-            setSTATUS((status) | IECON | IMON);
-			WAIT();
-			setSTATUS(status);
-		}
-	}
-	currProc = removeProcQ(&ReadyQueue); /* Remove the next ready process from the ReadyQueue and assign it as the current process */
-	setTIMER(TIME_TO_TICKS(TIMESLICE));
-	STCK(quantum);
-	LDST(&(currProc->p_s));
+	currProc = removeProcQ(&ReadyQueue); /* Remove a process from the ReadyQueue and assign it as the current process */
+
+    /* If the ReadyQueue is not empty, schedule the next process */
+    if (currProc != NULL){
+        setTIMER(TIME_TO_TICKS(TIMESLICE));     /* Set Process Local Timer (PLT) to 5ms for time-sharing */
+        STCK(quantum); /*record current quantum*/
+		LDST(&(currProc->p_s)); /*perform context switch to load state of the new process -> effectively handing control over to new proc*/
+    }
+
+    /* If there are no active processes left in the system, halt execution */
+    if (procCnt == INITPROCCNT){
+        HALT(); /* No more processes to execute, system stops */
+    }
+
+    /* If no ready processes exist but there are blocked processes, enter a wait state */
+    if ((procCnt > 0) && (softBlockCnt > 0)){
+		unsigned int curr_status = getSTATUS(); /*get current status*/
+		setTIMER(TIME_TO_TICKS(PLT_HIGHEST_VAL)); /*set timer to max possible value of unsigned 32 bit int to prevent premature timer interrupt*/
+        setSTATUS((curr_status) | IMON | IECON); /* Enable interrupts before waiting */
+		WAIT(); /*issue wait*/
+        setSTATUS(curr_status); /*restore original processor state after WAIT() period*/
+    }
+
+    /* If the system reaches this point, it means no processes are ready or waiting on I/O */
+    /* This indicates a deadlock situation, meaning all processes are blocked with no recovery */
+    PANIC();  /* Trigger a system panic as no forward progress can be made */
 }
 

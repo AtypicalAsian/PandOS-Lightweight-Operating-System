@@ -72,6 +72,7 @@ int syscallNo; /*stores the syscall number (1-8)*/
 HIDDEN void recursive_terminate(pcb_PTR proc);
 
 
+
 /**************** HELPER METHODS ***************************/
 
 /*Helper method to calculate elapsed time since process quantum began*/
@@ -352,11 +353,10 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
  *  
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
-void getCPUTime(){
+void getCPUTime(state_t *savedState){
 	cpu_t totalTime;
 	totalTime = currProc->p_time + get_elapsed_time();
-	((state_t *) BIOSDATAPAGE)->s_v0 = totalTime;
-	currProc->p_s.s_v0 = totalTime;
+	savedState->s_v0 = totalTime;
 }
 
 
@@ -392,9 +392,9 @@ void waitForClock() {
  *  
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
-void getSupportData(support_t **resultAddress) {
+void getSupportData(state_t *savedState) {
 	/*currProc->p_s.s_v0 = (int) (currProc->p_supportStruct);*/
-	*resultAddress = currProc->p_supportStruct;
+	savedState->s_v0 = currProc->p_supportStruct;
 }
 
 
@@ -423,6 +423,7 @@ HIDDEN void trapHandler() {
 
 
 HIDDEN void syscallHandler(unsigned int KUp) {
+	state_t *savedState = ((state_t *) BIOSDATAPAGE);
 	volatile unsigned int sysId = EXCSTATE->s_a0;
 
 	volatile unsigned int arg1 = EXCSTATE->s_a1;
@@ -451,13 +452,13 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 				waitForIO(arg1, arg2, arg3);
 				break;
 			case GETTIME:
-				getCPUTime();
+				getCPUTime((state_t) *savedState);
 				break;
 			case CLOCKWAIT:
 				waitForClock();
 				break;
 			case GETSUPPORTPTR:
-				getSupportData((support_t **) resultAddress);
+				getSupportData((state_t) *savedState);
 				break;
 			default:
 				terminateProcess();

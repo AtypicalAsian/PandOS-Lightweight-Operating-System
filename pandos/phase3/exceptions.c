@@ -458,7 +458,7 @@ HIDDEN void exceptionPassUpHandler(int exceptionCode) {
  * @return None (This function does not return, as it either transfers control  
  *               to a user-defined handler or terminates the process).  
  *****************************************************************************/  
-HIDDEN void prgmTrapHandler() {
+void prgmTrapHandler() {
 	exceptionPassUpHandler(GENERALEXCEPT);
 }
 
@@ -482,7 +482,7 @@ HIDDEN void prgmTrapHandler() {
  * 
  * @return None  
  *****************************************************************************/ 
-HIDDEN void tlbTrapHanlder() {
+void tlbTrapHanlder() {
 	exceptionPassUpHandler(PGFAULTEXCEPT);
 }
 
@@ -511,7 +511,7 @@ HIDDEN void tlbTrapHanlder() {
  *  
  * @return None  
  *****************************************************************************/  
-HIDDEN void sysTrapHandler(unsigned int KUp) {
+void sysTrapHandler(unsigned int KUp) {
 	state_t *savedState = ((state_t *) BIOSDATAPAGE);
 	volatile unsigned int sysId = EXCSTATE->s_a0;
 

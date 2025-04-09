@@ -312,6 +312,9 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
 	softBlockCnt++;
 
 	switch (lineNum) {
+	case DISKINT:
+	case FLASHINT:
+	case NETWINT:
 	case PRNTINT:
 		passeren(&deviceSemaphores[lineNum - DISKINT][deviceNum]);
 		break;
@@ -423,8 +426,6 @@ void exceptionHandler()
         trapHandler();
     }
 }
-
-
 
 
 void getCPUTime(cpu_t *resultAddress) {

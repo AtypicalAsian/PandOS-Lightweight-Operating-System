@@ -179,7 +179,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 			EXCSTATE->s_pc += WORDLEN;
 			switch (sysId) {
 			case CREATEPROCESS:
-				createProc((state_t *) arg1, (support_t *) arg2);
+				createProcess((state_t *) arg1, (support_t *) arg2);
 				break;
 			case TERMINATEPROCESS:
 				terminateProc();

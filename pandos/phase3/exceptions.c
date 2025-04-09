@@ -65,7 +65,7 @@
  #include "../h/interrupts.h"
  #include "../h/initial.h"
 
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given semaphore (helper method) */
 int syscallNo; /*stores the syscall number (1-8)*/
@@ -78,6 +78,17 @@ cpu_t timePassed() {
 	STCK(clockTime);
 	return clockTime - quantum;
 }
+
+void* memcpy(void *dest, const void *src, size_t len) {
+	char *d = dest;
+	const char *s = src;
+
+	while (len--) {
+		*d++ = *s++;
+	}
+	return dest;
+}
+
 
 
 /****************************************************************************  

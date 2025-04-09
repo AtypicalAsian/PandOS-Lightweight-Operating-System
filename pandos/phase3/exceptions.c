@@ -65,7 +65,7 @@
  #include "../h/interrupts.h"
  #include "../h/initial.h"
 
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given semaphore (helper method) */
 int syscallNo; /*stores the syscall number (1-8)*/

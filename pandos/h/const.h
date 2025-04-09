@@ -163,7 +163,7 @@
 
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
 #define EXCSTATE ((state_t *) BIOSDATAPAGE)
-#define TICKCONVERT(T) (T) * (*((cpu_t *)TIMESCALEADDR))
+#define TIME_TO_TICKS(T) (T) * (*((cpu_t *)TIMESCALEADDR)) /*convert time value into hardware ticks*/
 #define LDIT(T)	((* ((cpu_t *) INTERVALTMR)) = (T) * (* ((cpu_t *) TIMESCALEADDR))) 
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
 #define IP(C) ((C & 0x0000FF00) >> 8)

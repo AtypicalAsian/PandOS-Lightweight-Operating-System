@@ -1,16 +1,28 @@
 #ifndef EXCEPTIONS
 #define EXCEPTIONS
-#include "types.h"
-	
-#define EXCODESHIFT   10			
-cpu_t timePassed();
-void exceptionHandler();
-void createProc(state_t * statep, support_t * supportp);
-void terminateProc();
-void passeren(int *semAdd);
-pcb_PTR verhogen(int *semAdd);
-void waitIO(int intlNo, int dNum, bool waitForTermRea);
-void cpuTime(cpu_t * resultAddress);
-void waitClk();
-void getSupportData(support_t ** resultAddress);
+#include "../h/types.h"
+/**************************************************************************** 
+ * Nicolas & Tran
+ * The externals declaration file for exceptions.c module
+ * 
+ * 
+ ****************************************************************************/
+
+void sysTrapHandler(); /*Syscall Handler*/
+void tlbTrapHanlder(); /*TLB Trap Handler*/
+void prgmTrapHandler(); /*Program Trap Handler*/
+void gen_exception_handler(); /*General Exception Handler*/
+
+/*SYSCALLS METHOD HANDLER*/
+void createProcess(state_PTR stateSYS, support_t *suppStruct); /*SYS1*/
+void terminateProcess(); /*SYS2*/
+void passeren(int *sem); /*SYS3*/
+pcb_PTR verhogen(int *sem); /*SYS4*/
+void waitForIO(int lineNum, int deviceNum, int readBool); /*SYS5*/
+HIDDEN void getCPUTime(cpu_t * resultAddress); /*SYS6*/
+HIDDEN void waitForClock(); /*SYS7*/
+HIDDEN void getSupportData(support_t ** resultAddress); /*SYS8*/
+cpu_t updateTime();
+#define EXCODESHIFT   10
+
 #endif

@@ -36,9 +36,10 @@
 #include "../h/exceptions.h"
 #include "../h/interrupts.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 volatile cpu_t quantum;
+#define LARGETIME        0xFFFFFFFF
 
 /***********************HELPER METHODS***************************************/
 
@@ -79,6 +80,8 @@ void copyState(state_PTR src, state_PTR dst){
     dst->s_pc = src->s_pc;
 
 }
+
+/***************************SCHEDULER*************************************/
 
 /**************************************************************************** 
  * switchProcess()
@@ -123,24 +126,31 @@ void copyState(state_PTR src, state_PTR dst){
  *****************************************************************************/
 
 void switchProcess() {
-	if (emptyProcQ(ReadyQueue)) {
-		if (procCnt == 0) {
-			HALT();
-		}
-		if (procCnt > 0 && softBlockCnt > 0) {
-			unsigned int status = getSTATUS();
-            setTIMER(TICKCONVERT(MAXPLT));
-            setSTATUS((status) | IECON | IMON);
-			WAIT();
-			setSTATUS(status);
-		}
-		if (procCnt > 0 && softBlockCnt == 0) {
-			PANIC();
-		}
-	}
-	currProc = removeProcQ(&ReadyQueue);
-	setTIMER(TICKCONVERT(TIMESLICE));
-	STCK(quantum);
-	LDST(&(currProc->p_s));
+	currProc = removeProcQ(&ReadyQueue); /* Remove a process from the ReadyQueue and assign it as the current process */
+
+    /* If the ReadyQueue is not empty, schedule the next process */
+    if (currProc != NULL){
+        setTIMER(TICKCONVERT(TIMESLICE));     /* Set Process Local Timer (PLT) to 5ms for time-sharing */
+        STCK(quantum);
+		LDST(&(currProc->p_s));
+    }
+
+    /* If there are no active processes left in the system, halt execution */
+    if (procCnt == INITPROCCNT){
+        HALT(); /* No more processes to execute, system stops */
+    }
+
+    /* If no ready processes exist but there are blocked processes, enter a wait state */
+    if ((procCnt > INITPROCCNT) && (softBlockCnt > INITSBLOCKCNT)){
+		unsigned int status = getSTATUS();
+		setTIMER(TICKCONVERT(MAXPLT));
+        setSTATUS((status) | IMON | IECON); /* Enable interrupts before waiting */
+		WAIT();
+        setSTATUS(status);
+    }
+
+    /* If the system reaches this point, it means no processes are ready or waiting on I/O */
+    /* This indicates a deadlock situation, meaning all processes are blocked with no recovery */
+    PANIC();  /* Trigger a system panic as no forward progress can be made */
 }
 

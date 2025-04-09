@@ -310,16 +310,16 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
 
 	switch (lineNum) {
 	case PRNTINT:
-		passeren(&device_sems[lineNum - DISKINT][deviceNum]);
+		passeren(&deviceSemaphores[lineNum - DISKINT][deviceNum]);
 		break;
 	case TERMINT:
-		if (waitForTermRead)
-			passeren(&device_sems[4][deviceNum]);
+		if (readBool)
+			passeren(&deviceSemaphores[4][deviceNum]);
 		else
-			passeren(&device_sems[5][deviceNum]);
+			passeren(&deviceSemaphores[5][deviceNum]);
 		break;
 	default:
-		terminateProc();
+		terminateProcess();
 		break;
 	}
 }

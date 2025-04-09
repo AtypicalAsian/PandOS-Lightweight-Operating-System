@@ -1,6 +1,13 @@
 
+/************************************************************************************************ 
+ * Previous version of strConcat was somehow with the status variable used in the for loop
+ * to copy chars from the 1st string. The loop is copying status-1 characters from the first string
+ * into the concatenation buffer buf3, possibly anticipating a newline char -> error when joining 2
+ * strings we were missing the last char from the first string
+ * 
+ * This version introduces copyLen var to correct for the 1 index offset
+ ************************************************************************************************/
 /* concatenates two strings together and prints them out */
-
 #include "h/localLibumps.h"
 #include "h/tconst.h"
 #include "h/print.h"

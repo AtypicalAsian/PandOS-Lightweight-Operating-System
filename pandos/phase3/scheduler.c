@@ -137,14 +137,14 @@ void switchProcess() {
 		/* If there are active processes but some are blocked, wait for an external interrupt */
 		if (procCnt > 0 && softBlockCnt > 0) {
 			unsigned int status = getSTATUS();
-            setTIMER(TICKCONVERT(PLT_HIGHEST_VAL));
+            setTIMER(TIME_TO_TICKS(PLT_HIGHEST_VAL));
             setSTATUS((status) | IECON | IMON);
 			WAIT();
 			setSTATUS(status);
 		}
 	}
 	currProc = removeProcQ(&ReadyQueue); /* Remove the next ready process from the ReadyQueue and assign it as the current process */
-	setTIMER(TICKCONVERT(TIMESLICE));
+	setTIMER(TIME_TO_TICKS(TIMESLICE));
 	STCK(quantum);
 	LDST(&(currProc->p_s));
 }

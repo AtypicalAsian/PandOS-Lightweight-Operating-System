@@ -21,7 +21,7 @@ pcb_PTR verhogen(int *sem); /*SYS4*/
 void waitForIO(int lineNum, int deviceNum, int readBool); /*SYS5*/
 HIDDEN void getCPUTime(); /*SYS6*/
 HIDDEN void waitForClock(); /*SYS7*/
-HIDDEN void getSupportData(support_t ** resultAddress); /*SYS8*/
+HIDDEN void getSupportData(); /*SYS8*/
 cpu_t updateTime();
 #define EXCODESHIFT   10
 

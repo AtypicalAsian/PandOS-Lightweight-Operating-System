@@ -369,8 +369,8 @@ void getCPUTime(){
  * @return None  
  *****************************************************************************/
 void waitForClock() {
-	passeren(&semIntTimer);
 	softBlockCnt++;
+	passeren(&semIntTimer);
 }
 
 /****************************************************************************  
@@ -386,8 +386,8 @@ void waitForClock() {
  *  
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
-void getSupportData(support_t **resultAddress) {
-	*resultAddress = currProc->p_supportStruct;
+void getSupportData() {
+	currProc->p_s.s_v0 = (int) (currProc->p_supportStruct);
 }
 
 
@@ -450,7 +450,7 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 				waitForClock();
 				break;
 			case GETSUPPORTPTR:
-				getSupportData((support_t **) resultAddress);
+				getSupportData();
 				break;
 			default:
 				terminateProcess();

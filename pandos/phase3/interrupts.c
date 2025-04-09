@@ -71,7 +71,7 @@ void nonTimerInterrupt(int deviceType) {
 
 
 void pltInterrupt() {
-	setTIMER(TIME_TO_TICKS(MAXPLT));
+	setTIMER(TIME_TO_TICKS(PLT_HIGHEST_VAL));
 	currProc->p_s = *EXCSTATE;
 	currProc->p_time += timePassed();
 	insertProcQ(&ReadyQueue, currProc);

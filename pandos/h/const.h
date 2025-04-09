@@ -142,7 +142,7 @@
 #define TIMESLICE  5000     
 #define SECOND     1000000
 #define INTIMER  100000UL     
-#define MAXPLT   0xFFFFFFFFUL 
+#define PLT_HIGHEST_VAL   0xFFFFFFFFUL 
 
 /* Phase 3 Constants*/
 #define FLASHADDRSHIFT 8

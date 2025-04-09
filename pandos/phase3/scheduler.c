@@ -143,7 +143,7 @@ void switchProcess() {
     /* If no ready processes exist but there are blocked processes, enter a wait state */
     if ((procCnt > 0) && (softBlockCnt > 0)){
 		unsigned int curr_status = getSTATUS(); /*get current status*/
-		setTIMER(TIME_TO_TICKS(0xFFFFFFFFUL)); /*set timer to max possible value of unsigned 32 bit int to prevent premature timer interrupt*/
+		setTIMER(TIME_TO_TICKS(PLT_HIGHEST_VAL)); /*set timer to max possible value of unsigned 32 bit int to prevent premature timer interrupt*/
         setSTATUS((curr_status) | IMON | IECON); /* Enable interrupts before waiting */
 		WAIT(); /*issue wait*/
         setSTATUS(curr_status); /*restore original processor state after WAIT() period*/

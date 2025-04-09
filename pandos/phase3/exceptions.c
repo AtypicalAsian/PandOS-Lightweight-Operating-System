@@ -104,8 +104,8 @@ void recursive_terminate(pcb_PTR proc){
 
 	/* Terminate all child processes of proc */
     while ((child_proc = removeChild(proc)) != NULL) {
-        outProcQ(&ReadyQueue, child_proc);  // Remove child from the Ready Queue
-        recursive_terminate(child_proc);       // Recursively terminate the child process
+        outProcQ(&ReadyQueue, child_proc);  /Remove child from the Ready Queue*/
+        recursive_terminate(child_proc);       /*Recursively terminate the child process*/
     }
 
 	/* Check if process p is blocked on a device semaphore.
@@ -251,7 +251,7 @@ void passeren(int *sem){
 HIDDEN void passUpOrDie(int index) {
 	support_t *supportStructure = currProc->p_supportStruct;
 	if (supportStructure == NULL) {
-		terminateProc();
+		terminateProcess();
 	}
 	else {
 		supportStructure->sup_exceptState[index] = *EXCSTATE;
@@ -296,19 +296,19 @@ HIDDEN void syscallHandler(unsigned int KUp) {
 				verhogen((semaphore *) arg1);
 				break;
 			case WAITIO:
-				waitIO(arg1, arg2, arg3);
+				waitForIO(arg1, arg2, arg3);
 				break;
 			case GETTIME:
-				cpuTime((cpu_t *) resultAddress);
+				getCPUTime((cpu_t *) resultAddress);
 				break;
 			case CLOCKWAIT:
-				waitClk();
+				waitForClock();
 				break;
 			case GETSUPPORTPTR:
 				getSupportData((support_t **) resultAddress);
 				break;
 			default:
-				terminateProc();
+				terminateProcess();
 				break;
 			}
 			if (currProc == NULL)
@@ -363,7 +363,7 @@ pcb_PTR verhogen(int *semAdd) {
 }
 
 
-void waitIO(int intLine, int deviceNum, bool waitForTermRead) {
+void waitForIO(int intLine, int deviceNum, bool waitForTermRead) {
 	
 	currProc->p_s = *EXCSTATE;
 	softBlockCnt++;
@@ -382,19 +382,19 @@ void waitIO(int intLine, int deviceNum, bool waitForTermRead) {
 			passeren(&deviceSemaphores[5][deviceNum]);
 		break;
 	default:
-		terminateProc();
+		terminateProcess();
 		break;
 	}
 }
 
 
 
-void cpuTime(cpu_t *resultAddress) {
+void getCPUTime(cpu_t *resultAddress) {
 	*resultAddress = currProc->p_time + timePassed();
 }
 
 
-void waitClk() {
+void waitForClock() {
 	softBlockCnt++;
 	passeren(&semIntTimer);
 }

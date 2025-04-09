@@ -311,7 +311,7 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
 	if (lineNum >=3 && lineNum <= 6){
 		passeren(&deviceSemaphores[lineNum - DISKINT][deviceNum]);
 	}
-	elif (lineNum == 7){
+	else if (lineNum == 7){
 		if(readBool) { passeren(&deviceSemaphores[4][deviceNum]); }
 		else { passeren(&deviceSemaphores[5][deviceNum]); }
 	}

@@ -396,8 +396,8 @@ void waitForClock() {
  *  
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
-void getSupportData() {
-	EXCSTATE->s_v0 = currProc->p_supportStruct;
+void getSupportData(state_t *savedState) {
+	savedState->s_v0 = currProc->p_supportStruct;
 	/*savedState->s_v0 = currProc->p_supportStruct;*/
 }
 
@@ -519,7 +519,7 @@ void sysTrapHandler(unsigned int KUp) {
 	volatile unsigned int arg1 = EXCSTATE->s_a1;
 	volatile unsigned int arg2 = EXCSTATE->s_a2;
 	volatile unsigned int arg3 = EXCSTATE->s_a3;
-	memaddr resultAddress = (memaddr) &(EXCSTATE->s_v0);
+	/*memaddr resultAddress = (memaddr) &(EXCSTATE->s_v0);*/
 
 	if (sysId <= 8) {
 
@@ -548,7 +548,7 @@ void sysTrapHandler(unsigned int KUp) {
 				waitForClock();
 				break;
 			case GETSUPPORTPTR:
-				getSupportData();
+				getSupportData(state_t *savedState);
 				break;
 			default:
 				terminateProcess();

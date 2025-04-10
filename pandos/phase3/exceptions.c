@@ -357,10 +357,7 @@ void getCPUTime(state_t *savedState){
 	cpu_t totalTime;
     totalTime = currProc->p_time + get_elapsed_time();
 	savedState->s_v0 = totalTime;
-    /*EXCSTATE->s_v0 = totalTime;*/
     currProc->p_s.s_v0 = totalTime;
-
-	/*savedState->s_v0 = totalTime;*/
 }
 
 
@@ -397,9 +394,7 @@ void waitForClock() {
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
 void getSupportData(state_t *savedState) {
-	savedState->s_v0 = currProc->p_supportStruct;
-	/*EXCSTATE->s_v0 = currProc->p_supportStruct;*/
-	/*savedState->s_v0 = currProc->p_supportStruct;*/
+	savedState->s_v0 = (int) currProc->p_supportStruct;
 }
 
 

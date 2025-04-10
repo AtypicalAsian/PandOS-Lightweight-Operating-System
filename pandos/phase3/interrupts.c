@@ -100,14 +100,6 @@ int getInterruptLine(){
 		if (interruptMap & (1 << j)) {return j;}
 	}
 	return -1;
-
-    if ((savedState->s_cause & LINE3MASK) != ALLOFF) return 3;        /* Check if an interrupt is pending on line 3 */
-    else if ((savedState->s_cause & LINE4MASK) != ALLOFF) return 4;   /* Check if an interrupt is pending on line 4 */
-    else if ((savedState->s_cause & LINE5MASK) != ALLOFF) return 5;   /* Check if an interrupt is pending on line 5 */
-    else if ((savedState->s_cause & LINE6MASK) != ALLOFF) return 6;   /* Check if an interrupt is pending on line 6 */
-    else if ((savedState->s_cause & LINE7MASK) != ALLOFF) return 7;   /* Check if an interrupt is pending on line 7 */
-	PANIC();
-    return -1;  /* No interrupt detected */
 }
 
 

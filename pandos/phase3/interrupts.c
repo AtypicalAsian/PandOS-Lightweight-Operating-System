@@ -91,12 +91,14 @@ void interruptsHandler(state_t *exceptionState);
  * @return int - The interrupt line number (3-7), or -1 if no interrupt is pending.  
  *****************************************************************************/
 int getInterruptLine(){
+
 	state_t *savedState = (state_t *)BIOSDATAPAGE;
     if ((savedState->s_cause & LINE3MASK) != ALLOFF) return 3;        /* Check if an interrupt is pending on line 3 */
     else if ((savedState->s_cause & LINE4MASK) != ALLOFF) return 4;   /* Check if an interrupt is pending on line 4 */
     else if ((savedState->s_cause & LINE5MASK) != ALLOFF) return 5;   /* Check if an interrupt is pending on line 5 */
     else if ((savedState->s_cause & LINE6MASK) != ALLOFF) return 6;   /* Check if an interrupt is pending on line 6 */
     else if ((savedState->s_cause & LINE7MASK) != ALLOFF) return 7;   /* Check if an interrupt is pending on line 7 */
+	PANIC();
     return -1;  /* No interrupt detected */
 }
 
@@ -126,11 +128,17 @@ void unblockLoad(int deviceType, int deviceInstance, unsigned int status) {
 
 
 void nonTimerInterrupt(int deviceType) {
-	int instanceMap = DEVREGADDR->interrupt_dev[deviceType];
+	devregarea_t *deviceRegisters = (devregarea_t *)RAMBASEADDR;  /*get pointer to devreg struct*/
+	int device_intMap = deviceRegisters->interrupt_dev[deviceType]; /*retrieve interrupt status bitmap for specific device type*/
+	/*device_intMap &= -device_intMap;*/
 
-	instanceMap &= -instanceMap;
-	/*int deviceInstance = findIntLine(instanceMap);*/
-	int deviceInstance = getInterruptLine();
+	int mask = 1;  // Start with the least significant bit.
+	while (!(device_intMap & mask)) {
+		mask <<= 1;  // Shift the mask one bit to the left.
+	}
+	device_intMap = mask;  // Now device_intMap contains only the lowest set bit.
+	int deviceInstance = findIntLine(device_intMap);
+	/*int deviceInstance = getInterruptLine();*/
 	unsigned int status;
 
 	if (deviceType == (TERMINT-DISKINT)) {

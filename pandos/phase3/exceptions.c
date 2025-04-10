@@ -426,7 +426,6 @@ HIDDEN void exceptionPassUpHandler(int exceptionCode) {
 	/*If current process has a support structure -> pass up exception to the exception handler */
 	if (currProc->p_supportStruct != NULL){
 		copyState(((state_t *) BIOSDATAPAGE),&(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
-		/*currProc->p_supportStruct->sup_exceptState[exceptionCode] = *EXCSTATE;*/
 		context_t *ctx = &(currProc->p_supportStruct->sup_exceptContext[exceptionCode]);
 		LDCXT(ctx->c_stackPtr, ctx->c_status, ctx->c_pc);
 	}
@@ -593,16 +592,26 @@ void sysTrapHandler(unsigned int KUp) {
  * @return None  
  *****************************************************************************/
 void exceptionHandler()
-{
-    int exc_code = EXCCODE(EXCSTATE->s_cause);
-    if (exc_code == 0) {
-        intExceptionHandler(EXCSTATE);
-    } else if (((exc_code >= 1) && (exc_code <= TLBS))) {
-        tlbTrapHanlder();
-    } else if (exc_code == 8) {
+{	
+	state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
+    int exception_code; /* Stores the extracted exception type */  
+
+    saved_state = (state_t *) BIOSDATAPAGE;  /* Retrieve the saved processor state from BIOS data page */
+    exception_code = ((saved_state->s_cause) & GETEXCPCODE) >> CAUSESHIFT; /* Extract exception code from the cause register */
+
+	if (exception_code == 0) {  
+        /* Case 1: Exception Code 0 - Device Interrupt */
+        intExceptionHandler(saved_state);  /* call the Nucleus' device interrupt handler function */
+    }  
+    else if ((exception_code <= 3) && (exception_code >= 1)) {  
+        /* Case 2: Exception Codes 1-3 - TLB Exceptions */
+        tlbTrapHanlder();  /* call the Nucleus' TLB exception handler function */
+    }  
+    else if (exception_code == 8) {  
+        /* Case 3: Exception Code 8 - System Calls */
 		unsigned int KUp = KUP(EXCSTATE->s_status);
-        sysTrapHandler(KUp);
-    } else {
-        prgmTrapHandler();
+        sysTrapHandler(KUp);  /* call the Nucleus' SYSCALL exception handler function */
     }
+    /* Case 4: All Other Exceptions - Program Traps */
+    prgmTrapHandler(); /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
 }

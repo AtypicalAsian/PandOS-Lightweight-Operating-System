@@ -54,6 +54,7 @@
 #define NOPROC     -1
 #define INITPROCCNT 0
 #define INITSBLOCKCNT 0
+#define GETEXCPCODE 0x0000007C
 
 /* device interrupts */
 #define TIMERINT          1

@@ -130,7 +130,6 @@ void unblockLoad(int deviceType, int deviceInstance, unsigned int status) {
 void nonTimerInterrupt(int deviceType) {
 	devregarea_t *deviceRegisters = (devregarea_t *)RAMBASEADDR;  /*get pointer to devreg struct*/
 	int device_intMap = deviceRegisters->interrupt_dev[deviceType]; /*retrieve interrupt status bitmap for specific device type*/
-	/*device_intMap &= -device_intMap;*/
 
 	int mask = 1;  /*Start with the least significant bit*/
 	while (!(device_intMap & mask)) {

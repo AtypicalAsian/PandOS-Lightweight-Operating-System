@@ -398,6 +398,7 @@ void waitForClock() {
  *****************************************************************************/
 void getSupportData(state_t *savedState) {
 	savedState->s_v0 = currProc->p_supportStruct;
+	/*EXCSTATE->s_v0 = currProc->p_supportStruct;*/
 	/*savedState->s_v0 = currProc->p_supportStruct;*/
 }
 
@@ -548,7 +549,7 @@ void sysTrapHandler(unsigned int KUp) {
 				waitForClock();
 				break;
 			case GETSUPPORTPTR:
-				getSupportData(state_t *savedState);
+				getSupportData(savedState);
 				break;
 			default:
 				terminateProcess();

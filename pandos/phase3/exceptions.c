@@ -353,10 +353,11 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
  *  
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
-void getCPUTime(){
+void getCPUTime(state_t *savedState){
 	cpu_t totalTime;
     totalTime = currProc->p_time + get_elapsed_time();
-    EXCSTATE->s_v0 = totalTime;
+	savedState->s_v0 = totalTime;
+    /*EXCSTATE->s_v0 = totalTime;*/
     currProc->p_s.s_v0 = totalTime;
 
 	/*savedState->s_v0 = totalTime;*/
@@ -512,7 +513,7 @@ void tlbTrapHanlder() {
  * @return None  
  *****************************************************************************/  
 void sysTrapHandler(unsigned int KUp) {
-	state_t *savedState = ((state_t *) BIOSDATAPAGE);
+	state_t *savedState = (state_t *)BIOSDATAPAGE;
 	volatile unsigned int sysId = EXCSTATE->s_a0;
 
 	volatile unsigned int arg1 = EXCSTATE->s_a1;
@@ -541,7 +542,7 @@ void sysTrapHandler(unsigned int KUp) {
 				waitForIO(arg1, arg2, arg3);
 				break;
 			case GETTIME:
-				getCPUTime();
+				getCPUTime(savedState);
 				break;
 			case CLOCKWAIT:
 				waitForClock();

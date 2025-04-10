@@ -59,15 +59,46 @@
 #include "../h/interrupts.h"
 #include "../h/initial.h"
 
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 
 /**************** METHOD DECLARATIONS***************************/ 
-HIDDEN void nontimerInterruptHandler();
-HIDDEN void pltInterruptHandler();
-HIDDEN void systemIntervalInterruptHandler();
-HIDDEN int getInterruptLine();
-HIDDEN int getDevNum();
+void nontimerInterruptHandler();
+void pltInterruptHandler();
+void systemIntervalInterruptHandler();
+int getInterruptLine();
+int getDevNum();
+
+int findIntLine(unsigned int map);
+void unblockLoad(int deviceType, int deviceInstance, unsigned int status);
+void nonTimerInterrupt(int deviceType);
+void pltInterrupt();
+void intervalTimerInterrupt();
+void interruptsHandler(state_t *exceptionState);
+
+/****************************************************************************
+ * getInterruptLine()
+ * 
+ * @brief Identifies the highest-priority pending interrupt line.  
+ * 
+ * @details
+ * - This function checks the s_cause register in the saved processor state  
+ *   to determine which interrupt line (3-7) has an active interrupt.  
+ * - Interrupts are checked in ascending order, ensuring that the lowest-numbered  
+ *   line (highest priority) is returned first.
+ * - If no interrupts are detected, the function returns -1.  
+ * 
+ * @return int - The interrupt line number (3-7), or -1 if no interrupt is pending.  
+ *****************************************************************************/
+int getInterruptLine(){
+	state_t *savedState = (state_t *)BIOSDATAPAGE;
+    if ((savedState->s_cause & LINE3MASK) != ALLOFF) return 3;        /* Check if an interrupt is pending on line 3 */
+    else if ((savedState->s_cause & LINE4MASK) != ALLOFF) return 4;   /* Check if an interrupt is pending on line 4 */
+    else if ((savedState->s_cause & LINE5MASK) != ALLOFF) return 5;   /* Check if an interrupt is pending on line 5 */
+    else if ((savedState->s_cause & LINE6MASK) != ALLOFF) return 6;   /* Check if an interrupt is pending on line 6 */
+    else if ((savedState->s_cause & LINE7MASK) != ALLOFF) return 7;   /* Check if an interrupt is pending on line 7 */
+    return -1;  /* No interrupt detected */
+}
 
 
 int findIntLine(unsigned int map) {
@@ -98,7 +129,8 @@ void nonTimerInterrupt(int deviceType) {
 	int instanceMap = DEVREGADDR->interrupt_dev[deviceType];
 
 	instanceMap &= -instanceMap;
-	int deviceInstance = findIntLine(instanceMap);
+	/*int deviceInstance = findIntLine(instanceMap);*/
+	int deviceInstance = getInterruptLine();
 	unsigned int status;
 
 	if (deviceType == (TERMINT-DISKINT)) {

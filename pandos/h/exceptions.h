@@ -11,7 +11,7 @@
 void sysTrapHandler(); /*Syscall Handler*/
 void tlbTrapHanlder(); /*TLB Trap Handler*/
 void prgmTrapHandler(); /*Program Trap Handler*/
-void exceptionHandler(); /*General Exception Handler*/
+void gen_exception_handler(); /*General Exception Handler*/
 
 /*SYSCALLS METHOD HANDLER*/
 void createProcess(state_PTR stateSYS, support_t *suppStruct); /*SYS1*/

@@ -127,7 +127,7 @@ void populate_passUpVec(){
     proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer*/
     proc0_passup_vec->tlb_refill_handler = (memaddr) &uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
     proc0_passup_vec->tlb_refill_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
-    proc0_passup_vec->exception_handler = (memaddr) &exceptionHandler;  /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
+    proc0_passup_vec->exception_handler = (memaddr) &gen_exception_handler;  /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
     proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
 }
 

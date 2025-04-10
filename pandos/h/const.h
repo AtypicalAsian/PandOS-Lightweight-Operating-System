@@ -93,6 +93,21 @@
 #define FLASH_GET     17
 #define DELAY         18
 
+#define SYS1 1
+#define SYS2 2
+#define SYS3 3
+#define SYS4 4
+#define SYS5 5
+#define SYS6 6
+#define SYS7 7
+#define SYS8 8
+#define SYS9 9
+#define SYS10 10
+#define SYS11 11
+#define SYS12 12
+#define SYS13 13
+
+
 #define TLBS              3
 /* Exceptions related constants */
 #define PGFAULTEXCEPT 0

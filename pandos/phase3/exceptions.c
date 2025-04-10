@@ -534,28 +534,28 @@ void sysTrapHandler() {
 	/*If we're in kernel mode -> safe to proceed*/
 	if (kup_check == 0) {
 		switch (syscallNo) {
-		case CREATEPROCESS:
+		case SYS1:
 			createProcess((state_t *) reg_a1, (support_t *) reg_a2);
 			break;
-		case TERMINATEPROCESS:
+		case SYS2:
 			terminateProcess();
 			break;
-		case PASSEREN:
-			passeren((semaphore *) reg_a1);
+		case SYS3:
+			passeren((int *) reg_a1);
 			break;
-		case VERHOGEN:
-			verhogen((semaphore *) reg_a1);
+		case SYS4:
+			verhogen((int *) reg_a1);
 			break;
-		case WAITIO:
+		case SYS5:
 			waitForIO(reg_a1, reg_a2, reg_a3);
 			break;
-		case GETTIME:
+		case SYS6:
 			getCPUTime(savedState);
 			break;
-		case CLOCKWAIT:
+		case SYS7:
 			waitForClock();
 			break;
-		case GETSUPPORTPTR:
+		case SYS8:
 			getSupportData(savedState);
 			break;
 		default:
@@ -585,7 +585,7 @@ void sysTrapHandler() {
 }
 
 /****************************************************************************  
- * exceptionHandler()  
+ * gen_exception_handler()  
  *  
  * @brief  
  * Handles all general exceptions that occur in the system by determining  
@@ -609,7 +609,7 @@ void sysTrapHandler() {
  *  
  * @return None  
  *****************************************************************************/
-void exceptionHandler()
+void gen_exception_handler()
 {	
 	state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
     int exception_code; /* Stores the extracted exception type */  
@@ -627,7 +627,6 @@ void exceptionHandler()
     }  
     else if (exception_code == 8) {  
         /* Case 3: Exception Code 8 - System Calls */
-		/*unsigned int KUp = KUP(EXCSTATE->s_status);*/
         sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
     }
     /* Case 4: All Other Exceptions - Program Traps */

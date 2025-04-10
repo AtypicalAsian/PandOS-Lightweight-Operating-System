@@ -132,11 +132,11 @@ void nonTimerInterrupt(int deviceType) {
 	int device_intMap = deviceRegisters->interrupt_dev[deviceType]; /*retrieve interrupt status bitmap for specific device type*/
 	/*device_intMap &= -device_intMap;*/
 
-	int mask = 1;  // Start with the least significant bit.
+	int mask = 1;  /*Start with the least significant bit*/
 	while (!(device_intMap & mask)) {
-		mask <<= 1;  // Shift the mask one bit to the left.
+		mask <<= 1;  /*Shift the mask one bit to the left*/
 	}
-	device_intMap = mask;  // Now device_intMap contains only the lowest set bit.
+	device_intMap = mask;  /*device_intMap contains only the lowest set bit*/
 	int deviceInstance = findIntLine(device_intMap);
 	/*int deviceInstance = getInterruptLine();*/
 	unsigned int status;

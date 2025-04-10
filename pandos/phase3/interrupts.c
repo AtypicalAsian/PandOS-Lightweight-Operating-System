@@ -1,16 +1,73 @@
-#include "../h/const.h"
-#include "../h/types.h"
+/**************************************************************************** 
+ * @file interrupts.c
+ * 
+ * 
+ * @brief
+ * This module is responsible for handling interrupt exceptions that occur during 
+ * process execution. The interrupt handler functions defined here are invoked by 
+ * the Nucleus whenever an interrupt is detected. 
+ * 
+ * @details
+ * 
+ * - interruptsHandler() → Entry point for handling all types of interrupts.
+ * - getInterruptLine() → Determines which interrupt line triggered the exception.
+ * - getDevNum() → Identifies the specific device that generated an interrupt.
+ * - pltInterruptHandler() → Handles **Process Local Timer (PLT) interrupts**.
+ * - systemIntervalInterruptHandler() → Handles **System-wide Interval Timer interrupts**.
+ * - nontimerInterruptHandler() → Manages **I/O device interrupts** (lines 3-7).
+ * 
+ * @note
+ * @interrupt_priority
+ * - If multiple interrupts occur simultaneously, they are handled one at a time 
+ *   based on priority. The lower the line number, the higher the priority.
+ * - The highest-priority pending interrupt is resolved first, before handling any  
+ *   remaining lower-priority interrupts.
+ * 
+ * @cpu_time_accounting
+ * A key decision in this module is how*CPU time is charged when handling interrupts:
+ * - I/O Interrupts (Lines 3-7)  
+ *   - The CPU time spent handling an I/O interrupt is charged to the process that  
+ *     generated the interrupt, rather than the process that was running when the  
+ *     interrupt occurred. We made this decision because it is appropriate to charge
+ *     the process that generated the interrupt CPU time instead of penalizing the
+ *     process that was running when the interrupt occurred.
+ * 
+ * 
+ * - Handling Process Local Timer (PLT) Interrupts  
+ *   - The time between when the Current Process began executing and when the PLT  
+ *     interrupt occurred is charged to the Current Process.
+ *   - Additionally, the time spent **handling the PLT interrupt** is also charged to  
+ *     the Current Process, since it was responsible for exhausting its time slice.
+ * 
+ * - Handling System-wide Interval Timer Interrupt  
+ *   - The Current Process is charged for the time it executed before the interrupt.  
+ *   - However, the time spent handling the interrupt is not charged to any  
+ *     process, since it is a global system event, not directly caused by any process.
+ * 
+ * @authors
+ * - Nicolas & Tran
+ * 
+ * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
+ ****************************************************************************/
 
 #include "../h/asl.h"
+#include "../h/types.h"
+#include "../h/const.h"
 #include "../h/pcb.h"
-
-#include "../h/exceptions.h"
-#include "../h/initial.h"
-#include "../h/interrupts.h"
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
+#include "../h/interrupts.h"
+#include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
+
+
+/**************** METHOD DECLARATIONS***************************/ 
+HIDDEN void nontimerInterruptHandler();
+HIDDEN void pltInterruptHandler();
+HIDDEN void systemIntervalInterruptHandler();
+HIDDEN int getInterruptLine();
+HIDDEN int getDevNum();
 
 
 int findIntLine(unsigned int map) {

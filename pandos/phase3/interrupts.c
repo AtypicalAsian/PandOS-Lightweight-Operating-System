@@ -91,8 +91,16 @@ void interruptsHandler(state_t *exceptionState);
  * @return int - The interrupt line number (3-7), or -1 if no interrupt is pending.  
  *****************************************************************************/
 int getInterruptLine(){
-
+	/*Get saved proccessor state at time of interrupt and shift to extract IP bits*/
 	state_t *savedState = (state_t *)BIOSDATAPAGE;
+	unsigned int interruptMap = ((savedState->s_cause) & IP_MASK) >> 8;
+
+	int j;
+	for (j=0; j <= 7; j++){
+		if (interruptMap & (1 << j)) {return j;}
+	}
+	return -1;
+
     if ((savedState->s_cause & LINE3MASK) != ALLOFF) return 3;        /* Check if an interrupt is pending on line 3 */
     else if ((savedState->s_cause & LINE4MASK) != ALLOFF) return 4;   /* Check if an interrupt is pending on line 4 */
     else if ((savedState->s_cause & LINE5MASK) != ALLOFF) return 5;   /* Check if an interrupt is pending on line 5 */
@@ -136,7 +144,7 @@ void nonTimerInterrupt(int deviceType) {
 		mask <<= 1;  /*Shift the mask one bit to the left*/
 	}
 	device_intMap = mask;  /*device_intMap contains only the lowest set bit*/
-	int deviceInstance = findIntLine(device_intMap);
+	int deviceInstance = getInterruptLine();
 	/*int deviceInstance = getInterruptLine();*/
 	unsigned int status;
 

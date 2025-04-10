@@ -138,6 +138,7 @@
 
 #define VPNSHIFT      12
 #define ASIDSHIFT     6
+#define IP_MASK     0x0000FF00     
 
 
 /*Cause Register Mask to Isolate the correct corresponding to which line the interupt was generated from*/

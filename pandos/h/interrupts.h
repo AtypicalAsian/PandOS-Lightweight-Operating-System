@@ -6,6 +6,6 @@
 #define TERMSTATUSMASK 0x000000FF
 
 #define DEVREGADDR ((devregarea_t *)RAMBASEADDR)
-void intExceptionHandler(state_t *exceptionState);
+void interruptsHandler(state_t *exceptionState);
 
 #endif

@@ -97,7 +97,7 @@ void intervalTimerInterrupt() {
 		LDST(EXCSTATE);
 }
 
-void intExceptionHandler(state_t *exceptionState) {
+void interruptsHandler(state_t *exceptionState) {
 	int pending_int = (exceptionState->s_cause & GETIP);
 
 	pending_int &= -pending_int;

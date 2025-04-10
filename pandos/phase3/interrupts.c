@@ -136,8 +136,8 @@ void nonTimerInterrupt(int deviceType) {
 		mask <<= 1;  /*Shift the mask one bit to the left*/
 	}
 	device_intMap = mask;  /*device_intMap contains only the lowest set bit*/
-	/*int deviceInstance = getInterruptLine();*/
-	int deviceInstance = findIntLine(device_intMap);
+	int deviceInstance = getInterruptLine();
+	/*int deviceInstance = findIntLine(device_intMap);*/
 	unsigned int status;
 
 	if (deviceType == (TERMINT-DISKINT)) {

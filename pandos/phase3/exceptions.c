@@ -528,10 +528,11 @@ void sysTrapHandler() {
     if ((syscallNo < 1) || (syscallNo > 8)) {  
         exceptionPassUpHandler(GENERALEXCEPT);  /* Invalid syscall, try pass up or die to see if we can handle it */
     }
-	unsigned int kup_check = ((savedState->s_status) & 0x00000008) >> 3;
+	unsigned int kup_check = ((savedState->s_status) & 0x00000008) >> 3; /*KUp bit, which checks whether the process is in user or kernel mode*/
+	/*Phase 2 requires one to be in kernel mode*/
 
+	/*If we're in kernel mode -> safe to proceed*/
 	if (kup_check == 0) {
-		savedState->s_pc += WORDLEN;
 		switch (syscallNo) {
 		case CREATEPROCESS:
 			createProcess((state_t *) reg_a1, (support_t *) reg_a2);
@@ -561,15 +562,25 @@ void sysTrapHandler() {
 			terminateProcess();
 			break;
 		}
+	
+    /* 
+     * After handling the system call, check if there is a current process.
+     * If no process is available (i.e., currProc is NULL), switch to the next available process.
+     * Otherwise, load the processor state from the saved state to resume execution.
+     */
 	if (currProc == NULL)
 		switchProcess();
 	else
 		LDST(savedState);
 	}
 	else {
-		savedState->s_cause &= ~GETEXECCODE;
-		savedState->s_cause |= EXCODESHIFT << CAUSESHIFT;
-		prgmTrapHandler();
+	/* 
+     * If kup_check is not 0, the process is not in kernel mode
+     * which is an error condition since privileged system calls must be executed in kernel mode.
+     */
+		savedState->s_cause &= ~GETEXECCODE; /* Clear the current exception code bits from the cause field */
+		savedState->s_cause |= 10 << CAUSESHIFT; /* Set the new cause by shifting the exception code into place */
+		prgmTrapHandler(); /*Handle as program trap*/
 	}
 }
 

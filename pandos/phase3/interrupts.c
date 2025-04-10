@@ -91,20 +91,18 @@ void interruptsHandler(state_t *exceptionState);
  * @return int - The interrupt line number (3-7), or -1 if no interrupt is pending.  
  *****************************************************************************/
 int getInterruptLine(unsigned int interruptMap){
-	/*If no bit set -> no interrupt line active*/
     if (interruptMap == 0) {
         PANIC();
         return -1;
     }
-    unsigned int isolated = 0;
-    int j;
-    for (j = 0; j < 32; j++) {
-		if (interruptMap & (1u << j)) {   
-			isolated = 1u << j;           
-			break;                        
-		}
-	}
-    PANIC();
+
+    unsigned int isolated = interruptMap & (-interruptMap);
+    int i;
+    for (i = 0; i < 32; i++) {
+        if (isolated == (1u << i)) {
+            return i;
+        }
+    }
     return -1;
 }
 

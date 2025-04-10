@@ -507,7 +507,7 @@ void tlbTrapHanlder() {
  *  
  * @return None  
  *****************************************************************************/  
-void sysTrapHandler(unsigned int KUp) {
+void sysTrapHandler() {
 	/*Retrieve saved processor state (located at start of the BIOS Data Page) & extract the syscall number to find out which type of exception was raised*/
 	state_t *savedState = (state_t *)BIOSDATAPAGE;
 	syscallNo = savedState->s_a0;
@@ -528,8 +528,9 @@ void sysTrapHandler(unsigned int KUp) {
     if ((syscallNo < 1) || (syscallNo > 8)) {  
         exceptionPassUpHandler(GENERALEXCEPT);  /* Invalid syscall, try pass up or die to see if we can handle it */
     }
+	unsigned int kup_check = ((savedState->s_status) & 0x00000008) >> 3;
 
-	if (KUp == 0) {
+	if (kup_check == 0) {
 		savedState->s_pc += WORDLEN;
 		switch (syscallNo) {
 		case CREATEPROCESS:
@@ -615,8 +616,8 @@ void exceptionHandler()
     }  
     else if (exception_code == 8) {  
         /* Case 3: Exception Code 8 - System Calls */
-		unsigned int KUp = KUP(EXCSTATE->s_status);
-        sysTrapHandler(KUp);  /* call the Nucleus' SYSCALL exception handler function */
+		/*unsigned int KUp = KUP(EXCSTATE->s_status);*/
+        sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
     }
     /* Case 4: All Other Exceptions - Program Traps */
     prgmTrapHandler(); /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/

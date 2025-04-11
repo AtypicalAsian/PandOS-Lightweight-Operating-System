@@ -63,13 +63,12 @@
 
 
 /**************** METHOD DECLARATIONS***************************/ 
-void nontimerInterruptHandler();
+void nontimerInterruptHandler(int deviceType);
 void pltInterruptHandler();
 void systemIntervalInterruptHandler();
 int getInterruptLine();
 int getDevNum();
 
-int findIntLine(unsigned int map);
 void unblockLoad(int deviceType, int deviceInstance, unsigned int status);
 void nonTimerInterrupt(int deviceType);
 void pltInterrupt();
@@ -77,7 +76,7 @@ void intervalTimerInterrupt();
 void interruptsHandler(state_t *exceptionState);
 
 /****************************************************************************
- * getInterruptLine()
+ * getInterruptLine(unsigned int interruptMap)
  * 
  * @brief Identifies the highest-priority pending interrupt line.  
  * 
@@ -88,7 +87,9 @@ void interruptsHandler(state_t *exceptionState);
  *   line (highest priority) is returned first.
  * - If no interrupts are detected, the function returns -1.  
  * 
- * @return int - The interrupt line number (3-7), or -1 if no interrupt is pending.  
+ * @param - interruptMap - bitmap representing the status of potential interrupt lines
+ * 
+ * @return int - The interrupt line number, or -1 if no interrupt is pending.  
  *****************************************************************************/
 int getInterruptLine(unsigned int interruptMap){
     if (interruptMap == 0) {
@@ -96,6 +97,7 @@ int getInterruptLine(unsigned int interruptMap){
         return -1;
     }
 
+	/*isolate lowest set bit in the bitmap*/
     unsigned int isolated = interruptMap & (-interruptMap);
     int i;
     for (i = 0; i < 32; i++) {
@@ -106,34 +108,36 @@ int getInterruptLine(unsigned int interruptMap){
     return -1;
 }
 
-
-int findIntLine(unsigned int map) {
-    int i;
-	for (i = 0; i < 32; i++) {
-        if (map & (1 << i)) {
-            return i;
-        }
-    }
-    PANIC();
-    return -1;
-}
-
-
-void unblockLoad(int deviceType, int deviceInstance, unsigned int status) {
-	pcb_PTR unblockedProc;
-
-	unblockedProc = verhogen(&(deviceSemaphores[deviceType][deviceInstance]));
-
-	if (unblockedProc != NULL) {
-		unblockedProc->p_s.s_v0 = status;
-		softBlockCnt--;
-	}
-}
-
-
-void nonTimerInterrupt(int deviceType) {
+/**************************************************************************** 
+ * nontimerInterruptHandler()
+ * 
+ * @brief 
+ * Handles all non-timer interrupts (I/O device and terminal interrupts).  
+ * This function identifies the interrupt source, acknowledges the interrupt,  
+ * unblocks the waiting process if necessary, and resumes execution.
+ * 
+ * @details  
+ * 1. Calculate the address for this device’s device register. [Section 5.1-pops]
+ * 2. Save off the status code from the device’s device registers
+ * 3. Acknowledge the outstanding interrupt. This is accomplished by writing 
+ *    the acknowledge command code in the interrupting device’s device register.
+ * 4. Perform a V operation on the Nucleus maintained semaphore associated
+ *    with this (sub)device. This operation should unblock the process (pcb)
+ *    which initiated this I/O operation and then requested to wait for its 
+ *    completion via a SYS5 operation.
+ * 5. Place the stored off status code in the newly unblocked pcb’s v0 register.
+ * 6. Insert the newly unblocked pcb on the Ready Queue, transitioning this process from 
+ *    the “blocked” state to the “ready” state.
+ * 7. Return control to the Current Process: Perform a LDST on the saved exception 
+ *    state (located at the start of the BIOS Data Page [Section 3.4]). 
+ * 
+ * 
+ * @return None
+ *****************************************************************************/
+void nontimerInterruptHandler(int deviceType){
 	devregarea_t *deviceRegisters = (devregarea_t *)RAMBASEADDR;  /*get pointer to devreg struct*/
 	int device_intMap = deviceRegisters->interrupt_dev[deviceType]; /*retrieve interrupt status bitmap for specific device type*/
+	unsigned int status;
 
 	int mask = 1;  /*Start with the least significant bit*/
 	while (!(device_intMap & mask)) {
@@ -141,32 +145,51 @@ void nonTimerInterrupt(int deviceType) {
 	}
 	device_intMap = mask;  /*device_intMap contains only the lowest set bit*/
 	int deviceInstance = getInterruptLine(device_intMap);
-	/*int deviceInstance = findIntLine(device_intMap);*/
-	unsigned int status;
 
-	if (deviceType == (TERMINT-DISKINT)) {
-		device_t *termStatus = &(DEVREGADDR->devreg[deviceType][deviceInstance]);
-
-		if ((termStatus->d_status & TERMSTATUSMASK) == RECVD_CHAR) {
-			status = termStatus->d_status;
-			DEVREGADDR->devreg[deviceType][deviceInstance].d_command = ACK;
-			unblockLoad(deviceType, deviceInstance, status);
-		}
-		if ((termStatus->d_data0 & TERMSTATUSMASK) == TRANS_CHAR) {
-			status = termStatus->d_data0;
-			DEVREGADDR->devreg[deviceType][deviceInstance].d_data1 = ACK;
-			unblockLoad(deviceType + 1, deviceInstance, status);
+	/*Case 1: Interrupt device is not terminal devs*/
+	if (deviceType != 4){
+		status = deviceRegisters->devreg[deviceType][deviceInstance].d_status; /*Save off the status code from the device’s device registers*/
+		deviceRegisters->devreg[deviceType][deviceInstance].d_command = ACK; /*Acknowledge the interrupt*/
+		pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[deviceType][deviceInstance])); /*perform v op on semaphore*/
+		if (pcb_unblocked != NULL){
+			softBlockCnt--;
+			pcb_unblocked->p_s.s_v0 = status; /*Place the stored off status code in the newly unblocked pcb’s v0 register*/
 		}
 	}
-	else {
-		status = DEVREGADDR->devreg[deviceType][deviceInstance].d_status;
-		DEVREGADDR->devreg[deviceType][deviceInstance].d_command = ACK;
-		unblockLoad(deviceType, deviceInstance, status);
+	/*Case 2: Handle Terminal devices separately*/
+	else{
+		device_t *tStat = &(deviceRegisters->devreg[deviceType][deviceInstance]);
+		/*Terminal devices have 2 subdevices: transmission and reception*/
+		/*Case 1: If device is transmission*/
+        if ((tStat->d_data0 & 0x000000FF) == 5) {
+            status = tStat->d_data0;  /*Retrieve the status*/
+            deviceRegisters->devreg[deviceType][deviceInstance].d_data1 = ACK; /*ACK the interrupt*/
+            
+            /*For transmit interrupts, use the next device type slot (deviceType + 1)*/
+			/*Transmission device semaphores are 8 bits behind reception for terminal devices (plus 8 to index)*/
+			pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[deviceType+1][deviceInstance])); /*do v op on device semaphore*/
+            if (pcb_unblocked != NULL) {
+				softBlockCnt--;
+                pcb_unblocked->p_s.s_v0 = status;
+            }
+        }
+		/*Case 2: If device is reception*/
+		if ((tStat->d_status & 0x000000FF) == 5) {
+            status = tStat->d_status;  /*Retrieve the status*/
+            deviceRegisters->devreg[deviceType][deviceInstance].d_command = ACK; /*ACK the interrupt*/
+            
+            pcb_PTR pcb_unblocked = verhogen(&(deviceSemaphores[deviceType][deviceInstance])); /*do v op on device semaphore*/
+            if (pcb_unblocked != NULL) {
+				softBlockCnt--;
+                pcb_unblocked->p_s.s_v0 = status;                   
+            }
+        }
 	}
-	if (currProc == NULL)
-		switchProcess();
-	else
-		LDST(EXCSTATE);
+	state_PTR savedState = (state_t *) BIOSDATAPAGE;
+	if (currProc != NULL){
+		LDST(savedState);
+	}
+	switchProcess();
 }
 
 
@@ -214,7 +237,7 @@ void interruptsHandler(state_t *exceptionState) {
 	case NETWINTERRUPT:
 	case PRINTINTERRUPT:
 	case TERMINTERRUPT:
-		nonTimerInterrupt(findIntLine(pending_int >> IPSHIFT) - DISKINT);
+		nonTimerInterrupt(getInterruptLine(pending_int >> IPSHIFT) - DISKINT);
 		break;
 	default:
 		break;

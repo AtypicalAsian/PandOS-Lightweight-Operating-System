@@ -290,9 +290,9 @@ void systemIntervalInterruptHandler() {
  *****************************************************************************/
 void interruptsHandler() {
 	state_t *savedState = (state_t *)BIOSDATAPAGE;
-	int pending_int = (savedState->s_cause & GETIP);
-
-	pending_int &= -pending_int;
+	unsigned int causeReg = savedState->s_cause;
+	int interrupt = (causeReg & 0x0000FE00);
+	interrupt &= -interrupt;
 
 	/* Check if the interrupt came from the Process Local Timer (PLT) (Line 1) */
     if (((savedState->s_cause) & LINE1MASK) != ALLOFF){
@@ -303,7 +303,8 @@ void interruptsHandler() {
     if (((savedState->s_cause) & LINE2MASK) != ALLOFF){
         systemIntervalInterruptHandler(); /* Call method to the System Interval Timer interrupt */
     }
-
+	
+	int nonTimerDeviceType = getInterruptLine(interrupt >> 8) - DISKINT;
     /*Handle non-timer interrupts*/
-    nontimerInterruptHandler(getInterruptLine(pending_int >> IPSHIFT) - DISKINT);  /* Call method to the handle non-timer interrupts */
+    nontimerInterruptHandler(nonTimerDeviceType);  /* Call method to the handle non-timer interrupts */
 }

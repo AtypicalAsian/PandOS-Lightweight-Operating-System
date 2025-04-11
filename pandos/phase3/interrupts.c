@@ -62,14 +62,13 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 
-/**************** METHOD DECLARATIONS***************************/ 
+/**************** METHOD DECLARATIONS***************************/
+int getInterruptLine();
 void nontimerInterruptHandler(int deviceType);
 void pltInterruptHandler();
 void systemIntervalInterruptHandler();
-int getInterruptLine();
 
-void pltInterrupt();
-void intervalTimerInterrupt();
+
 void interruptsHandler(state_t *exceptionState);
 
 /****************************************************************************
@@ -247,8 +246,10 @@ void pltInterruptHandler() {
  * @return None
  *****************************************************************************/
 
-void intervalTimerInterrupt() {
-	LDIT(INTIMER);
+void systemIntervalInterruptHandler() {
+	pcb_PTR unblockedProc; /*pointer to a process being unblocked*/
+	LDIT(INITTIMER);       /* Load the Interval Timer with 100ms to maintain periodic interrupts */
+
 	pcb_t *blockedProcess = NULL;
 
 	while ((blockedProcess = removeBlocked(&semIntTimer)) != NULL) {
@@ -274,7 +275,7 @@ void interruptsHandler(state_t *exceptionState) {
 		pltInterruptHandler();
 		break;
 	case TIMERINTERRUPT:
-		intervalTimerInterrupt();
+		systemIntervalInterruptHandler();
 		break;
 	case DISKINTERRUPT:
 	case FLASHINTERRUPT:

@@ -169,6 +169,7 @@
 /* Time related constants*/
 #define TIMESLICE  5000     
 #define SECOND     1000000
+#define INITTIMER  100000
 #define INTIMER  100000UL     
 #define PLT_HIGHEST_VAL   0xFFFFFFFFUL 
 

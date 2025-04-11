@@ -235,7 +235,7 @@ int main() {
     populate_passUpVec();
 
 	/*Load the system-wide Interval Timer with 100 milliseconds*/
-	LDIT(INTIMER); /*Set interval timer to 100ms*/
+	LDIT(INITTIMER); /*Set interval timer to 100ms*/
 
 	/*Create and Launch the First Process*/
 	first_proc = allocPcb(); /*allocate a PCB from the PCB free list for the first process*/

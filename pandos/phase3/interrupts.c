@@ -63,7 +63,7 @@
 
 
 /**************** METHOD DECLARATIONS***************************/
-int getInterruptLine();
+int getInterruptLine(unsigned int interruptMap);
 void nontimerInterruptHandler(int deviceType);
 void pltInterruptHandler();
 void systemIntervalInterruptHandler();
@@ -103,7 +103,7 @@ int getInterruptLine(unsigned int interruptMap){
 }
 
 /**************************************************************************** 
- * nontimerInterruptHandler()
+ * nontimerInterruptHandler(int deviceType)
  * 
  * @brief 
  * Handles all non-timer interrupts (I/O device and terminal interrupts).  
@@ -125,7 +125,7 @@ int getInterruptLine(unsigned int interruptMap){
  * 7. Return control to the Current Process: Perform a LDST on the saved exception 
  *    state (located at the start of the BIOS Data Page [Section 3.4]). 
  * 
- * 
+ * @param - int corresponding to device type that gen the interrupt
  * @return None
  *****************************************************************************/
 void nontimerInterruptHandler(int deviceType){
@@ -278,21 +278,14 @@ void systemIntervalInterruptHandler() {
  * - The Process Local Timer (PLT) and System Interval Timer have dedicated handlers.  
  * - All other interrupts (I/O devices, terminal, disk, etc.) are handled by nontimerInterruptHandler().
  * 
- * @details
- * Interrupt Handling Flow:
- * 1. Store the current Time-of-Day (TOD) clock value to track execution time.  
- * 2. Retrieve the remaining process quantum (time slice) before servicing the interrupt.  
- * 3. Check for Process Local Timer (PLT) interrupts (Line 1) → Call pltInterruptHandler().  
- * 4. Check for System-Wide Interval Timer interrupts (Line 2) → Call systemIntervalInterruptHandler().  
- * 5. If neither of the above, assume an I/O interrupt and call nontimerInterruptHandler().  
  * 
  * @return None
  *****************************************************************************/
 void interruptsHandler() {
-	state_t *savedState = (state_t *)BIOSDATAPAGE;
-	unsigned int causeReg = savedState->s_cause;
-	int interrupt = (causeReg & 0x0000FE00);
-	interrupt &= -interrupt;
+	state_t *savedState = (state_t *)BIOSDATAPAGE; /*Get saved processor state*/
+	unsigned int causeReg = savedState->s_cause; /*Extract value from cause register*/
+	int interrupt = (causeReg & 0x0000FE00); /*Mask out the bits corresponding to the pending interrupts*/
+	interrupt &= -interrupt; /*Isolate the lowest set bit (highest priority interrupt)*/
 
 	/* Check if the interrupt came from the Process Local Timer (PLT) (Line 1) */
     if (((savedState->s_cause) & LINE1MASK) != ALLOFF){

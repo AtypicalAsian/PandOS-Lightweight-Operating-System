@@ -130,7 +130,7 @@ void switchProcess() {
 
     /* If the ReadyQueue is not empty, schedule the next process */
     if (currProc != NULL){
-        setTIMER(TIME_TO_TICKS(TIMESLICE));     /* Set Process Local Timer (PLT) to 5ms for time-sharing */
+        setTIMER(TIMESLICE);     /* Set Process Local Timer (PLT) to 5ms for time-sharing */
         STCK(quantum); /*record current quantum*/
 		LDST(&(currProc->p_s)); /*perform context switch to load state of the new process -> effectively handing control over to new proc*/
     }

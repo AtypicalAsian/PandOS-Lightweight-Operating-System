@@ -59,7 +59,7 @@
 #include "../h/interrupts.h"
 #include "../h/initial.h"
 
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 
 /**************** METHOD DECLARATIONS***************************/ 

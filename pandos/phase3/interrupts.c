@@ -67,8 +67,6 @@ int getInterruptLine();
 void nontimerInterruptHandler(int deviceType);
 void pltInterruptHandler();
 void systemIntervalInterruptHandler();
-
-
 void interruptsHandler(state_t *exceptionState);
 
 /****************************************************************************
@@ -250,41 +248,81 @@ void systemIntervalInterruptHandler() {
 	pcb_PTR unblockedProc = NULL; /*pointer to a process being unblocked*/
 	LDIT(INITTIMER);       /* Load the Interval Timer with 100ms to maintain periodic interrupts */
 
+	/* Unblock all processes waiting on the pseudo-clock semaphore */
 	while (headBlocked(&semIntTimer) != NULL){
-		unblockedProc = removeBlocked(&semIntTimer);
-		insertProcQ(&ReadyQueue, unblockedProc);
-		softBlockCnt--;
+		unblockedProc = removeBlocked(&semIntTimer); /* Remove a blocked process */
+		insertProcQ(&ReadyQueue, unblockedProc); /* Move it to the Ready Queue */
+		softBlockCnt--; /* Decrease the count of soft-blocked processes */
 	}
-	semIntTimer = 0;
-
+	semIntTimer = 0; /* Reset the pseudo-clock semaphore to 0 */
 	state_t *savedState = (state_t *) BIOSDATAPAGE;
 
+	/* If there is a currently running process, resume execution */
 	if (currProc != NULL){
 		LDST(savedState);
 	}
-	switchProcess();
+	switchProcess(); /*If no curr process to return to -> call scheduler to run next job*/
 }
 
+
+/**************************************************************************** 
+ * interruptsHandler()
+ * 
+ * @brief 
+ * Handles all hardware interrupts by determining the interrupt source  
+ * and delegating processing to the appropriate handler.
+ * 
+ * @note  
+ * - Interrupts are triggered by hardware events, such as timers and devices.  
+ * - This function determines which interrupt occurred and calls the appropriate handler.  
+ * - The Process Local Timer (PLT) and System Interval Timer have dedicated handlers.  
+ * - All other interrupts (I/O devices, terminal, disk, etc.) are handled by nontimerInterruptHandler().
+ * 
+ * @details
+ * Interrupt Handling Flow:
+ * 1. Store the current Time-of-Day (TOD) clock value to track execution time.  
+ * 2. Retrieve the remaining process quantum (time slice) before servicing the interrupt.  
+ * 3. Check for Process Local Timer (PLT) interrupts (Line 1) → Call pltInterruptHandler().  
+ * 4. Check for System-Wide Interval Timer interrupts (Line 2) → Call systemIntervalInterruptHandler().  
+ * 5. If neither of the above, assume an I/O interrupt and call nontimerInterruptHandler().  
+ * 
+ * @return None
+ *****************************************************************************/
 void interruptsHandler(state_t *exceptionState) {
-	int pending_int = (exceptionState->s_cause & GETIP);
+	state_t *savedState = (state_t *)BIOSDATAPAGE;
+	int pending_int = (savedState->s_cause & GETIP);
 
 	pending_int &= -pending_int;
 
-	switch (pending_int) {
-	case LOCALTIMERINT:
-		pltInterruptHandler();
-		break;
-	case TIMERINTERRUPT:
-		systemIntervalInterruptHandler();
-		break;
-	case DISKINTERRUPT:
-	case FLASHINTERRUPT:
-	case NETWINTERRUPT:
-	case PRINTINTERRUPT:
-	case TERMINTERRUPT:
-		nontimerInterruptHandler(getInterruptLine(pending_int >> IPSHIFT) - DISKINT);
-		break;
-	default:
-		break;
-	}
+	/* Check if the interrupt came from the Process Local Timer (PLT) (Line 1) */
+    if (((savedState->s_cause) & LINE1MASK) != ALLOFF){
+        pltInterruptHandler();  /* Call method to handle the Process Local Timer (PLT) interrupt */
+    }
+
+    /* Check if the interrupt came from the System-Wide Interval Timer (Line 2) */
+    if (((savedState->s_cause) & LINE2MASK) != ALLOFF){
+        systemIntervalInterruptHandler(); /* Call method to the System Interval Timer interrupt */
+    }
+
+    /*Handle non-timer interrupts*/
+    nontimerInterruptHandler();  /* Call method to the handle non-timer interrupts */
+
+
+	// switch (pending_int) {
+	// case LOCALTIMERINT:
+	// 	pltInterruptHandler();
+	// 	break;
+	// case TIMERINTERRUPT:
+	// 	systemIntervalInterruptHandler();
+	// 	break;
+	// case DISKINTERRUPT:
+	// case FLASHINTERRUPT:
+	// case NETWINTERRUPT:
+	// case PRINTINTERRUPT:
+	// case TERMINTERRUPT:
+	// 	nontimerInterruptHandler(getInterruptLine(pending_int >> IPSHIFT) - DISKINT);
+	// 	break;
+	// default:
+	// 	break;
+	// }
 }

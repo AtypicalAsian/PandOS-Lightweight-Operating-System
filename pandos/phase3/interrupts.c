@@ -247,22 +247,22 @@ void pltInterruptHandler() {
  *****************************************************************************/
 
 void systemIntervalInterruptHandler() {
-	pcb_PTR unblockedProc; /*pointer to a process being unblocked*/
+	pcb_PTR unblockedProc = NULL; /*pointer to a process being unblocked*/
 	LDIT(INITTIMER);       /* Load the Interval Timer with 100ms to maintain periodic interrupts */
 
-	pcb_t *blockedProcess = NULL;
-
-	while ((blockedProcess = removeBlocked(&semIntTimer)) != NULL) {
-		insertProcQ(&ReadyQueue, blockedProcess);
+	while (headBlocked(&semIntTimer) != NULL){
+		unblockedProc = removeBlocked(&semIntTimer);
+		insertProcQ(&ReadyQueue, unblockedProc);
+		softBlockCnt--;
 	}
-
-	softBlockCnt += semIntTimer;
 	semIntTimer = 0;
 
-	if (currProc == NULL)
-		switchProcess();
-	else
-		LDST(EXCSTATE);
+	state_t *savedState = (state_t *) BIOSDATAPAGE;
+
+	if (currProc != NULL){
+		LDST(savedState);
+	}
+	switchProcess();
 }
 
 void interruptsHandler(state_t *exceptionState) {

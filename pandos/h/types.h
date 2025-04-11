@@ -39,7 +39,7 @@ typedef struct devregarea {
 	unsigned int tlb_floor_addr;
 	unsigned int inst_dev[DEVINTNUM];
 	unsigned int interrupt_dev[DEVINTNUM];
-	device_t devreg[5][8];
+	device_t devreg[40];
 } devregarea_t;
 
 /* Pass Up Vector */

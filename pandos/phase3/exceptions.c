@@ -333,9 +333,9 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
         terminateProcess();
         return;
     }
-
+	int index = semIndex * DEVPERINT + deviceNum;
     /*Perform the "passeren" (P or wait) operation on the chosen device semaphore.*/
-    passeren(&deviceSemaphores[semIndex][deviceNum]);
+    passeren(&deviceSemaphores[index]);
 }
 
 /****************************************************************************  

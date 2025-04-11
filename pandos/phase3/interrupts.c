@@ -142,9 +142,11 @@ void nontimerInterruptHandler(int deviceType){
 
 	/*Case 1: Interrupt device is not terminal devs*/
 	if (deviceType != 4){
-		statusCode = deviceRegisters->devreg[deviceType][deviceInstance].d_status; /*Save off the status code from the device’s device registers*/
-		deviceRegisters->devreg[deviceType][deviceInstance].d_command = ACK; /*Acknowledge the interrupt*/
-		pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[deviceType][deviceInstance])); /*perform v op on semaphore*/
+		int regIndex = deviceType * 8 + deviceInstance;
+		statusCode = deviceRegisters->devreg[regIndex].d_status; /*Save off the status code from the device’s device registers*/
+		deviceRegisters->devreg[regIndex].d_command = ACK; /*Acknowledge the interrupt*/
+		int semIndex = deviceType * 8 + deviceInstance;
+		pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*perform v op on semaphore*/
 		if (pcb_unblocked != NULL){
 			softBlockCnt--;
 			pcb_unblocked->p_s.s_v0 = statusCode; /*Place the stored off status code in the newly unblocked pcb’s v0 register*/
@@ -152,16 +154,18 @@ void nontimerInterruptHandler(int deviceType){
 	}
 	/*Case 2: Handle Terminal devices separately*/
 	else{
-		device_t *tStat = &(deviceRegisters->devreg[deviceType][deviceInstance]);
+		int regIndex = deviceType * 8 + deviceInstance;
+		device_t *tStat = &(deviceRegisters->devreg[regIndex]);
 		/*Terminal devices have 2 subdevices: transmission and reception*/
 		/*Case 1: If device is transmission*/
         if ((tStat->d_data0 & 0x000000FF) == 5) {
             statusCode = tStat->d_data0;  /*Retrieve the status*/
-            deviceRegisters->devreg[deviceType][deviceInstance].d_data1 = ACK; /*ACK the interrupt*/
+            deviceRegisters->devreg[regIndex].d_data1 = ACK; /*ACK the interrupt*/
             
             /*For transmit interrupts, use the next device type slot (deviceType + 1)*/
 			/*Transmission device semaphores are 8 bits behind reception for terminal devices (plus 8 to index)*/
-			pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[deviceType+1][deviceInstance])); /*do v op on device semaphore*/
+			int semIndex = (deviceType + 1) * 8 + deviceInstance;
+			pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*do v op on device semaphore*/
             if (pcb_unblocked != NULL) {
 				softBlockCnt--;
                 pcb_unblocked->p_s.s_v0 = statusCode;
@@ -170,9 +174,9 @@ void nontimerInterruptHandler(int deviceType){
 		/*Case 2: If device is reception*/
 		if ((tStat->d_status & 0x000000FF) == 5) {
             statusCode = tStat->d_status;  /*Retrieve the status*/
-            deviceRegisters->devreg[deviceType][deviceInstance].d_command = ACK; /*ACK the interrupt*/
-            
-            pcb_PTR pcb_unblocked = verhogen(&(deviceSemaphores[deviceType][deviceInstance])); /*do v op on device semaphore*/
+            deviceRegisters->devreg[regIndex].d_command = ACK; /*ACK the interrupt*/
+			int semIndex = deviceType * 8 + deviceInstance;
+            pcb_PTR pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*do v op on device semaphore*/
             if (pcb_unblocked != NULL) {
 				softBlockCnt--;
                 pcb_unblocked->p_s.s_v0 = statusCode;                   

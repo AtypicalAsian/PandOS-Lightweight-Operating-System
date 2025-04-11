@@ -59,7 +59,7 @@ int procCnt; /*integer indicating the number of started, but not yet terminated 
 int softBlockCnt; /*Integer representing the number of started, but not terminated processes that in are the “blocked” state due to an I/O or timer request.*/
 pcb_PTR ReadyQueue; /*Tail pointer to a queue of pcbs that are in the “ready” state.*/
 pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. the current executing process.*/
-int deviceSemaphores[DEVICE_TYPES][DEVICE_INSTANCES]; /* semaphore integer array that represents each external (sub) device, plus one semd for the Pseudo-clock */
+int deviceSemaphores[DEVICE_TYPES * DEVICE_INSTANCES]; /* semaphore integer array that represents each external (sub) device, plus one semd for the Pseudo-clock */
 int semIntTimer; /* semaphore used by the interval timer (pseudo-clock) for timer-related blocking operations */
 
 /***********************HELPER METHODS***************************************/

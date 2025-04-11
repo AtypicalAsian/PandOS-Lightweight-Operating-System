@@ -59,7 +59,7 @@
 #include "../h/interrupts.h"
 #include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 
 /**************** METHOD DECLARATIONS***************************/ 
@@ -67,10 +67,7 @@ void nontimerInterruptHandler(int deviceType);
 void pltInterruptHandler();
 void systemIntervalInterruptHandler();
 int getInterruptLine();
-int getDevNum();
 
-void unblockLoad(int deviceType, int deviceInstance, unsigned int status);
-void nonTimerInterrupt(int deviceType);
 void pltInterrupt();
 void intervalTimerInterrupt();
 void interruptsHandler(state_t *exceptionState);
@@ -137,7 +134,7 @@ int getInterruptLine(unsigned int interruptMap){
 void nontimerInterruptHandler(int deviceType){
 	devregarea_t *deviceRegisters = (devregarea_t *)RAMBASEADDR;  /*get pointer to devreg struct*/
 	int device_intMap = deviceRegisters->interrupt_dev[deviceType]; /*retrieve interrupt status bitmap for specific device type*/
-	unsigned int status;
+	unsigned int statusCode;
 
 	int mask = 1;  /*Start with the least significant bit*/
 	while (!(device_intMap & mask)) {
@@ -148,12 +145,12 @@ void nontimerInterruptHandler(int deviceType){
 
 	/*Case 1: Interrupt device is not terminal devs*/
 	if (deviceType != 4){
-		status = deviceRegisters->devreg[deviceType][deviceInstance].d_status; /*Save off the status code from the device’s device registers*/
+		statusCode = deviceRegisters->devreg[deviceType][deviceInstance].d_status; /*Save off the status code from the device’s device registers*/
 		deviceRegisters->devreg[deviceType][deviceInstance].d_command = ACK; /*Acknowledge the interrupt*/
 		pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[deviceType][deviceInstance])); /*perform v op on semaphore*/
 		if (pcb_unblocked != NULL){
 			softBlockCnt--;
-			pcb_unblocked->p_s.s_v0 = status; /*Place the stored off status code in the newly unblocked pcb’s v0 register*/
+			pcb_unblocked->p_s.s_v0 = statusCode; /*Place the stored off status code in the newly unblocked pcb’s v0 register*/
 		}
 	}
 	/*Case 2: Handle Terminal devices separately*/
@@ -162,7 +159,7 @@ void nontimerInterruptHandler(int deviceType){
 		/*Terminal devices have 2 subdevices: transmission and reception*/
 		/*Case 1: If device is transmission*/
         if ((tStat->d_data0 & 0x000000FF) == 5) {
-            status = tStat->d_data0;  /*Retrieve the status*/
+            statusCode = tStat->d_data0;  /*Retrieve the status*/
             deviceRegisters->devreg[deviceType][deviceInstance].d_data1 = ACK; /*ACK the interrupt*/
             
             /*For transmit interrupts, use the next device type slot (deviceType + 1)*/
@@ -170,18 +167,18 @@ void nontimerInterruptHandler(int deviceType){
 			pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[deviceType+1][deviceInstance])); /*do v op on device semaphore*/
             if (pcb_unblocked != NULL) {
 				softBlockCnt--;
-                pcb_unblocked->p_s.s_v0 = status;
+                pcb_unblocked->p_s.s_v0 = statusCode;
             }
         }
 		/*Case 2: If device is reception*/
 		if ((tStat->d_status & 0x000000FF) == 5) {
-            status = tStat->d_status;  /*Retrieve the status*/
+            statusCode = tStat->d_status;  /*Retrieve the status*/
             deviceRegisters->devreg[deviceType][deviceInstance].d_command = ACK; /*ACK the interrupt*/
             
             pcb_PTR pcb_unblocked = verhogen(&(deviceSemaphores[deviceType][deviceInstance])); /*do v op on device semaphore*/
             if (pcb_unblocked != NULL) {
 				softBlockCnt--;
-                pcb_unblocked->p_s.s_v0 = status;                   
+                pcb_unblocked->p_s.s_v0 = statusCode;                   
             }
         }
 	}
@@ -192,16 +189,63 @@ void nontimerInterruptHandler(int deviceType){
 	switchProcess();
 }
 
+/**************************************************************************** 
+ * pltInterruptHandler()
+ * 
+ * @brief 
+ * Handles a Process Local Timer (PLT) interrupt to enforce time-sharing.
+ * 
+ * @details  
+ * - The PLT is a timer used to enforce preemptive scheduling by 
+ *   periodically interrupting the running process.
+ * - When a PLT interrupt occurs, this function:  
+ *   1. Acknowledges the interrupt by resetting the timer.  
+ *   2. Saves the current process state (from the BIOS Data Page).  
+ *   3. Updates the CPU time used by the current process.  
+ *   4. Moves the current process back to the Ready Queue.  
+ *   5. Calls the scheduler to select the next process to run.  
+ * - If no process is running, this function triggers a kernel panic.
+ * 
+ * @return None
+ *****************************************************************************/
 
-void pltInterrupt() {
-	setTIMER(TIME_TO_TICKS(PLT_HIGHEST_VAL));
-	currProc->p_s = *EXCSTATE;
-	currProc->p_time += get_elapsed_time();
-	insertProcQ(&ReadyQueue, currProc);
-	currProc = NULL;
-	switchProcess();
+void pltInterruptHandler() {
+	state_t *savedState = (state_t *) BIOSDATAPAGE;
+
+	/*If there is a running process when the interrupt was generated*/
+	if (currProc != NULL){
+		setTIMER(0xFFFFFFFF); /*Reset the timer*/
+		currProc->p_s = *savedState; /*Saves the current process state (from the BIOS Data Page)*/
+		currProc->p_time = currProc->p_time + get_elapsed_time(); /*Updates the CPU time used by the current process*/
+		insertProcQ(&ReadyQueue, currProc); /* Move the current process back to the Ready Queue since it used up its time slice */
+		currProc = NULL; /* Clear the current process pointer switch to the next process */
+		switchProcess();  /* Call the scheduler to select and run the next process */
+	}
+	PANIC();
 }
 
+/**************************************************************************** 
+ * systemIntervalInterruptHandler()
+ * 
+ * @brief 
+ * Handles a System-Wide Interval Timer interrupt, which occurs every 100ms.
+ * 
+ * @details  
+ * - The System Interval Timer is used to manage pseudo-clock-based process wakeups.
+ * - When an interrupt occurs, this function:  
+ *   1. Reloads the Interval Timer with 100ms to reset the Pseudo-Clock
+ *   2. Unblocks all processes waiting on the pseudo-clock semaphore  
+ *      (these processes were waiting via SYS7 - waitForClock()).  
+ *   3. Resets the pseudo-clock semaphore to zero
+ *   4. Restores execution of the current process if one exists.  
+ *   5. Calls the scheduler if no process is available to run.  
+ * 
+ * @note The pseudo-clock semaphore is used for time-based process blocking.  
+ *       Each process that calls SYS7 (waitForClock) is blocked on this semaphore until  
+ *       the next interval timer tick, at which point it is unblocked.
+ * 
+ * @return None
+ *****************************************************************************/
 
 void intervalTimerInterrupt() {
 	LDIT(INTIMER);
@@ -227,7 +271,7 @@ void interruptsHandler(state_t *exceptionState) {
 
 	switch (pending_int) {
 	case LOCALTIMERINT:
-		pltInterrupt();
+		pltInterruptHandler();
 		break;
 	case TIMERINTERRUPT:
 		intervalTimerInterrupt();

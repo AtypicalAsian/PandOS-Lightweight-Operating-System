@@ -237,7 +237,7 @@ void interruptsHandler(state_t *exceptionState) {
 	case NETWINTERRUPT:
 	case PRINTINTERRUPT:
 	case TERMINTERRUPT:
-		nonTimerInterrupt(getInterruptLine(pending_int >> IPSHIFT) - DISKINT);
+		nontimerInterruptHandler(getInterruptLine(pending_int >> IPSHIFT) - DISKINT);
 		break;
 	default:
 		break;

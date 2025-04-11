@@ -305,24 +305,5 @@ void interruptsHandler(state_t *exceptionState) {
     }
 
     /*Handle non-timer interrupts*/
-    nontimerInterruptHandler();  /* Call method to the handle non-timer interrupts */
-
-
-	// switch (pending_int) {
-	// case LOCALTIMERINT:
-	// 	pltInterruptHandler();
-	// 	break;
-	// case TIMERINTERRUPT:
-	// 	systemIntervalInterruptHandler();
-	// 	break;
-	// case DISKINTERRUPT:
-	// case FLASHINTERRUPT:
-	// case NETWINTERRUPT:
-	// case PRINTINTERRUPT:
-	// case TERMINTERRUPT:
-	// 	nontimerInterruptHandler(getInterruptLine(pending_int >> IPSHIFT) - DISKINT);
-	// 	break;
-	// default:
-	// 	break;
-	// }
+    nontimerInterruptHandler(getInterruptLine(pending_int >> IPSHIFT) - DISKINT);  /* Call method to the handle non-timer interrupts */
 }

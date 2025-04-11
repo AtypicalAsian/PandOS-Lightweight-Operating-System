@@ -619,7 +619,7 @@ void gen_exception_handler()
 
 	if (exception_code == 0) {  
         /* Case 1: Exception Code 0 - Device Interrupt */
-        interruptsHandler(saved_state);  /* call the Nucleus' device interrupt handler function */
+        interruptsHandler();  /* call the Nucleus' device interrupt handler function */
     }  
     else if ((exception_code <= 3) && (exception_code >= 1)) {  
         /* Case 2: Exception Codes 1-3 - TLB Exceptions */

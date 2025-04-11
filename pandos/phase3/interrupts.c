@@ -67,7 +67,7 @@ int getInterruptLine();
 void nontimerInterruptHandler(int deviceType);
 void pltInterruptHandler();
 void systemIntervalInterruptHandler();
-void interruptsHandler(state_t *exceptionState);
+void interruptsHandler();
 
 /****************************************************************************
  * getInterruptLine(unsigned int interruptMap)
@@ -288,7 +288,7 @@ void systemIntervalInterruptHandler() {
  * 
  * @return None
  *****************************************************************************/
-void interruptsHandler(state_t *exceptionState) {
+void interruptsHandler() {
 	state_t *savedState = (state_t *)BIOSDATAPAGE;
 	int pending_int = (savedState->s_cause & GETIP);
 

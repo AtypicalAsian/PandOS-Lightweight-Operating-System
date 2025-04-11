@@ -304,7 +304,7 @@ void interruptsHandler() {
         systemIntervalInterruptHandler(); /* Call method to the System Interval Timer interrupt */
     }
 	
-	int nonTimerDeviceType = getInterruptLine(interrupt >> 8) - DISKINT;
+	int nonTimerDeviceType = getInterruptLine(interrupt >> 8) - OFFSET; /*subtract offset since interrupts start at 3-7*/
     /*Handle non-timer interrupts*/
     nontimerInterruptHandler(nonTimerDeviceType);  /* Call method to the handle non-timer interrupts */
 }

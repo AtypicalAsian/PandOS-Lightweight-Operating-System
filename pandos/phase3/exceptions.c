@@ -317,10 +317,9 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
     int semIndex;  /*This will hold the index into the deviceSemaphores array*/
 
     /*For device interrupts (assumed to be in the range [DISKINT, ...]),*/
-    /*compute semIndex based on lineNum. For example, if DISKINT is defined as 3,*/
-    /*lineNum values 3-6 correspond to indices 0-3*/
+    /*compute semIndex based on lineNum*/
     if (lineNum >= 3 && lineNum <= 6) {
-        semIndex = lineNum - DISKINT;  
+        semIndex = lineNum - OFFSET;  
     }
     /*If lineNum corresponds to a terminal interrupt (e.g., TERMINT == 7),*/
     /*choose the semaphore index based on the readBool flag:*/

@@ -158,7 +158,8 @@
 #define FLASHWRITE 3
 #define DEVICE_TYPES     6 
 #define DEVICE_INSTANCES 8 
-#define DEVREGSIZE	    16 
+#define DEVREGSIZE	    16
+#define OFFSET 3 
 
 /* Device Sems*/
 #define FLASHSEM 1

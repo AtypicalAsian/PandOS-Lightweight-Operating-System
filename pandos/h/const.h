@@ -24,6 +24,7 @@
 #define TODLOADDR     0x1000001C
 #define INTERVALTMR   0x10000020
 #define TIMESCALEADDR 0x10000024
+#define TIMER_RESET_CONST 0xFFFFFFFF
 
 /* device register addresses */
 #define DEVICEREGSTART  0x10000054

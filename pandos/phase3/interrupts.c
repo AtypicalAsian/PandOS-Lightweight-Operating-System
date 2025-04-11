@@ -214,7 +214,7 @@ void pltInterruptHandler() {
 
 	/*If there is a running process when the interrupt was generated*/
 	if (currProc != NULL){
-		setTIMER(0xFFFFFFFF); /*Reset the timer*/
+		setTIMER(TIMER_RESET_CONST); /*Reset the timer*/
 		currProc->p_s = *savedState; /*Saves the current process state (from the BIOS Data Page)*/
 		currProc->p_time = currProc->p_time + get_elapsed_time(); /*Updates the CPU time used by the current process*/
 		insertProcQ(&ReadyQueue, currProc); /* Move the current process back to the Ready Queue since it used up its time slice */

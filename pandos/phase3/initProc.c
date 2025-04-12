@@ -149,7 +149,35 @@ void test() {
     /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/
 
     for (process_id= 1; process_id < UPROCMAX+1; process_id++) {
-        summon_process(process_id, &base_state);
+        suppStruct = allocate(); /*allocate a support structure from the free pool*/
+        base_state->s_entryHI = (process_id << ASIDSHIFT);
+            
+        /*Create exception context per process*/
+        suppStruct->sup_asid = process_id;
+
+        /*Set Up General Exception Context*/
+        suppStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) &sysSupportGenHandler; 
+        suppStruct->sup_exceptContext[GENERALEXCEPT].c_status = IEPON | IMON | TEBITON;
+        suppStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackGen[STACKSIZE]);
+
+        /*Set Up Page Fault Exception Context*/
+        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) &pager;
+        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = IEPON | IMON | TEBITON;
+        suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackTLB[STACKSIZE]);
+            
+        /*Set Up process page table*/
+        int k;
+        for (k=0; k < 31; k++){
+            suppStruct->sup_privatePgTbl[k].entryHI = 0x80000000 + (k << VPNSHIFT) + (process_id << ASIDSHIFT);
+            suppStruct->sup_privatePgTbl[k].entryLO = DIRTYON;
+        }
+            
+        /*Entry 31 of page table = stack*/
+        suppStruct->sup_privatePgTbl[31].entryHI = 0xBFFFF000 + (process_id << ASIDSHIFT);
+        suppStruct->sup_privatePgTbl[31].entryLO = DIRTYON;
+
+        /*Call SYS1*/
+        SYSCALL(SYS1,(memaddr) &base_state,(memaddr)suppStruct,0);
     }
     
     /*Wait for all uprocs to finish*/

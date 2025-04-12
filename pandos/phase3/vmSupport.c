@@ -1,4 +1,4 @@
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 #include "../h/exceptions.h"
 #include "../h/initial.h"

@@ -6,7 +6,7 @@
 
 extern swap_t swapPool[POOLSIZE];
 
-void updateTLB(pteEntry_t *updatedEntry);
+void updateTLB(pte_entry_t *updatedEntry);
 void initSwapPool();
 void pager();
 

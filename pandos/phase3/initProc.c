@@ -25,7 +25,7 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 /* GLOBAL VARIABLES DECLARATION */
 int deviceSema4s[DEVICE_TYPES * DEVPERINT]; /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
@@ -145,7 +145,7 @@ void test() {
     for (i = 0; i < UPROCMAX; i++){
         SYSCALL(SYS3, (memaddr) &masterSema4, 0, 0);
     }
-    
+
     /* Terminate the current process */
     SYSCALL(SYS2, 0, 0, 0);
 }

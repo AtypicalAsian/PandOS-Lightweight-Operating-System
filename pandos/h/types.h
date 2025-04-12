@@ -77,14 +77,14 @@ typedef struct state_t {
 typedef struct swap_t {
     int         sw_asid;  
     int         sw_pageNo;
-    pteEntry_t *sw_pte;  
+    pte_entry_t *sw_pte;  
 } swap_t;
 
 typedef struct support_t {
     int       sup_asid;            
     state_t   sup_exceptState[2];  
     context_t sup_exceptContext[2];
-    pteEntry_t sup_privatePgTbl[32]; 
+    pte_entry_t sup_privatePgTbl[32]; 
     int sup_stackTLB[500];
     int sup_stackGen[500];
 } support_t;

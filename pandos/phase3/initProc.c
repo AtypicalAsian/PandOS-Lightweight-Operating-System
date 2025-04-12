@@ -50,21 +50,24 @@ void init_base_state(state_t *base_state){
  * TO-DO
  **************************************************************************************************/
 void deallocate(support_t *support){
-    free_support_pool[freeSupIndex] = support;
-    freeSupIndex++;
+    if (freeSupIndex < MAX_SUPPORTS){
+        free_support_pool[freeSupIndex++] = support;
+    }
 }
 
 /**************************************************************************************************
  * TO-DO
  **************************************************************************************************/
-support_t* allocate() {
-    support_t *tempSupport = NULL;
-    
+support_t* allocate() {    
     if (freeSupIndex != 0){
+        support_t *newSupStruct = NULL;
         freeSupIndex--;
-        tempSupport = free_support_pool[freeSupIndex];
+        newSupStruct = free_support_pool[freeSupIndex];
+        return newSupStruct;
     }
-    return tempSupport;
+    else{
+        return NULL;
+    }
 }
 
 /**************************************************************************************************

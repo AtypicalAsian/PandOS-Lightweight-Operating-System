@@ -187,6 +187,8 @@
 #define TEXT_START    0x800000B0
 #define SP_START      0xC0000000
 
+#define MAX_SUPPORTS 9
+
 
 #define NEVER 0xFFFFFFFF
 #define DELAYASID 0

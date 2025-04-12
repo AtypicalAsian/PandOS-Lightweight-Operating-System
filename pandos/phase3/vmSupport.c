@@ -16,16 +16,6 @@ semaphore swapSemaphore;
 
 
 void initSwapPool() {
-    int i, j, k;
-    for (i = 0; i < DEVICE_TYPES; i++) {
-        for (j = 0; j < DEVICE_INSTANCES; j++) {
-            support_device_sems[i][j] = 1;
-        }
-    }
-
-    swapSemaphore = 1;
-    masterSema4 = 0;
-
     for (k = 0; k < POOLSIZE; k++) {
         swapPool[k].sw_asid = NOPROC;
     }

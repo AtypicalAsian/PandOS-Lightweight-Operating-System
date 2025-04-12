@@ -79,6 +79,22 @@ void initSupport() {
 }
 
 /**************************************************************************************************
+ * TO-DO
+ **************************************************************************************************/
+void init_deviceSema4s(){
+    int i, j;
+    for (i = 0; i < DEVICE_TYPES; i++) {
+        for (j = 0; j < DEVICE_INSTANCES; j++) {
+            support_device_sems[i][j] = 1;
+        }
+    }
+    swapSemaphore = 1;
+}
+
+
+
+
+/**************************************************************************************************
  * TO-DO  
  * Implement test() function 
  *      1. Initialize I/O device semaphores + master semaphore (done)
@@ -98,7 +114,7 @@ void test() {
     masterSema4 = 0; /*DEFINE CONSTANT FOR 0*/
 
     /* Initalise device reg semaphores */
-    /*init_deviceSema4s();*/ /*initialize device semaphores array*/
+    init_deviceSema4s(); /*initialize device semaphores array*/
     initSwapPool(); /*Initialize swap pool & swap pool semaphore*/
     initSupport(); /*Initialize support structs*/
  

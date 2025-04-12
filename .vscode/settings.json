@@ -8,6 +8,7 @@
     "scheduler.h": "c",
     "syssupport.h": "c",
     "initial.h": "c",
-    "type_traits": "c"
+    "type_traits": "c",
+    "vmsupport.h": "c"
   }
 }

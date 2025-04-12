@@ -14,5 +14,6 @@ extern int masterSema4; /* A Support Level semaphore used to ensure that test() 
 extern void test(); 
 void deallocate(support_t* supportStruct);
 support_t* allocate();
+void summon_process(int process_id,state_t *base_state);
  
 #endif

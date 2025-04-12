@@ -10,5 +10,6 @@ void updateTLB(pte_entry_t *updatedEntry);
 void initSwapPool();
 void init_deviceSema4s();
 void pager();
+int flashOp(int flashNum, int sector, int buffer, int operation);
 
 #endif

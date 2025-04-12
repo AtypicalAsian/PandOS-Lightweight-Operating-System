@@ -1,15 +1,43 @@
-#include "/usr/include/umps3/umps/libumps.h"
-
-#include "../h/exceptions.h"
+/**************************************************************************************************  
+ * @file vmSupport.c  
+ *  
+ * 
+ * @brief  
+ * This module implements the TLB exception handler (The Pager). Additionally, the Swap Pool 
+ * table and Swap Pool semaphore are local to this module. Instead of declaring them globally 
+ * in initProc.c they are declared module-wide in vmSupport.c
+ * 
+ * @details  
+ * 
+ *  
+ * @note  
+ * 
+ *  
+ * @authors  
+ * Nicolas & Tran  
+ * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
+ * 
+ * 
+ * TO-DO
+ * This module implements the TLB exception handler (The Pager). Since reading and writing to each U-proc’s flash device is limited 
+ * to supporting paging, this module should also contain the function(s) for 
+ * reading and writing flash devices. Additionally, the Swap Pool table and Swap Pool semaphore are local to 
+ * this module. Instead of declaring them globally in initProc.c they can be 
+ * declared module-wide in vmSupport.c. The test function will now invoke a new “public” function initSwapStructs which will do the work 
+ * of initializing both the Swap Pool table and accompanying semaphore.
+ **************************************************************************************************/
+#include "../h/types.h"
+#include "../h/const.h"
+#include "../h/asl.h"
+#include "../h/pcb.h"
 #include "../h/initial.h"
-
+#include "../h/scheduler.h"
+#include "../h/exceptions.h"
+#include "../h/interrupts.h"
 #include "../h/initProc.h"
-#include "../h/sysSupport.h"
 #include "../h/vmSupport.h"
-#include "../h/deviceSupportDMA.h"  
-
-
-#define FLASHSEM 1  
+#include "../h/sysSupport.h"  
+#include "/usr/include/umps3/umps/libumps.h"  
 
 swap_t swapPool[POOLSIZE];
 semaphore swapSemaphore;
@@ -54,6 +82,35 @@ void updateTLB(pte_entry_t *pageTableEntry) {
     }
 
     setENTRYHI(prevEntry);
+}
+
+int flashOp(int flashNum, int sector, int buffer, int operation) {
+    unsigned int command;   
+    device_t *flashDevice;  
+    unsigned int maxBlock;
+
+    
+    flashDevice = (device_t *) (DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (flashNum * DEVREGSIZE));
+    maxBlock = flashDevice->d_data1; 
+    
+    if (sector >= maxBlock) {
+        terminate(NULL); 
+    }
+    
+    if (operation == FLASHREAD) {
+        command = FLASHREAD | (sector << FLASHADDRSHIFT); 
+    } else if (operation == FLASHWRITE) {
+        command = FLASHWRITE | (sector << FLASHADDRSHIFT); 
+    } else {
+        return -1; 
+    }
+   
+    flashDevice->d_data0 = buffer;
+    setSTATUS(INTSOFF);
+    flashDevice->d_command = command;  
+    unsigned int deviceStatus = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
+    setSTATUS(INTSON);
+    return deviceStatus;
 }
 
 void uTLB_RefillHandler() {
@@ -105,11 +162,11 @@ void pager() {
 
         flashNum = swapPool[frameNum].sw_asid - 1;
 
-        SYSCALL(PASSEREN, (memaddr)&support_device_sems[FLASHSEM][flashNum], 0, 0);
+        SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
 
         deviceStatus = flashOp(flashNum, blockID, frameAddress, FLASHWRITE);
 
-        SYSCALL(VERHOGEN, (memaddr)&support_device_sems[FLASHSEM][flashNum], 0, 0);
+        SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
 
         if (deviceStatus != READY) {
             trapExcHandler(supportStruct);
@@ -121,11 +178,11 @@ void pager() {
 
     flashNum = asid - 1;
 
-    SYSCALL(PASSEREN, (memaddr)&support_device_sems[FLASHSEM][flashNum], 0, 0);
+    SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
 
     deviceStatus = flashOp(flashNum, blockID, frameAddress, FLASHREAD);
 
-    SYSCALL(VERHOGEN, (memaddr)&support_device_sems[FLASHSEM][flashNum], 0, 0);
+    SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
 
     if (deviceStatus != READY) {
         trapExcHandler(supportStruct);

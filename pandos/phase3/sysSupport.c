@@ -2,7 +2,6 @@
 #include "../h/initProc.h"
 #include "../h/sysSupport.h"
 #include "../h/vmSupport.h"
-#include "../h/deviceSupportDMA.h"
 
 
 /* 2D Array of support level device semaphores */

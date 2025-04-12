@@ -13,5 +13,5 @@ void initSwapPool();
 void init_deviceSema4s();
 void pager();
 int flashOp(int flashNum, int sector, int buffer, int operation);
-extern swap_t swapPool[POOLSIZE];
+extern swap_t swap_pool[POOLSIZE];
 #endif

@@ -63,7 +63,7 @@ void init_deviceSema4s(){
 void initSwapPool() {
     int k;
     for (k = 0; k < POOLSIZE; k++) {
-        swapPool[k].sw_asid = NOPROC;
+        swap_pool[k].sw_asid = NOPROC;
     }
 }
 
@@ -217,21 +217,21 @@ void pager() {
     int asid = supportStruct->sup_asid;
     int missingPageNum = ((supportStruct->sup_exceptState[PGFAULTEXCEPT].s_entryHI) & MISSINGPAGESHIFT) >> VPNSHIFT;
 
-    frameNum = selectFrame();
+    frameNum = find_frame_swapPool();
     frameAddress = (frameNum * PAGESIZE) + FRAMEADDRSHIFT;
 
-    if (swapPool[frameNum].sw_asid != NOPROC) {
+    if (swap_pool[frameNum].sw_asid != NOPROC) {
         setSTATUS(INTSOFF);
 
-        swapPool[frameNum].sw_pte->entryLO &= VALIDOFF;
-        update_tlb_handler(swapPool[frameNum].sw_pte);
+        swap_pool[frameNum].sw_pte->entryLO &= VALIDOFF;
+        update_tlb_handler(swap_pool[frameNum].sw_pte);
 
         setSTATUS(INTSON);
 
-        blockID = swapPool[frameNum].sw_pageNo;
+        blockID = swap_pool[frameNum].sw_pageNo;
         blockID = blockID % MAXPAGES;
 
-        flashNum = swapPool[frameNum].sw_asid - 1;
+        flashNum = swap_pool[frameNum].sw_asid - 1;
 
         SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
 
@@ -260,13 +260,13 @@ void pager() {
     }
 
     pageTableEntry = &(supportStruct->sup_privatePgTbl[blockID]);
-    swapPool[frameNum].sw_asid = asid;
-    swapPool[frameNum].sw_pageNo = missingPageNum;
-    swapPool[frameNum].sw_pte = pageTableEntry;
+    swap_pool[frameNum].sw_asid = asid;
+    swap_pool[frameNum].sw_pageNo = missingPageNum;
+    swap_pool[frameNum].sw_pte = pageTableEntry;
 
     setSTATUS(INTSOFF);
 
-    swapPool[frameNum].sw_pte->entryLO = frameAddress | VALIDON | DIRTYON;
+    swap_pool[frameNum].sw_pte->entryLO = frameAddress | VALIDON | DIRTYON;
     update_tlb_handler(&(supportStruct->sup_privatePgTbl[blockID]));
 
     setSTATUS(INTSON);

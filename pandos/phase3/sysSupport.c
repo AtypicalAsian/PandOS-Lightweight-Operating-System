@@ -97,7 +97,7 @@ void terminate(support_t *support_struct)
         if(support_struct->sup_privatePgTbl[i].entryLO & VALIDON){
             setSTATUS(INTSOFF);
             support_struct->sup_privatePgTbl[i].entryLO &= ~VALIDON;
-            updateTLB(&(support_struct->sup_privatePgTbl[i]));
+            update_tlb_handler(&(support_struct->sup_privatePgTbl[i]));
             setSTATUS(INTSON);
         }
     }

@@ -85,10 +85,6 @@ void test() {
     state_t base_state;
     support_t *suppStruct;
 
-    /*Initialize master semaphore to 0*/
-    masterSema4 = 0; /*DEFINE CONSTANT FOR 0*/
-    freeSupIndex = 0;
-
     /* Initalise device reg semaphores */
     initSwapPool();
     initSupport();

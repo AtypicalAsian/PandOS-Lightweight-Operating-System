@@ -37,7 +37,7 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"  
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 /*Support Level Data Structures*/
 swap_t swap_pool[UPROCMAX * 2];    /*swap pool table*/

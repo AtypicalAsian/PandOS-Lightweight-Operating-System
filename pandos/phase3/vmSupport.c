@@ -57,8 +57,8 @@ void uTLB_RefillHandler() {
     int missingPageNum = (EXCSTATE->s_entryHI & MISSINGPAGESHIFT) >> VPNSHIFT;
     missingPageNum %= MAXPAGES;
 
-    setENTRYHI(currProc->p_supportStruct->sup_privatePgTbl[missingPageNum].pte_entryHI);
-    setENTRYLO(currProc->p_supportStruct->sup_privatePgTbl[missingPageNum].pte_entryLO);
+    setENTRYHI(currProc->p_supportStruct->sup_privatePgTbl[missingPageNum].entryHI);
+    setENTRYLO(currProc->p_supportStruct->sup_privatePgTbl[missingPageNum].entryLO);
 
     TLBWR();
     returnControl();
@@ -92,7 +92,7 @@ void pager() {
     if (swapPool[frameNum].sw_asid != NOPROC) {
         setSTATUS(INTSOFF);
 
-        swapPool[frameNum].sw_pte->pte_entryLO &= VALIDOFF;
+        swapPool[frameNum].sw_pte->entryLO &= VALIDOFF;
         updateTLB(swapPool[frameNum].sw_pte);
 
         setSTATUS(INTSON);
@@ -135,7 +135,7 @@ void pager() {
 
     setSTATUS(INTSOFF);
 
-    swapPool[frameNum].sw_pte->pte_entryLO = frameAddress | VALIDON | DIRTYON;
+    swapPool[frameNum].sw_pte->entryLO = frameAddress | VALIDON | DIRTYON;
     updateTLB(&(supportStruct->sup_privatePgTbl[blockID]));
 
     setSTATUS(INTSON);

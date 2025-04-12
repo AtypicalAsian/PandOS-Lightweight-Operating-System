@@ -95,9 +95,9 @@ void terminate(support_t *support_struct)
     }
 
     for (i = 0; i < MAXPAGES; i++) {
-        if(support_struct->sup_privatePgTbl[i].pte_entryLO & VALIDON){
+        if(support_struct->sup_privatePgTbl[i].entryLO & VALIDON){
             setSTATUS(INTSOFF);
-            support_struct->sup_privatePgTbl[i].pte_entryLO &= ~VALIDON;
+            support_struct->sup_privatePgTbl[i].entryLO &= ~VALIDON;
             updateTLB(&(support_struct->sup_privatePgTbl[i]));
             setSTATUS(INTSON);
         }

@@ -260,7 +260,7 @@ void tlb_exception_handler() {
     /*Step 3: If the exception code is a "modification" type, treat as program trap*/
     if (exception_cause == 1){
         /*Pass execution to support level program trap handler*/
-        trapExcHandler(); /*Define this method in sysSupport.c*/
+        trapExcHandler(currProc_supp_struct); /*Define this method in sysSupport.c*/
     }
     else{
         /*Step 4: First, gain mutual exclusion of swap pool via performing a SYS3 operation*/

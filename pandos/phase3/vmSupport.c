@@ -1,4 +1,4 @@
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 #include "../h/exceptions.h"
 #include "../h/initial.h"
@@ -38,15 +38,15 @@ int selectFrame() {
     return selectFrame;
 }
 
-void updateTLB(pteEntry_t *pageTableEntry) {
+void updateTLB(pte_entry_t *pageTableEntry) {
     unsigned int prevEntry = getENTRYHI();
 
-    setENTRYHI(pageTableEntry->pte_entryHI);
+    setENTRYHI(pageTableEntry->entryHI);
     TLBP();
 
     if ((getINDEX() & KUSEG) == 0) {
-        setENTRYHI(pageTableEntry->pte_entryHI);
-        setENTRYLO(pageTableEntry->pte_entryLO);
+        setENTRYHI(pageTableEntry->entryHI);
+        setENTRYLO(pageTableEntry->entryLO);
         TLBWI();
     }
 
@@ -68,7 +68,7 @@ void pager() {
     int frameNum = 0;
     int blockID;
     unsigned int frameAddress;
-    pteEntry_t *pageTableEntry;
+    pte_entry_t *pageTableEntry;
     support_t *supportStruct;
     int deviceStatus;
     int flashNum;

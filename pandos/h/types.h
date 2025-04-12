@@ -51,10 +51,10 @@ typedef struct passupvector {
 } passupvector_t;
 
 /* single page table entry */
-typedef struct pteEntry_t {
-    unsigned int pte_entryHI;
-    unsigned int pte_entryLO;
-} pteEntry_t;
+typedef struct pte_entry_t {
+    unsigned int entryHI;
+    unsigned int entryLO;
+} pte_entry_t;
 
 /* process context type */
 typedef struct context_t {

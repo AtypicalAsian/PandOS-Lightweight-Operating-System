@@ -28,6 +28,7 @@ void init_deviceSema4s(){
 }
 
 void initSwapPool() {
+    int k;
     for (k = 0; k < POOLSIZE; k++) {
         swapPool[k].sw_asid = NOPROC;
     }

@@ -9,6 +9,7 @@
     "syssupport.h": "c",
     "initial.h": "c",
     "type_traits": "c",
-    "vmsupport.h": "c"
+    "vmsupport.h": "c",
+    "interrupts.h": "c"
   }
 }

@@ -37,10 +37,11 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"  
-#include "/usr/include/umps3/umps/libumps.h"  
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
-swap_t swapPool[POOLSIZE];
-semaphore swapSemaphore;
+/*Support Level Data Structures*/
+swap_t swap_pool[UPROCMAX * 2];    /*swap pool table*/
+int semaphore_swapPool;              /*swap pool sempahore*/
 
 /**************************************************************************************************
  * TO-DO
@@ -52,9 +53,13 @@ void init_deviceSema4s(){
             support_device_sems[i][j] = 1;
         }
     }
-    swapSemaphore = 1;
+    semaphore_swapPool = 1;
 }
 
+/**************************************************************************************************
+ * DONE
+ * Initialize swap pool table
+ **************************************************************************************************/
 void initSwapPool() {
     int k;
     for (k = 0; k < POOLSIZE; k++) {
@@ -62,28 +67,65 @@ void initSwapPool() {
     }
 }
 
-
-int selectFrame() {
-    static int selectFrame = 0;
-    selectFrame = (selectFrame + 1) % POOLSIZE;
-    return selectFrame;
+/**************************************************************************************************
+ * DONE
+ * TO-DO  
+ * BIG PICTURE - Implement Page Replacement Algorithm (using Round Robin approach)
+ **************************************************************************************************/
+int find_frame_swapPool(){
+    static int frame_no = 0;    /*use static to retain frame_no value inside of the method*/
+    frame_no = (frame_no + 1) % POOLSIZE;
+    return frame_no;
 }
 
-void updateTLB(pte_entry_t *pageTableEntry) {
-    unsigned int prevEntry = getENTRYHI();
+/**************************************************************************************************
+ * DONE
+ * TO-DO  
+ * This function ensures TLB cache consistency after the page table is updated.
+ * Reference: POPS 6.4 and PandOS 4.5.2.
+ **************************************************************************************************/
+void update_tlb_handler(pte_entry_t *ptEntry) {
+    /* Save the current value of the CP0 EntryHi register (contains VPN + ASID).
+     * We will restore this later to preserve system state.
+     */
+    unsigned int entry_prev = getENTRYHI();
 
-    setENTRYHI(pageTableEntry->entryHI);
-    TLBP();
+    /* Load the new page's virtual page number (VPN) and ASID into EntryHi.
+     * This is necessary for TLB to find the matching page table entry
+     */
+    setENTRYHI(ptEntry->entryHI);
+    TLBP(); /*probe the TLB to searches for a matching entry using the current EntryHi*/
 
-    if ((getINDEX() & KUSEG) == 0) {
-        setENTRYHI(pageTableEntry->entryHI);
-        setENTRYLO(pageTableEntry->entryLO);
-        TLBWI();
+    /*Check INDEX.P bit (bit 31 of INDEX)*/
+    if ((KUSEG & getINDEX()) == 0){ /*If P bit == 0 -> found a matching entry*/
+        setENTRYLO(ptEntry->entryLO);  /* Load the updated physical frame number and permissions into EntryLo */
+        setENTRYHI(ptEntry->entryHI);  /* Re-load EntryHi just to be safe before issuing TLBWI (DO WE NEED TO DO THIS?) */
+        TLBWI(); /* Write to the TLB at the index found by TLBP. This updates the cached entry to match the page table*/
     }
 
-    setENTRYHI(prevEntry);
+    /* Restore the previously saved EntryHi in CP0 register */
+    setENTRYHI(entry_prev);
 }
 
+/**************************************************************************************************
+ * DONE
+ * TO-DO - pandOS [section 4.5.1]
+ * BIG PICTURE - To read/write to a flash device, we need to perform these 2 steps:
+ *      1. Write the flash device’s DATA0 field with the appropriate starting physical
+ *      address of the 4k block to be read (or written); the particular frame’s starting address
+ * 
+ *      2. Write the flash device’s COMMAND field with the device block number 
+ *      (high order three bytes) and the command to read (or write) in the lower order byte.
+ * 
+ * After these 2 steps, we will perform a SYS5 operation (section 3.5.5)
+ * 
+ * @note
+ * Write the COMMAND field and issue SYS5 atomically (disable interrupts before, enable after) 
+ * to ensure interrupt always happen after the SYS5
+ * 
+ * Each u-proc is associated with its own flash device, already initialized with backing store data.
+ * Flash device blocks 0 to 30 store .text and .data, block 31 stores the stack page
+ **************************************************************************************************/
 int flashOp(int flashNum, int sector, int buffer, int operation) {
     unsigned int command;   
     device_t *flashDevice;  
@@ -113,15 +155,44 @@ int flashOp(int flashNum, int sector, int buffer, int operation) {
     return deviceStatus;
 }
 
+/**************************************************************************************************
+ * DONE
+ * TO-DO  
+ * BIG PICTURE
+ *      1. Determine the page number (denoted as p) of the missing TLB entry by
+ *         inspecting EntryHi in the saved exception state located at the start of the
+ *         BIOS Data Page. [Section 3.4]
+ *      2. Get the Page Table entry for page number p for the Current Process. This
+ *         will be located in the Current Process’s Page Table, which is part of its 
+ *         Support Structure.
+ *      3. Write this Page Table entry into the TLB. This is a three-set process: setENTRYHI, setENTRYLO, TLBWR
+ *      4. Return control to current process
+ **************************************************************************************************/
 void uTLB_RefillHandler() {
-    int missingPageNum = (EXCSTATE->s_entryHI & MISSINGPAGESHIFT) >> VPNSHIFT;
-    missingPageNum %= MAXPAGES;
+    /*Step 1: Determine missing page number*/
+    /*virtual addr split into: VPN and Offset -> to isolate the virtual page number, we mask out 
+    the offset bits, then shift right by 12 bits to get the page number*/
 
-    setENTRYHI(currProc->p_supportStruct->sup_privatePgTbl[missingPageNum].entryHI);
-    setENTRYLO(currProc->p_supportStruct->sup_privatePgTbl[missingPageNum].entryLO);
+    state_PTR saved_except_state = (state_PTR) BIOSDATAPAGE; /*get the saved exception state located at start of BIOS data page*/
+    unsigned int entryHI = saved_except_state->s_entryHI;   /*get entryHI*/
+    unsigned int missing_virtual_pageNum = (entryHI & 0xFFFFF000) >> VPNSHIFT; /*mask offset bits and shift right 12 bits to get VPN*/
+    missing_virtual_pageNum %= 32;
 
+    /*WHAT IF VPN exceed size of 32 we defined in types.h? Mod 32?*/
+
+    /*Step 2: Get matching page table entry for missing page number of current process*/
+    pte_entry_t page_entry = currProc->p_supportStruct->sup_privatePgTbl[missing_virtual_pageNum];
+    /*Technically, uTLB_RefillHandler method is part of phase 2 so we can access currProc global var?*/
+    /*Otherwise, we can use sys8 to access the support structure of the current process*/
+
+
+    /*Step 3: Write page table entry into TLB -> 3-step process: setENTRYHI, setENTRYLO, TLBWR*/
+    setENTRYHI(page_entry.entryHI);
+    setENTRYLO(page_entry.entryLO);
     TLBWR();
-    returnControl();
+
+    /*Step 4: Return control to current process (context switch)*/
+    LDST(saved_except_state);
 }
 
 void pager() {
@@ -141,7 +212,7 @@ void pager() {
         trapExcHandler(supportStruct);
     }
 
-    SYSCALL(PASSEREN, (int)&swapSemaphore, 0, 0);
+    SYSCALL(PASSEREN, (int)&semaphore_swapPool, 0, 0);
 
     int asid = supportStruct->sup_asid;
     int missingPageNum = ((supportStruct->sup_exceptState[PGFAULTEXCEPT].s_entryHI) & MISSINGPAGESHIFT) >> VPNSHIFT;
@@ -153,7 +224,7 @@ void pager() {
         setSTATUS(INTSOFF);
 
         swapPool[frameNum].sw_pte->entryLO &= VALIDOFF;
-        updateTLB(swapPool[frameNum].sw_pte);
+        update_tlb_handler(swapPool[frameNum].sw_pte);
 
         setSTATUS(INTSON);
 
@@ -196,11 +267,11 @@ void pager() {
     setSTATUS(INTSOFF);
 
     swapPool[frameNum].sw_pte->entryLO = frameAddress | VALIDON | DIRTYON;
-    updateTLB(&(supportStruct->sup_privatePgTbl[blockID]));
+    update_tlb_handler(&(supportStruct->sup_privatePgTbl[blockID]));
 
     setSTATUS(INTSON);
 
-    SYSCALL(VERHOGEN, (int)&swapSemaphore, 0, 0);
+    SYSCALL(VERHOGEN, (int)&semaphore_swapPool, 0, 0);
 
     returnControlSup(supportStruct, PGFAULTEXCEPT);
 }

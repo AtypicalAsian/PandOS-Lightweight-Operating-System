@@ -184,6 +184,9 @@
 #define TERMTRANSHIFT 8
 #define EXCODE_NUM 20
 
+#define TEXT_START    0x800000B0
+#define SP_START      0xC0000000
+
 
 #define NEVER 0xFFFFFFFF
 #define DELAYASID 0

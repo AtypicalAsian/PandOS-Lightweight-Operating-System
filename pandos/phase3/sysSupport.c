@@ -102,8 +102,8 @@ void terminate(support_t *support_struct)
             setSTATUS(INTSON);
         }
     }
-    SYSCALL(VERHOGEN, (memaddr) &testSem, 0, 0);
-    dealocate_sup(support_struct);
+    SYSCALL(VERHOGEN, (memaddr) &masterSema4, 0, 0);
+    deallocate(support_struct);
     SYSCALL(TERMINATEPROCESS, 0, 0, 0);
 }
 

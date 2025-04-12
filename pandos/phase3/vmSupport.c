@@ -24,7 +24,7 @@ void initSwapPool() {
     }
 
     swapSemaphore = 1;
-    testSem = 0;
+    masterSema4 = 0;
 
     for (k = 0; k < POOLSIZE; k++) {
         swapPool[k].sw_asid = NOPROC;

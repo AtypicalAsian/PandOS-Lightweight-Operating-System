@@ -90,10 +90,9 @@ void summon_process(int process_id, state_t *base_state){
     if (suppStruct == NULL){
         PANIC();
     }
-    state_t base_state_copy = *base_state;
+    state_t base_state_copy = *base_state; /*make a copy of base state to avoid modifying the same struct for multiple processes*/
     base_state_copy.s_entryHI = (process_id << ASIDSHIFT);
         
-    /*Create exception context per process*/
     suppStruct->sup_asid = process_id;
 
     /*Set Up General Exception Context*/
@@ -152,7 +151,7 @@ void test() {
     /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/
 
     for (process_id= 1; process_id < UPROCMAX+1; process_id++) {
-        summon_process(process_id,&base_state);
+        summon_process(process_id,&base_state); /*Helper method to set up asid, exception contexts and page tables for each process*/
     }
     
     /*Wait for all uprocs to finish*/

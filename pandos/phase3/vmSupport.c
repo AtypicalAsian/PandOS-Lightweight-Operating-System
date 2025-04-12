@@ -14,6 +14,18 @@
 swap_t swapPool[POOLSIZE];
 semaphore swapSemaphore;
 
+/**************************************************************************************************
+ * TO-DO
+ **************************************************************************************************/
+void init_deviceSema4s(){
+    int i, j;
+    for (i = 0; i < DEVICE_TYPES; i++) {
+        for (j = 0; j < DEVICE_INSTANCES; j++) {
+            support_device_sems[i][j] = 1;
+        }
+    }
+    swapSemaphore = 1;
+}
 
 void initSwapPool() {
     for (k = 0; k < POOLSIZE; k++) {

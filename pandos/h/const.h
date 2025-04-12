@@ -188,6 +188,11 @@
 #define SP_START      0xC0000000
 
 #define MAX_SUPPORTS 9
+#define POOLBASEADDR 0x20020000
+
+#define VALIDBITOFF     0xFFFFFDFF
+#define V_BIT_SET       0x00000200      /*Bit 9*/
+#define D_BIT_SET       0x00000400      /*Bit 10*/
 
 
 #define NEVER 0xFFFFFFFF

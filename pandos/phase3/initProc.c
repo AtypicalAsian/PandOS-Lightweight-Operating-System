@@ -101,7 +101,7 @@ void summon_process(int process_id, state_t *base_state){
     suppStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackGen[STACKSIZE]);
 
     /*Set Up Page Fault Exception Context*/
-    suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) &pager;
+    suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) &tlb_exception_handler;
     suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = IEPON | IMON | TEBITON;
     suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackTLB[STACKSIZE]);
         

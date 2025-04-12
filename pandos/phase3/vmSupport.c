@@ -37,7 +37,7 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"  
-#include "/usr/include/umps3/umps/libumps.h"
+/*#include "/usr/include/umps3/umps/libumps.h"*/
 
 /*Support Level Data Structures*/
 swap_t swap_pool[UPROCMAX * 2];    /*swap pool table*/
@@ -195,83 +195,161 @@ void uTLB_RefillHandler() {
     LDST(saved_except_state);
 }
 
-void pager() {
-    int frameNum = 0;
-    int blockID;
-    unsigned int frameAddress;
-    pte_entry_t *pageTableEntry;
-    support_t *supportStruct;
+/**************************************************************************************************
+ * ALMOST DONE
+ * BIG PICTURE
+ * TLB refills managed by refill handler
+ * Pager manages other page faults (page fault on load, page fault on store op, attemp write
+ *          to read only page?should not occur in Pandos so treat as program trap)
+ * 
+ * @details
+ * STEPS (Section 4.4 - pandOS)
+ *       1.Obtain Current Process’s Support Structure (SYS8)
+ *       2.Identify the cause of the TLB exception from `sup_exceptState[0].Cause`
+ *       3.If the cause is a "Modification" exception, treat it as a program trap
+ * 
+ *       Otherwise:
+ *       4.Gain mutual exclusion over the Swap Pool Table (SYS3 - P operation)
+ *       5.Determine the missing page number (EntryHi in the exception state).
+ *       6.Pick a frame from the Swap Pool (determined by the page replacement algorithm).
+ *       7.Check if the frame is occupied by another process’s page
+ *       8.If occupied, perform the following steps:
+ *           - Mark the old page as invalid in the previous process’s Page Table.
+ *           - Update the TLB, ensuring it reflects the invalidated page.
+ *           - Write the old page back to its backing store (flash device).
+ *       9.Load the missing page from the backing store into the selected frame.
+ *       10.Update the Swap Pool Table to reflect the new contents.
+ *       11.Update the Page Table for the new process, marking the page as valid (V bit)
+ *       12.Update the TLB to include the new page.
+ *       13.Release mutual exclusion over the Swap Pool Table (SYS4 - V operation).
+ *       14.Retry the instruction that caused the page fault using LDST.
+ * 
+ * @note
+ * To update tlb there are 2 approaches
+ *      1. Probe the TLB (TLBP) to see if the newly updated TLB entry is indeed cached in the TLB. 
+ *         If so (Index.P is 0), rewrite (update) that entry (TLBWI) to match the entry in the Page Table.
+ *      2. Erase ALL the entries in the TLB (TLBCLR) - implement this before implementing the first approach
+ * 
+ * @todo
+ *      - implement occupied_frame_handler helper method
+ *      - implement program_trap_handler helper method
+ *      - implement flash_read_write helper method
+ *      - check step 9 for correctness (refer to Pandos docs)
+ *      - optimize step 12 (after testing)
+ **************************************************************************************************/
+void tlb_exception_handler() {
+    /*If we're here, page fault has occured*/
+
+    /*--------------Declare local variables---------------------*/
+    support_t* currProc_supp_struct;
+    int free_frame_num = 0;
+    int flash_no;
+    unsigned int frame_addr;
+    unsigned int exception_cause;
+    int asid;
     int deviceStatus;
-    int flashNum;
+    unsigned int missing_page_no;
+    /*----------------------------------------------------------*/
 
-    supportStruct = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
+    /*Step 1: Obtain current process support structure via syscall number 8*/
+    currProc_supp_struct = (support_t*) SYSCALL(SYS8,0,0,0);
 
-    int cause = (supportStruct->sup_exceptState[PGFAULTEXCEPT].s_cause & GETEXECCODE) >> CAUSESHIFT;
+    /*Step 2: Identify Cause of the TLB Exception from sup_exceptState field of support structure*/
+    exception_cause = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_cause & GETEXCPCODE) >> CAUSESHIFT;
 
-    if (cause == 1) {
-        trapExcHandler(supportStruct);
+    /*Step 3: If the exception code is a "modification" type, treat as program trap*/
+    if (exception_cause == 1){
+        /*Pass execution to support level program trap handler*/
+        program_trap_handler(); /*Define this method in sysSupport.c*/
     }
+    else{
+        /*Step 4: First, gain mutual exclusion of swap pool via performing a SYS3 operation*/
+        SYSCALL(SYS3,(int)&semaphore_swapPool,0,0);
 
-    SYSCALL(PASSEREN, (int)&semaphore_swapPool, 0, 0);
+        /*Step 5: Compute missing page number*/
+        missing_page_no = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & 0xFFFFF000) >> VPNSHIFT;
 
-    int asid = supportStruct->sup_asid;
-    int missingPageNum = ((supportStruct->sup_exceptState[PGFAULTEXCEPT].s_entryHI) & MISSINGPAGESHIFT) >> VPNSHIFT;
+        /*Step 6: Pick a frame from the swap pool (Page Replacement Algorithm)*/
+        free_frame_num = find_frame_swapPool();
+        frame_addr = (free_frame_num * PAGESIZE) + POOLBASEADDR; /*Calculate the starting address of the frame (4KB block)*/
+        /*We get frame address by multiplying the page size with the frame number then adding the offset which is the starting address of the swap pool*/
 
-    frameNum = find_frame_swapPool();
-    frameAddress = (frameNum * PAGESIZE) + FRAMEADDRSHIFT;
+        /*Step 7 + 8: If the frame is occupied -> need to evict it (invalidate the page occupying this frame)*/
+        if (swap_pool[free_frame_num].sw_asid != -1){
+            /*Updating TLB and Swap Pool must be atomic -> DISABLE INTERRUPTS - pandOS [section 4.5.3]*/
+            setSTATUS(INTSOFF);
 
-    if (swap_pool[frameNum].sw_asid != NOPROC) {
-        setSTATUS(INTSOFF);
+            /*Step 1: Mark old page currently occupying the frame number as invalid*/
+            swap_pool[free_frame_num].sw_pte->entryLO &= VALIDBITOFF; /*go to page table entry of owner process and set valid bit to off*/
 
-        swap_pool[frameNum].sw_pte->entryLO &= VALIDOFF;
-        update_tlb_handler(swap_pool[frameNum].sw_pte);
+            /*Step 2: Update the TLB*/
+            update_tlb_handler(swap_pool[free_frame_num].sw_pte);
 
-        setSTATUS(INTSON);
+            /*ENABLE INTERRUPTS*/
+            setSTATUS(INTSON);
 
-        blockID = swap_pool[frameNum].sw_pageNo;
-        blockID = blockID % MAXPAGES;
+            unsigned int occp_pageNum = swap_pool[free_frame_num].sw_pageNo; /*get the page number of the page occupying the frame at swap_pool[frame_number]*/
+            occp_pageNum = occp_pageNum % 32; /*mod to map page to range 0-31*/    
+            unsigned int occp_asid = swap_pool[free_frame_num].sw_asid; /*get ASID of process whose page owns the frame at swap_pool[frame_number]*/
+            flash_no = occp_asid - 1;
 
-        flashNum = swap_pool[frameNum].sw_asid - 1;
+            /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device) - pandOS [section 4.5.1]*/
+            /*need to input: flash device no, block num, op_type, frame_num (or frame_address)*/
+            SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flash_no], 0, 0);
+            deviceStatus = flashOp(flash_no, occp_pageNum, frame_addr, FLASHWRITE);
+            SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flash_no], 0, 0);
+            if (deviceStatus != READY) {
+                trapExcHandler(currProc_supp_struct);
+            }
+        }
+        /*If frame is not occupied*/
+        
+        /*section 4.4.1 - [pandOS]*/
 
-        SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
+        /*Step 9:Load missing page from backing store into the selected frame (at address free_fram_address)*/
+        /*For this step, we essentially must do a flash device read operation to load the page into the frame*/
+        asid = currProc_supp_struct->sup_asid; /*Get process asid to map to flash device number*/
+        flash_no = asid - 1; /*Get flash device number associated with the process asid*/
+        missing_page_no = missing_page_no % 32; /*mod to map page to range 0-31*/
 
-        deviceStatus = flashOp(flashNum, blockID, frameAddress, FLASHWRITE);
+        /*First, get flash device number that is associated with the current u-proc*/
 
-        SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
+        /*Perform flash read operation*/
+        SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flash_no], 0, 0);
+        deviceStatus = flashOp(flash_no, missing_page_no, frame_addr, FLASHREAD);
+        SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flash_no], 0, 0);
 
         if (deviceStatus != READY) {
-            trapExcHandler(supportStruct);
+            trapExcHandler(currProc_supp_struct);
         }
+
+        /*Step 10: Update the Swap Pool Table to reflect the new contents (atomic operations)*/
+        /*First, we disable Interrupts by getting current status and clearing the IEc (global interrupt) bit*/
+        setSTATUS(INTSOFF); /*section 7.1 - [pops]*/
+        
+
+        /*Update swap pool table with new entry*/
+        swap_pool[free_frame_num].sw_asid = asid; /*set asid of the u-proc that now owns this frame*/
+        swap_pool[free_frame_num].sw_pageNo = missing_page_no; /*record virtual page number that is now occupying this frame*/
+        swap_pool[free_frame_num].sw_pte = &(currProc_supp_struct->sup_privatePgTbl[missing_page_no]); /*store pointer to page table entry for this page*/
+
+
+        /*Step 11: Update the Page Table for the new process, marking the page as valid (V bit)*/
+        currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO = frame_addr | V_BIT_SET | D_BIT_SET; /*set the valid bit and dirty bit in entryLO*/
+
+        /*Step 12: Update the TLB to include the new page (optimization)*/
+        /*update_tlb_handler();*/
+
+        TLBCLR(); /*For now, we will do approach 2 - erase ALL the entries in the TLB (OPTIMIZE LATER)*/
+
+        /*Re-enable interrupts*/
+        setSTATUS(INTSON); /*section 7.1 - [pops]*/
+
+        /*Step 13: Perform SYS4 to release mutex on swap pool table*/
+        SYSCALL(SYS4,(int)&semaphore_swapPool,0,0);
+
+        /*Step 14: Return control (context switch) to the instruction that caused the page fault*/
+        return_control(PGFAULTEXCEPT,currProc_supp_struct);
+        /*LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));*/
     }
-
-    blockID = missingPageNum;
-    blockID = blockID % MAXPAGES;
-
-    flashNum = asid - 1;
-
-    SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
-
-    deviceStatus = flashOp(flashNum, blockID, frameAddress, FLASHREAD);
-
-    SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flashNum], 0, 0);
-
-    if (deviceStatus != READY) {
-        trapExcHandler(supportStruct);
-    }
-
-    pageTableEntry = &(supportStruct->sup_privatePgTbl[blockID]);
-    swap_pool[frameNum].sw_asid = asid;
-    swap_pool[frameNum].sw_pageNo = missingPageNum;
-    swap_pool[frameNum].sw_pte = pageTableEntry;
-
-    setSTATUS(INTSOFF);
-
-    swap_pool[frameNum].sw_pte->entryLO = frameAddress | VALIDON | DIRTYON;
-    update_tlb_handler(&(supportStruct->sup_privatePgTbl[blockID]));
-
-    setSTATUS(INTSON);
-
-    SYSCALL(VERHOGEN, (int)&semaphore_swapPool, 0, 0);
-
-    returnControlSup(supportStruct, PGFAULTEXCEPT);
 }

@@ -150,7 +150,7 @@ void test() {
 
     for (process_id= 1; process_id < UPROCMAX+1; process_id++) {
         suppStruct = allocate(); /*allocate a support structure from the free pool*/
-        base_state->s_entryHI = (process_id << ASIDSHIFT);
+        base_state.s_entryHI = (process_id << ASIDSHIFT);
             
         /*Create exception context per process*/
         suppStruct->sup_asid = process_id;

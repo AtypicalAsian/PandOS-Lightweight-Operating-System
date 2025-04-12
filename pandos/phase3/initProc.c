@@ -83,12 +83,12 @@ void initSupport() {
 /**************************************************************************************************
  * TO-DO  
  * Implement test() function 
- *      1. Initialize I/O device semaphores + master semaphore (done)
- *      2. Initialize Virtual Memory (swap pool table) (working on it!!!)
- *      3. Initialize base processor state for all user processes (working on it!!!)
- *      4. Create and launch max number of processes (working on it!!!)
- *      5. Optimization (perform P op on master sema4 MAXUPROCESS times) (working on it!!!)
- *      6. Terminate test() (working on it!!!)
+ *      1. Initialize I/O device semaphores + master semaphore 
+ *      2. Initialize Virtual Memory (swap pool table) 
+ *      3. Initialize base processor state for all user processes 
+ *      4. Create and launch max number of processes 
+ *      5. Optimization (perform P op on master sema4 MAXUPROCESS times) 
+ *      6. Terminate test() 
  **************************************************************************************************/
 void test() {
     /*Declare local variables*/

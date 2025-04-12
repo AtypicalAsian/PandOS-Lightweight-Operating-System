@@ -88,7 +88,12 @@ void test() {
     /* Initalise device reg semaphores */
     initSwapPool();
     initSupport();
-    init_base_state(base_state); /* Set up initial processor state */
+
+    /*Set up initial proccessor state*/
+    base_state.s_status = USERPON | IEPON | TEBITON | IMON;
+    base_state.s_pc = TEXT_START; /*initialize PC*/
+    base_state.s_t9 = TEXT_START; /*have to set t9 register after setting s_pc*/
+    base_state.s_sp = SP_START; /*stack pointer*/
 
     support_t *supportStruct;
     int proc;

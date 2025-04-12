@@ -46,12 +46,6 @@ void init_base_state(state_t base_state){
     base_state.s_sp = SP_START; /*stack pointer*/
 }
 
-
-// int testSem;
-// support_t support_structs[UPROCMAX];
-// support_t *freeSupports[UPROCMAX+1];
-// int stackSupport;
-
 /**************************************************************************************************
  * TO-DO
  **************************************************************************************************/

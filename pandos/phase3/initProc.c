@@ -137,7 +137,7 @@ void test() {
         suppStruct->sup_privatePgTbl[31].entryLO = DIRTYON;
 
         /*Call SYS1*/
-        SYSCALL(SYS1,(memaddr) (memaddr) &base_state,(memaddr)suppStruct,0);
+        SYSCALL(SYS1,(memaddr) &base_state,(memaddr)suppStruct,0);
     }
     
     /*Wait for all uprocs to finish*/

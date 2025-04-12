@@ -50,8 +50,8 @@ void init_base_state(state_t *base_state){
  * TO-DO
  **************************************************************************************************/
 void deallocate(support_t *support){
-    if (freeSupIndex < MAX_SUPPORTS){
-        free_support_pool[freeSupIndex++] = support;
+    if (freeSupIndex < MAX_SUPPORTS){ /*Verify that we're not overflowing the pool*/
+        free_support_pool[freeSupIndex++] = support; /*Return the support struct to the free pool*/
     }
 }
 
@@ -59,7 +59,7 @@ void deallocate(support_t *support){
  * TO-DO
  **************************************************************************************************/
 support_t* allocate() {    
-    if (freeSupIndex != 0){
+    if (freeSupIndex != 0){ /*If we still have available support structs from the free pool*/
         support_t *newSupStruct = NULL;
         freeSupIndex--;
         newSupStruct = free_support_pool[freeSupIndex];
@@ -137,7 +137,7 @@ void test() {
             suppStruct->sup_privatePgTbl[k].entryLO = DIRTYON;
         }
         
-         /*Entry 31 of page table = stack*/
+        /*Entry 31 of page table = stack*/
         suppStruct->sup_privatePgTbl[31].entryHI = 0xBFFFF000 + (process_id << ASIDSHIFT);
         suppStruct->sup_privatePgTbl[31].entryLO = DIRTYON;
 

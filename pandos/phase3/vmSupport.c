@@ -338,7 +338,7 @@ void tlb_exception_handler() {
         currProc_supp_struct->sup_privatePgTbl[missing_page_no].entryLO = frame_addr | V_BIT_SET | D_BIT_SET; /*set the valid bit and dirty bit in entryLO*/
 
         /*Step 12: Update the TLB to include the new page (optimization)*/
-        update_tlb_handler(&(supportStruct->sup_privatePgTbl[missing_page_no]));
+        update_tlb_handler(&(currProc_supp_struct->sup_privatePgTbl[missing_page_no]));
 
         /*TLBCLR();*/ /*For now, we will do approach 2 - erase ALL the entries in the TLB (OPTIMIZE LATER)*/
 

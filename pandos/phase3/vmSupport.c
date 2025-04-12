@@ -37,7 +37,7 @@
 #include "../h/initProc.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"  
-/*#include "/usr/include/umps3/umps/libumps.h"*/
+#include "/usr/include/umps3/umps/libumps.h"
 
 /*Support Level Data Structures*/
 swap_t swap_pool[UPROCMAX * 2];    /*swap pool table*/
@@ -260,7 +260,7 @@ void tlb_exception_handler() {
     /*Step 3: If the exception code is a "modification" type, treat as program trap*/
     if (exception_cause == 1){
         /*Pass execution to support level program trap handler*/
-        program_trap_handler(); /*Define this method in sysSupport.c*/
+        trapExcHandler(); /*Define this method in sysSupport.c*/
     }
     else{
         /*Step 4: First, gain mutual exclusion of swap pool via performing a SYS3 operation*/
@@ -349,7 +349,7 @@ void tlb_exception_handler() {
         SYSCALL(SYS4,(int)&semaphore_swapPool,0,0);
 
         /*Step 14: Return control (context switch) to the instruction that caused the page fault*/
-        return_control(PGFAULTEXCEPT,currProc_supp_struct);
+        LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));
         /*LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));*/
     }
 }

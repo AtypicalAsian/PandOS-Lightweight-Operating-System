@@ -126,33 +126,55 @@ void update_tlb_handler(pte_entry_t *ptEntry) {
  * Each u-proc is associated with its own flash device, already initialized with backing store data.
  * Flash device blocks 0 to 30 store .text and .data, block 31 stores the stack page
  **************************************************************************************************/
-int flashOp(int flashNum, int sector, int buffer, int operation) {
-    unsigned int command;   
-    device_t *flashDevice;  
-    unsigned int maxBlock;
+int flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest) {
+    /*Local variables to thid method*/
+    unsigned int device_status; /*status of the device (success or no)*/
+    unsigned int max_block;     /*max number of blocks the flash device supports*/
+    unsigned int command;       /*command to write to COMMAND field of flash device*/
+    device_t* f_device;      /*pointer to the flash device we want to work with*/
+
+    /*Method 1: Array indexing (Calculate address of specific flash device register block)*/
+    int devIdx = (FLASHINT-DISKINT) * DEVPERINT + deviceNum;
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    f_device = &busRegArea->devreg[devIdx];
+
+    /*Compute pointer to correct device_t struct representing the selected flash device - method 2*/
+    /*f_device = (device_t *) ((DEV_STARTING_REG + ((FLASHINT - DISKINT) * (DEVPERINT * DEVREGSIZE)) + (deviceNum * DEVREGSIZE)));*/
+
+    /*Perform SYS3 to lock flash device semaphore*/
+    SYSCALL(SYS3, (memaddr)&support_device_sems[1][deviceNum], 0, 0);
+
+    /*Read DATA1 field to get max number of blocks the flash device supports*/
+    max_block = f_device->d_data1; /*pops - [section 5.4]*/
+
+    /*Check whether the requested block number is out of bounds*/
+    if (block_num >= max_block){
+        terminate();
+    }
+
+    /*Build command code*/
+    if (op_type == 3){ /*If it's a write operation*/
+        command = 3 | (block_num << 8);
+    }
+    else { /*If it's a read operation*/
+        command = 2 | (block_num << 8);
+    }
+
+    /*Write the flash device’s DATA0 field with the starting physical address of the 4kb block to be read (or written)*/
+    f_device->d_data0 = frame_dest;
 
     
-    flashDevice = (device_t *) (DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (flashNum * DEVREGSIZE));
-    maxBlock = flashDevice->d_data1; 
+    setSTATUS(INTSOFF); /*Disable interrupts*/
+    f_device->d_command = command;  /*write the flash device's COMMAND field*/
+    device_status = SYSCALL(SYS5,FLASHINT,deviceNum,0); /*immediately issue SYS5 (wait for IO) to block the current process*/
+    setSTATUS(INTSON); /*enable interrupts*/
     
-    if (sector >= maxBlock) {
-        terminate(NULL); 
+    /*Perform SYS4 to unlock flash device semaphore*/
+    SYSCALL(SYS4, (memaddr)&support_device_sems[1][deviceNum], 0, 0);
+    /*If operation failed (check device status) -> program trap handler*/
+    if (device_status != READY){
+        trapExcHandler();
     }
-    
-    if (operation == FLASHREAD) {
-        command = FLASHREAD | (sector << FLASHADDRSHIFT); 
-    } else if (operation == FLASHWRITE) {
-        command = FLASHWRITE | (sector << FLASHADDRSHIFT); 
-    } else {
-        return -1; 
-    }
-   
-    flashDevice->d_data0 = buffer;
-    setSTATUS(INTSOFF);
-    flashDevice->d_command = command;  
-    unsigned int deviceStatus = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
-    setSTATUS(INTSON);
-    return deviceStatus;
 }
 
 /**************************************************************************************************
@@ -295,12 +317,9 @@ void tlb_exception_handler() {
 
             /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device) - pandOS [section 4.5.1]*/
             /*need to input: flash device no, block num, op_type, frame_num (or frame_address)*/
-            SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flash_no], 0, 0);
-            deviceStatus = flashOp(flash_no, occp_pageNum, frame_addr, FLASHWRITE);
-            SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flash_no], 0, 0);
-            if (deviceStatus != READY) {
-                trapExcHandler(currProc_supp_struct);
-            }
+            /*SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flash_no], 0, 0);*/
+            flash_read_write(flash_no, occp_pageNum,FLASHWRITE, frame_addr);
+            /*SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flash_no], 0, 0);*/
         }
         /*If frame is not occupied*/
         
@@ -315,13 +334,9 @@ void tlb_exception_handler() {
         /*First, get flash device number that is associated with the current u-proc*/
 
         /*Perform flash read operation*/
-        SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flash_no], 0, 0);
-        deviceStatus = flashOp(flash_no, missing_page_no, frame_addr, FLASHREAD);
-        SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flash_no], 0, 0);
-
-        if (deviceStatus != READY) {
-            trapExcHandler(currProc_supp_struct);
-        }
+        /*SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flash_no], 0, 0);*/
+        flash_read_write(flash_no, missing_page_no, FLASHREAD,frame_addr);
+        /*SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flash_no], 0, 0);*/
 
         /*Step 10: Update the Swap Pool Table to reflect the new contents (atomic operations)*/
         /*First, we disable Interrupts by getting current status and clearing the IEc (global interrupt) bit*/

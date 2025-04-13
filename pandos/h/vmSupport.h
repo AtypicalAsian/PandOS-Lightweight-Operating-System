@@ -12,6 +12,6 @@ void update_tlb_handler(pte_entry_t *ptEntry);
 void initSwapPool();
 void init_deviceSema4s();
 void tlb_exception_handler();
-int flashOp(int flashNum, int sector, int buffer, int operation);
+int flash_read_write(int flashNum, int sector, int buffer, int operation);
 extern swap_t swap_pool[POOLSIZE];
 #endif

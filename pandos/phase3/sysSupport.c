@@ -358,43 +358,46 @@ void trapExcHandler(support_t *support_struct)
  *      4. Execute appropriate syscall handler
  *      5. LDST to return to process that requested SYSCALL
  **************************************************************************************************/
-void syscall_excp_handler(support_t *support_struct, int exceptionCode){
-    if (exceptionCode < 9 || exceptionCode > 13) { /*Have to change for later phases right now we're just looking at syscall 9-13*/
-        trapExcHandler(support_struct);
+void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
+    /*--------------Declare local variables---------------------*/
+    char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
+    int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
+    /*int param3;*/     /*value stored in a3*/
+    /*----------------------------------------------------------*/
+
+    /*Step 1: Check syscall number (must fall within syscall 9 to 13)*/
+    if (syscall_num_requested > SYS13 || syscall_num_requested < SYS9){ /*Have to change this for future phases*/
+        trapExcHandler(currProc_support_struct);
         return;
     }
 
-    int arg1 = support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
-    int arg2 = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+    /*Step 2: Read values in registers a1-a3*/
+    virtualAddr = (char *) currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+    /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3*/  
 
-    switch(exceptionCode) {
+    /*Step 3: Increment PC+4 to execute next instruction on return*/
+    currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
+
+    /*Step 4: Execute appropriate syscall helper method based on requested syscall number*/
+    switch(syscall_num_requested){
         case SYS9:
-            terminate(support_struct);
-            break;
-
+            terminate();
         case SYS10:
-            getTOD(&support_struct->sup_exceptState[GENERALEXCEPT]);
-            break;
-
+            get_TOD(&currProc_support_struct->sup_exceptState[GENERALEXCEPT]);
         case SYS11:
-            writeToPrinter((char *) arg1, arg2, support_struct);
-            break;
-
+            /*virtual address of first char in a1, length of string in a2*/
+            write_to_printer(virtualAddr, length, currProc_support_struct);
         case SYS12:
-            writeToTerminal((char *) arg1, arg2, support_struct);  
-            break;
-
+            /*virtual address of first char in a1, length of string in a2*/
+            write_to_terminal(virtualAddr, length, currProc_support_struct);
         case SYS13:
-            readTerminal((char *) arg1, support_struct);
-            break;
+            read_from_terminal(virtualAddr,currProc_support_struct);
         default:
-            trapExcHandler(support_struct);
+            trapExcHandler(currProc_support_struct);
             break;
     }
-
-    support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
-    returnControlSup(support_struct, GENERALEXCEPT);
-
+    return_control(GENERALEXCEPT,currProc_support_struct); /*Context switch*/
 }
 
 /**************************************************************************************************

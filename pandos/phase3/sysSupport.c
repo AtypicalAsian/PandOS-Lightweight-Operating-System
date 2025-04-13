@@ -108,37 +108,89 @@ void getTOD(state_PTR excState)
  * TO-DO 
  **************************************************************************************************/
 void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
-    int device_instance = support_struct->sup_asid - 1;
-    int charCount = 0;
+    /* 
+    Ref: pandos section 4.7.3
+    STEPS:
+    1. Check if address we're writing from is outside of the uproc logical address space
+    2. Check if length of string is within bounds (0-128)
+    3. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
+    4. Perform SYS3 to gain mutex over printer device
+    5. Use For Loop to iterating through each character and write one by one to printer: start at virtAddr, end at virtAddr + len
+    (cond: printer device is not busy (ready))
+       5.1. Retrieve current processor status before disabling all external interrupts
+       5.2. Reset the status to 0x0 and disable all interrupts
+       5.3. Pass character to printer device with d_data0 & d_command
+       5.4. Request I/O to print the passed character
+       5.5. Enable the interrupt again by restoring the previous processor status
+       5.6 Increment transmitted character count
+    (cond: printer device is busy)
+       5.7 Return the negative of device status in v0
+    6. Load the transmitted char count into v0 register
+    7. Perform SYS4 to release printer device sempahore
 
-    int semIndex = (PRINTSEM * DEVICE_INSTANCES) + device_instance;
-
-    SYSCALL(PASSEREN, (memaddr) &support_device_sems[semIndex], 0, 0);
-
-    device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
+    Ref: princOfOperations section 5.1, 5.6
+    */
     
+    /*Check if address we're writing from is outside of the uproc logical address space*/
+
+    /*Check if length of string is within bounds (0-128)*/
+    if (len < 0 || len > 128 || (unsigned int) virtualAddr < KUSEG) /*DEFINE CONSTANTS FOR THESE*/
+    {
+        SYSCALL(SYS9, 0, 0, 0);
+    }
+
+    /*--------------Declare local variables---------------------*/
+    int semIndex;
+    int pid;
+    int char_printed_count; /*tracks how many characters were printed*/
+    char_printed_count = 0;
+    /*----------------------------------------------------------*/
+    pid = support_struct->sup_asid-1;
+    semIndex = ((PRNTINT - OFFSET) * DEVPERINT) + pid;
+
+    devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
+    device_t *printerDevice = &(devRegArea->devreg[semIndex]);
+
+    SYSCALL(SYS3, (memaddr) &support_device_sems[semIndex], 0, 0);
+
     int i;
-    for (i = 0; i < len; i++) {
-        if(device_int->d_status == READY) {
+    for (i = 0; i < len; i++)
+    {
+        /*
+        Ref: princOfOperations section 5.6, table 5.11
+             princOfOperations section 2.3
+        */
+        if (printerDevice->d_status == READY) /*no need to & with BUSY?*/
+        {
 
+            /* Need to perform setSTATUS (disable interrupt) to ensure the atomicity */
             setSTATUS(INTSOFF);
-            device_int->d_data0 = ((int) *(virtualAddr + i));
-            device_int->d_command = PRINTCHR;
-            SYSCALL(WAITIO, PRNTINT, device_instance, 0);
-            setSTATUS(INTSON);
 
-            charCount++;
+            printerDevice->d_data0 = (memaddr) * (virtualAddr + i);
+            printerDevice->d_command = PRINTCHR;
+            char_printed_count ++;
+
+            /* Need to perform waitForIO to "truly" request printing the character */
+            SYSCALL(SYS5, semIndex, pid, 0);
+
+            /* Need to perform setSTATUS (enable interrupt again) to restore previous status & allow I/O request */
+            setSTATUS(INTSOFF);
+            
         }
-        else {
-            charCount = -(device_int->d_status);
-            i = len;
+        else
+        {
+            /*If printer device status code is not READY -> have to return negative of device status*/
+            support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -(printerDevice->d_status);
+            break;
         }
     }
 
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
-    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);  
-
+    /* Add SYSCALL 4 to unlock the semaphore */
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
+    SYSCALL(SYS4,(memaddr) &support_device_sems[semIndex], 0, 0);
 }
+
+
 
 void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     int device_instance = support_struct->sup_asid - 1;

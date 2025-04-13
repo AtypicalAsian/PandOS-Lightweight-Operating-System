@@ -37,7 +37,7 @@
  #include "../h/initProc.h"
  #include "../h/vmSupport.h"
  #include "../h/sysSupport.h"
-//  #include "/usr/include/umps3/umps/libumps.h"
+ #include "/usr/include/umps3/umps/libumps.h"
 
 int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES]; /*Support level device semaphores*/
 

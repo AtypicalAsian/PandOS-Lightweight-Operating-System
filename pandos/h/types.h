@@ -115,7 +115,7 @@ typedef struct support_t {
 
 /* Process Control Block (PCB) type */
 typedef struct pcb_t {
-	/* process queue fields */
+	/* Process queue fields */
 	struct pcb_t *p_next;  /* Pointer to next entry */
     struct pcb_t *p_prev;  /* Pointer to previous entry */
 
@@ -140,13 +140,12 @@ typedef struct semd_t {
 
 struct semd_t *s_next;   /* next element on the ASL */
 int 		  *s_semAdd; /* pointer to the semaphore*/
-pcb_t 		   *s_procQ;  /* procQ tail ptr */
+pcb_t 		   *s_procQ;  /* tail ptr to process queue */
 
 } semd_t, *semd_PTR;
 
-typedef unsigned int size_t;
-typedef int bool;
-typedef int semaphore;
+
+/*typedef int semaphore;*/
 
 #define	s_at	s_reg[0]
 #define	s_v0	s_reg[1]

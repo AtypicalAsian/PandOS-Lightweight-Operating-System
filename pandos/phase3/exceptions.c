@@ -83,7 +83,7 @@ cpu_t get_elapsed_time() {
 }
 
 /*Helper method to copy 'len' bytes from the source memory block 'src' to the destination memory block 'dest' */
-void* memcpy(void *dest, const void *src, size_t len) {
+void* memcpy(void *dest, const void *src, unsigned int len) {
 	char *d = dest;
 	const char *s = src;
 	while (len--) {
@@ -115,7 +115,7 @@ void recursive_terminate(pcb_PTR proc){
 	/* Check if process p is blocked on a device semaphore.
        It is considered blocked on a device if its semaphore pointer (p->p_semAdd)
        falls within the range of deviceSemaphores[] or is equal to the address of semIntTimer. */
-	   bool blockedOnDevice = 
+	   int blockedOnDevice = 
 	   ((processSem >= (int *) deviceSemaphores) &&
 		(processSem < ((int *) deviceSemaphores + (sizeof(int) * DEVICE_TYPES * DEVICE_INSTANCES))))
 		|| (processSem == (int *) &semIntTimer);

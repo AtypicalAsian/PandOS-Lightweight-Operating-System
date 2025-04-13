@@ -37,7 +37,7 @@
  #include "../h/initProc.h"
  #include "../h/vmSupport.h"
  #include "../h/sysSupport.h"
- #include "/usr/include/umps3/umps/libumps.h"
+//  #include "/usr/include/umps3/umps/libumps.h"
 
 int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES]; /*Support level device semaphores*/
 
@@ -207,14 +207,13 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     5. Set the command for terminal device with bit shift (like the guide in Ref)
     6. Request I/O to pass the character to terminal device
     7. Check terminal transmitted status
-    8. Issue ACK to let the device return to ready state after each iteration
+    8. Issue ACK to let the device return to ready state after each iteration (no need to do this)
     9. Save the character count (success) or device's status value (FAIL) to v0
     10. Unlock the semaphore by calling SYS4 & restore the device status 
 
     Ref: princOfOperations section 5.7
          pandos section 3.5.5, pg 27,28
     */
-
     /*Local variables*/
     int pid;
     int baseTerminalIndex;
@@ -224,37 +223,39 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + pid;
     semIndex = baseTerminalIndex + DEVPERINT;
 
-    devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
-    device_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    /*Calculate the offset for the terminal device row relative to disk*/
+    unsigned int terminalOffset = (TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE);
+
+    /*Calculate the offset for the specific device instance (column) within that row*/
+    unsigned int instanceOffset = pid * DEVREGSIZE;
+
+    /*The total offset is the sum of the row offset and the instance offset*/
+    unsigned int totalOffset = terminalOffset + instanceOffset;
+
+    /*Add the total offset to the base address of the device registers*/
+    device_t *terminalDevice = (device_t *)(DEVICEREGSTART + totalOffset);
+
     SYSCALL(SYS3,(memaddr) &support_device_sems[semIndex], 0, 0);
 
     int transmittedChars;
     transmittedChars = 0;
     int i;
+    int status;
 
     for (i = 0; i < len; i ++) {
         memaddr transmitterStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
         if (transmitterStatus == TERMINAL_STATUS_READY) {
             /* memaddr oldStatus = getSTATUS(); */
             setSTATUS(INTSOFF);
-
             char transmitChar = *(virtualAddr + i);
             terminalDevice->d_data1 = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
-            memaddr newStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
-
-            SYSCALL(SYS5, semIndex, pid, 0);
-
+            /*memaddr newStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);*/
+            status = SYSCALL(SYS5, TERMINT, pid, 0);
+            transmittedChars++;
             setSTATUS(INTSON);
-
-            if (newStatus == TERMINAL_STATUS_TRANSMITTED) {
-                transmittedChars ++;
-            } else {
-                transmittedChars = -(newStatus);
-                break;
-            }
-        } else if (transmitterStatus != READY) {
-            transmittedChars = -(transmitterStatus);
-            break;
+        } else {
+            transmittedChars = -(status);
+            i = len;
         }
     }
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;

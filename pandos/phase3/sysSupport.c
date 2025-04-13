@@ -376,8 +376,6 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
     /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3*/  
 
-    /*Step 3: Increment PC+4 to execute next instruction on return*/
-    currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
 
     /*Step 4: Execute appropriate syscall helper method based on requested syscall number*/
     switch(syscall_num_requested){
@@ -397,6 +395,8 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             trapExcHandler(currProc_support_struct);
             break;
     }
+    /*Step 3: Increment PC+4 to execute next instruction on return*/
+    currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
     returnControlSup(currProc_support_struct,GENERALEXCEPT); /*Context switch*/
 }
 

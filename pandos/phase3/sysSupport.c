@@ -277,9 +277,6 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     9. Unlock the semaphore by calling SYS4 & restore the device status 
     Ref: pandos section 4.7.5, princOfOperations chapter 5.7 
     */
-    if (virtualAddr == NULL) {
-        SYSCALL(SYS9, 0, 0, 0);
-    }
 
     /*Local variables*/
     int pid;

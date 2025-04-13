@@ -126,12 +126,14 @@ void update_tlb_handler(pte_entry_t *ptEntry) {
  * Each u-proc is associated with its own flash device, already initialized with backing store data.
  * Flash device blocks 0 to 30 store .text and .data, block 31 stores the stack page
  **************************************************************************************************/
-int flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest) {
+void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest) {
     /*Local variables to thid method*/
     unsigned int device_status; /*status of the device (success or no)*/
     unsigned int max_block;     /*max number of blocks the flash device supports*/
     unsigned int command;       /*command to write to COMMAND field of flash device*/
     device_t* f_device;      /*pointer to the flash device we want to work with*/
+
+    support_t *currSuppStruct = (support_t*) SYSCALL(SYS8,0,0,0);
 
     /*Method 1: Array indexing (Calculate address of specific flash device register block)*/
     int devIdx = (FLASHINT-DISKINT) * DEVPERINT + deviceNum;
@@ -149,7 +151,7 @@ int flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest) 
 
     /*Check whether the requested block number is out of bounds*/
     if (block_num >= max_block){
-        terminate();
+        terminate(NULL);
     }
 
     /*Build command code*/
@@ -173,7 +175,7 @@ int flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest) 
     SYSCALL(SYS4, (memaddr)&support_device_sems[1][deviceNum], 0, 0);
     /*If operation failed (check device status) -> program trap handler*/
     if (device_status != READY){
-        trapExcHandler();
+        trapExcHandler(currSuppStruct);
     }
 }
 

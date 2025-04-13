@@ -360,7 +360,7 @@ void trapExcHandler(support_t *support_struct)
  **************************************************************************************************/
 void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
     /*--------------Declare local variables---------------------*/
-    int virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
+    char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
     int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
     /*----------------------------------------------------------*/
 

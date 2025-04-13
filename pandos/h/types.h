@@ -24,6 +24,28 @@ typedef struct {
 #define t_transm_status		d_data0
 #define t_transm_command	d_data1
 
+/* Device register type for disks, flash and printers */
+typedef struct dtpreg {
+	unsigned int status;
+	unsigned int command;
+	unsigned int data0;
+	unsigned int data1;
+} dtpreg_t;
+
+/* Device register type for terminals */
+typedef struct termreg {
+	unsigned int recv_status;
+	unsigned int recv_command;
+	unsigned int transm_status;
+	unsigned int transm_command;
+} termreg_t;
+
+
+typedef union devreg {
+	dtpreg_t dtp;
+	termreg_t term;
+} devreg_t;
+
 /*Bus Register Area*/
 typedef struct devregarea {
 	unsigned int rambase;
@@ -36,10 +58,10 @@ typedef struct devregarea {
 	unsigned int todlo;
 	unsigned int intervaltimer;
 	unsigned int timescale;
-	unsigned int tlb_floor_addr;
+	unsigned int TLB_Floor_Addr;
 	unsigned int inst_dev[DEVINTNUM];
 	unsigned int interrupt_dev[DEVINTNUM];
-	device_t devreg[40];
+	device_t devreg[DEVINTNUM * DEVPERINT];
 } devregarea_t;
 
 /* Pass Up Vector */
@@ -58,9 +80,10 @@ typedef struct pte_entry_t {
 
 /* process context type */
 typedef struct context_t {
-    unsigned int c_stackPtr;
-    unsigned int c_status;
-    unsigned int c_pc;
+    /* process context fields */
+    unsigned int c_stackPtr; /* stack pointer value */
+    unsigned int c_status; /* status reg value */
+    unsigned int c_pc; /* PC address */
 } context_t;
 
 #define STATEREGNUM	31
@@ -81,12 +104,12 @@ typedef struct swap_t {
 } swap_t;
 
 typedef struct support_t {
-    int       sup_asid;            
-    state_t   sup_exceptState[2];  
-    context_t sup_exceptContext[2];
-    pte_entry_t sup_privatePgTbl[32]; 
-    int sup_stackTLB[500];
-    int sup_stackGen[500];
+    int       sup_asid;            /* process Id (asid) */
+    state_t   sup_exceptState[2];  /* stored except states */
+    context_t sup_exceptContext[2]; /* pass up contexts */
+    pte_entry_t sup_privatePgTbl[32]; /* the user process's page table */
+    int sup_stackTLB[500]; /* the stack area for the process' TLB exception handler */
+    int sup_stackGen[500]; /* the stack area for the process' general exception handler */
 } support_t;
 
 

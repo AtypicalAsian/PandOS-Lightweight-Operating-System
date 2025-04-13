@@ -364,7 +364,6 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
     /*----------------------------------------------------------*/
 
-
     /* Validate syscall number */
     if (syscall_num_requested < 9 || syscall_num_requested > 13) {
         /* Invalid syscall number, treat as Program Trap */
@@ -406,7 +405,6 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             trapExcHandler(currProc_support_struct);
             break;
     }
-
     returnControlSup(currProc_support_struct, GENERALEXCEPT);
 }
 

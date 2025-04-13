@@ -37,7 +37,7 @@
  #include "../h/initProc.h"
  #include "../h/vmSupport.h"
  #include "../h/sysSupport.h"
- #include "/usr/include/umps3/umps/libumps.h"
+//  #include "/usr/include/umps3/umps/libumps.h"
 
 int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES]; /*Support level device semaphores*/
 
@@ -277,6 +277,9 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     9. Unlock the semaphore by calling SYS4 & restore the device status 
     Ref: pandos section 4.7.5, princOfOperations chapter 5.7 
     */
+    if (virtualAddr == NULL) {
+        SYSCALL(SYS9, 0, 0, 0);
+    }
 
     /*Local variables*/
     int pid;
@@ -300,34 +303,36 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
 
     SYSCALL(SYS3,(memaddr) &support_device_sems[semIndex], 0, 0);
 
-
+    char currStr = ' ';
     int receivedChars;
     receivedChars = 0;
     int readStatus;
 
-    while (1) {
-        readStatus = (terminalDevice->d_status & TERMINAL_STATUS_MASK);
-        
-        if (readStatus == TERMINAL_STATUS_RECEIVED) {
-            /* memaddr oldStatus = getSTATUS(); */
-            setSTATUS(INTSOFF);
-            char receivedChar = (char) (terminalDevice->d_command & TERMINAL_STATUS_MASK);
-            /* Save the read chars to buffer */
-            *(virtualAddr + receivedChars) = receivedChar;
-            receivedChars++;
-            SYSCALL(SYS5, semIndex, pid, 0);
-            setSTATUS(INTSON);
-        } else if (readStatus != TERMINAL_STATUS_READY) {
-            receivedChars = -(readStatus);
-            break;
-        } else {
-            break;
+    while(((terminalDevice->d_status & TERMSTATUSMASK) == READY) && (currStr != EOS)) {
+        setSTATUS(INTSOFF);
+        terminalDevice->d_command = TRANSMITCHAR;
+        readStatus = SYSCALL(WAITIO, TERMINT, pid, TRUE);
+        setSTATUS(INTSON);
+        if((readStatus & TERMSTATUSMASK) == OKCHARTRANS) {
+            currStr = (readStatus >> DEVICE_INSTANCES);
+            if(currStr != '\n') {
+                *virtualAddr = currStr;
+                virtualAddr++;
+                receivedChars++;
+            }
         }
+        else {
+            currStr = '\n';
+        }
+    }
+    if((terminalDevice->d_status & TERMSTATUSMASK) != READY || (readStatus & TERMSTATUSMASK) != OKCHARTRANS) {
+        receivedChars = -(readStatus);
     }
 
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
     SYSCALL(SYS4,(memaddr) &support_device_sems[semIndex], 0, 0);
     /*IMPLEMENTATION ENDS*/
+
 }
 
 /**************************************************************************************************
@@ -340,28 +345,6 @@ void trapExcHandler(support_t *support_struct)
     terminate(support_struct);
 }
 
-/**************************************************************************************************
- * DONE
- * TO-DO 
- * Support Level General Exception Handler
- * BIG PICTURE
- *      1. Obtain current process' support structure
- *      2. Examine Cause register in exceptState field of support structure and extract exception code
- *      3. Pass control to either the support level syscall handler or the program trap handler
- **************************************************************************************************/
-void sysSupportGenHandler() {
-
-    support_t *support_struct = (support_t *) SYSCALL(GETSUPPORTPTR, 0, 0, 0);
-    int cause = support_struct->sup_exceptState[GENERALEXCEPT].s_cause;
-    int exc_code = EXCCODE(cause);
-    if (exc_code == 8) {
-        int syscall_num = support_struct->sup_exceptState[GENERALEXCEPT].s_a0;
-        supportSyscallHandler(syscall_num, support_struct);
-    }
-    else {
-        trapExcHandler(support_struct);
-    }
-}
 
 /**************************************************************************************************
  * TO-DO 
@@ -410,8 +393,30 @@ void supportSyscallHandler(int exc_code, support_t *support_struct)
             break;
     }
 
-
     support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
     returnControlSup(support_struct, GENERALEXCEPT);
 
+}
+
+/**************************************************************************************************
+ * DONE
+ * TO-DO 
+ * Support Level General Exception Handler
+ * BIG PICTURE
+ *      1. Obtain current process' support structure
+ *      2. Examine Cause register in exceptState field of support structure and extract exception code
+ *      3. Pass control to either the support level syscall handler or the program trap handler
+ **************************************************************************************************/
+void sysSupportGenHandler() {
+
+    support_t *support_struct = (support_t *) SYSCALL(GETSUPPORTPTR, 0, 0, 0);
+    int cause = support_struct->sup_exceptState[GENERALEXCEPT].s_cause;
+    int exc_code = EXCCODE(cause);
+    if (exc_code == 8) {
+        int syscall_num = support_struct->sup_exceptState[GENERALEXCEPT].s_a0;
+        supportSyscallHandler(syscall_num, support_struct);
+    }
+    else {
+        trapExcHandler(support_struct);
+    }
 }

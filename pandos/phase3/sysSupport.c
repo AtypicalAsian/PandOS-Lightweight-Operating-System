@@ -1,87 +1,64 @@
-#include "/usr/include/umps3/umps/libumps.h"
-#include "../h/initProc.h"
-#include "../h/sysSupport.h"
-#include "../h/vmSupport.h"
+/**************************************************************************************************  
+ * @file sysSupport.c  
+ *  
+ * 
+ * @brief  
+ * This module implements the Support Level’s:
+ *      - general exception handler. [Section 4.6]
+ *      - SYSCALL exception handler. [Section 4.7]
+ *      - Program Trap exception handler. [Section 4.8]
+ * 
+ * @details  
+ * 
+ *  
+ * @note  
+ * 
+ *  
+ * @authors  
+ * Nicolas & Tran  
+ * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
+ * 
+ * TODO
+ * This module implements
+ *       general exception handler. [Section 4.6]
+ *       SYSCALL exception handler. [Section 4.7]
+ *       Program Trap exception handler. [Section 4.8] - vmSupport pass control here if page fault is a modification type (should not happen in pandOS)
+ * 
+ **************************************************************************************************/
+
+ #include "../h/types.h"
+ #include "../h/const.h"
+ #include "../h/asl.h"
+ #include "../h/pcb.h"
+ #include "../h/initial.h"
+ #include "../h/scheduler.h"
+ #include "../h/exceptions.h"
+ #include "../h/interrupts.h"
+ #include "../h/initProc.h"
+ #include "../h/vmSupport.h"
+ #include "../h/sysSupport.h"
+ #include "/usr/include/umps3/umps/libumps.h"
+
+int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES]; /*Support level device semaphores*/
 
 
-/* 2D Array of support level device semaphores */
-int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES];
 
-
-
-void returnControl()
-{
-    LDST(EXCSTATE);
-}
-
-
+/**************************************************************************************************
+ * DONE
+ * This function is a wrapper to perform LDST
+ * Can't use LDST directly in phase 3?
+ **************************************************************************************************/
 void returnControlSup(support_t *support, int exc_code)
 {
     LDST(&(support->sup_exceptState[exc_code]));
 }
 
 
-void trapExcHandler(support_t *support_struct)
-{
-    terminate(support_struct);
-}
 
-
-void sysSupportGenHandler() {
-
-    support_t *support_struct = (support_t *) SYSCALL(GETSUPPORTPTR, 0, 0, 0);
-    int cause = support_struct->sup_exceptState[GENERALEXCEPT].s_cause;
-    int exc_code = EXCCODE(cause);
-    if (exc_code == 8) {
-        int syscall_num = support_struct->sup_exceptState[GENERALEXCEPT].s_a0;
-        supportSyscallHandler(syscall_num, support_struct);
-    }
-    else {
-        trapExcHandler(support_struct);
-    }
-}
-
-void supportSyscallHandler(int exc_code, support_t *support_struct)
-{
-    if (exc_code < TERMINATE || exc_code > DELAY) {
-        trapExcHandler(support_struct);
-        return;
-    }
-
-    int arg1 = support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
-    int arg2 = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
-
-    switch(exc_code) {
-        case TERMINATE:
-            terminate(support_struct);
-            break;
-
-        case GET_TOD:
-            getTOD(support_struct);
-            break;
-
-        case WRITEPRINTER:
-            writeToPrinter((char *) arg1, arg2, support_struct);
-            break;
-
-        case WRITETERMINAL:
-            writeToTerminal((char *) arg1, arg2, support_struct);  
-            break;
-
-        case READTERMINAL:
-            readTerminal((char *) arg1, support_struct);
-            break;
-        default:
-            trapExcHandler(support_struct);
-            break;
-    }
-
-
-    support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
-    returnControlSup(support_struct, GENERALEXCEPT);
-
-}
-
+/**************************************************************************************************
+ * TO-DO 
+ * terminate() is a essentially a wrapper for the kernel-mode restricted SYS2 service
+ **************************************************************************************************/
 void terminate(support_t *support_struct)
 {
     int dev_num = support_struct->sup_asid - 1;
@@ -107,11 +84,21 @@ void terminate(support_t *support_struct)
     SYSCALL(TERMINATEPROCESS, 0, 0, 0);
 }
 
+
+/**************************************************************************************************
+ * TO-DO 
+ * Returns the number of microseconds since system boot
+ * The method calls the hardware TOD clock and stores in register v0
+ **************************************************************************************************/
 void getTOD(support_t *support_struct)
 {
     STCK(support_struct->sup_exceptState[GENERALEXCEPT].s_v0);
 }
 
+
+/**************************************************************************************************
+ * TO-DO 
+ **************************************************************************************************/
 void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     int device_instance = support_struct->sup_asid - 1;
     int charCount = 0;
@@ -222,5 +209,91 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     }
     SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
+
+}
+
+/**************************************************************************************************
+ * TO-DO 
+ * Support Level Program Trap Handler
+ * BIG PICTURE
+ **************************************************************************************************/
+void trapExcHandler(support_t *support_struct)
+{
+    terminate(support_struct);
+}
+
+/**************************************************************************************************
+ * DONE
+ * TO-DO 
+ * Support Level General Exception Handler
+ * BIG PICTURE
+ *      1. Obtain current process' support structure
+ *      2. Examine Cause register in exceptState field of support structure and extract exception code
+ *      3. Pass control to either the support level syscall handler or the program trap handler
+ **************************************************************************************************/
+void sysSupportGenHandler() {
+
+    support_t *support_struct = (support_t *) SYSCALL(GETSUPPORTPTR, 0, 0, 0);
+    int cause = support_struct->sup_exceptState[GENERALEXCEPT].s_cause;
+    int exc_code = EXCCODE(cause);
+    if (exc_code == 8) {
+        int syscall_num = support_struct->sup_exceptState[GENERALEXCEPT].s_a0;
+        supportSyscallHandler(syscall_num, support_struct);
+    }
+    else {
+        trapExcHandler(support_struct);
+    }
+}
+
+/**************************************************************************************************
+ * TO-DO 
+ * Support Level Syscall Exception Handler
+ * BIG PICTURE
+ * Steps:
+ *      1. Check if the syscall number falls within the range 9-13
+ *            If invalid syscall number, handle as program trap
+ *      2. Reads parameters in registers a1,a2,a3
+ *      3. Manually imcrement PC+4 to avoid re-executing Syscall on return
+ *      4. Execute appropriate syscall handler
+ *      5. LDST to return to process that requested SYSCALL
+ **************************************************************************************************/
+void supportSyscallHandler(int exc_code, support_t *support_struct)
+{
+    if (exc_code < TERMINATE || exc_code > DELAY) {
+        trapExcHandler(support_struct);
+        return;
+    }
+
+    int arg1 = support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    int arg2 = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+
+    switch(exc_code) {
+        case TERMINATE:
+            terminate(support_struct);
+            break;
+
+        case GET_TOD:
+            getTOD(support_struct);
+            break;
+
+        case WRITEPRINTER:
+            writeToPrinter((char *) arg1, arg2, support_struct);
+            break;
+
+        case WRITETERMINAL:
+            writeToTerminal((char *) arg1, arg2, support_struct);  
+            break;
+
+        case READTERMINAL:
+            readTerminal((char *) arg1, support_struct);
+            break;
+        default:
+            trapExcHandler(support_struct);
+            break;
+    }
+
+
+    support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
+    returnControlSup(support_struct, GENERALEXCEPT);
 
 }

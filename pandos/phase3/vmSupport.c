@@ -272,7 +272,7 @@ void tlb_exception_handler() {
     unsigned int frame_addr;
     unsigned int exception_cause;
     int asid;
-    int deviceStatus;
+    /*int deviceStatus;*/
     unsigned int missing_page_no;
     /*----------------------------------------------------------*/
 

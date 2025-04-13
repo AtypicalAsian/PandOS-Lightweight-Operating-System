@@ -359,7 +359,7 @@ void trapExcHandler(support_t *support_struct)
  *      5. LDST to return to process that requested SYSCALL
  **************************************************************************************************/
 void syscall_excp_handler(support_t *support_struct, int exceptionCode){
-    if (exc_code < 9 || exc_code > 13) { /*Have to change for later phases right now we're just looking at syscall 9-13*/
+    if (exceptionCode < 9 || exceptionCode > 13) { /*Have to change for later phases right now we're just looking at syscall 9-13*/
         trapExcHandler(support_struct);
         return;
     }
@@ -367,24 +367,24 @@ void syscall_excp_handler(support_t *support_struct, int exceptionCode){
     int arg1 = support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
     int arg2 = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
 
-    switch(exc_code) {
-        case TERMINATE:
+    switch(exceptionCode) {
+        case SYS9:
             terminate(support_struct);
             break;
 
-        case GET_TOD:
+        case SYS10:
             getTOD(&support_struct->sup_exceptState[GENERALEXCEPT]);
             break;
 
-        case WRITEPRINTER:
+        case SYS11:
             writeToPrinter((char *) arg1, arg2, support_struct);
             break;
 
-        case WRITETERMINAL:
+        case SYS12:
             writeToTerminal((char *) arg1, arg2, support_struct);  
             break;
 
-        case READTERMINAL:
+        case SYS13:
             readTerminal((char *) arg1, support_struct);
             break;
         default:
@@ -420,7 +420,7 @@ void sysSupportGenHandler() {
     exception_code = (((currProc_supp_struct->sup_exceptState[GENERALEXCEPT].s_cause) & GETEXCPCODE) >> CAUSESHIFT);
 
     /*Step 3: Pass control to appropriate handler based on exception code*/
-    if (exception_code == SYSCONST){   /*If Cause.ExcCode is set to 8 -> call the syscall handler method [pandOS 3.7.1]*/
+    if (exception_code == 8){   /*If Cause.ExcCode is set to 8 -> call the syscall handler method [pandOS 3.7.1]*/
         requested_syscall_num = currProc_supp_struct->sup_exceptState[GENERALEXCEPT].s_a0; /*the syscall number is stored in register a0 [pandOS 3.7.1]*/
         syscall_excp_handler(currProc_supp_struct,requested_syscall_num); /*Pass to support level syscall handler*/
     }

@@ -382,9 +382,9 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     /*Step 4: Execute appropriate syscall helper method based on requested syscall number*/
     switch(syscall_num_requested){
         case SYS9:
-            terminate();
+            terminate(currProc_support_struct);
         case SYS10:
-            get_TOD(&currProc_support_struct->sup_exceptState[GENERALEXCEPT]);
+            getTOD(&currProc_support_struct->sup_exceptState[GENERALEXCEPT]);
         case SYS11:
             /*virtual address of first char in a1, length of string in a2*/
             writeToPrinter(virtualAddr, length, currProc_support_struct);
@@ -397,7 +397,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             trapExcHandler(currProc_support_struct);
             break;
     }
-    returnControlSup(GENERALEXCEPT,currProc_support_struct); /*Context switch*/
+    returnControlSup(currProc_support_struct,GENERALEXCEPT); /*Context switch*/
 }
 
 /**************************************************************************************************

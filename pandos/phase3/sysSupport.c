@@ -360,7 +360,7 @@ void trapExcHandler(support_t *support_struct)
  **************************************************************************************************/
 void syscall_excp_handler(support_t *support_struct,int exc_code){
     /* Validate syscall number */
-    if (exc_code < TERMINATE || exc_code > DELAY) {
+    if (exc_code < TERMINATE || exc_code > 13) {
         /* Invalid syscall number, treat as Program Trap */
         trapExcHandler(support_struct);
         return;

@@ -5,26 +5,38 @@
  * This header file contains utility constants & macro definitions.
  * 
  ****************************************************************************/
-
 /* Hardware & software constants */
-#define PAGESIZE 4096 
-#define WORDLEN  4 
+#define PAGESIZE		  4096			/* page size in bytes	*/
+#define WORDLEN			  4				  /* word size in bytes	*/
 #define MAXPROC 20 
-#define MAXPAGES      32 
-#define USERPGTBLSIZE MAXPAGES
+#define MAXPAGES      32
 #define UPROCMAX 8
 #define POOLSIZE (UPROCMAX * 2)
 #define STACKSIZE 499
-#define DEVINTNUM 5
-#define DEVPERINT 8
+
 
 /* timer, timescale, TOD-LO and other bus regs */
-#define RAMBASEADDR   0x10000000
-#define RAMBASESIZE   0x10000004
-#define TODLOADDR     0x1000001C
-#define INTERVALTMR   0x10000020
-#define TIMESCALEADDR 0x10000024
+#define RAMBASEADDR		0x10000000
+#define RAMBASESIZE		0x10000004
+#define TODLOADDR		  0x1000001C
+#define INTERVALTMR		0x10000020	
+#define TIMESCALEADDR	0x10000024
 #define TIMER_RESET_CONST 0xFFFFFFFF
+
+/* utility constants */
+#define	TRUE			    1
+#define	FALSE			    0
+#define HIDDEN			  static
+#define NULL 			    ((void *)0xFFFFFFFF)
+#define RESET			    0
+#define ACK				    1
+#define READY			    1
+#define ON         1
+#define OK         0
+#define NOPROC     -1
+#define INITPROCCNT 0
+#define INITSBLOCKCNT 0
+#define GETEXCPCODE 0x0000007C
 
 /* device register addresses */
 #define DEVICEREGSTART  0x10000054
@@ -42,20 +54,7 @@
 #define UPROCSTACKPG 0xBFFFF000
 #define TOPSTKPAGE 0x20001000
 
-/* utility constants */
-#define NULL 			    ((void *)0xFFFFFFFF)
-#define TRUE 			    1
-#define FALSE 			    0
-#define HIDDEN 			    static
-#define RESET			    0
-#define ACK				    1
-#define READY			    1
-#define ON         1
-#define OK         0
-#define NOPROC     -1
-#define INITPROCCNT 0
-#define INITSBLOCKCNT 0
-#define GETEXCPCODE 0x0000007C
+
 
 /* device interrupts */
 #define TIMERINT          1
@@ -66,6 +65,40 @@
 #define PRNTINT 		  6
 #define TERMINT			  7
 
+#define DEVINTNUM		  5		  /* interrupt lines used by devices */
+#define DEVPERINT		  8		  /* devices per interrupt line */
+#define DEVREGLEN		  4		  /* device register field length in bytes, and regs per dev */	
+#define DEVREGSIZE	  16 		/* device register size in bytes */
+
+/* Constants for the different device numbers an interrupt may occur on */
+#define	DEV0			0				/* constant representing device 0 */
+#define	DEV1			1				/* constant representing device 1 */
+#define	DEV2			2				/* constant representing device 2 */
+#define	DEV3			3				/* constant representing device 3 */
+#define	DEV4			4				/* constant representing device 4 */
+#define	DEV5			5				/* constant representing device 5 */
+#define	DEV6			6				/* constant representing device 6 */
+#define	DEV7			7				/* constant representing device 7 */
+
+/*Cause Register Mask to Isolate the correct corresponding to which line the interupt was generated from*/
+#define	LINE1MASK		0x00000200		/* constant for setting all bits to 0 in the Cause register except for bit 9 -> line 1 interrupts*/
+#define	LINE2MASK		0x00000400		/* constant for setting all bits to 0 in the Cause register except for bit 10 -> line 2 interrupts */
+#define	LINE3MASK		0x00000800		/* constant for setting all bits to 0 in the Cause register except for bit 11 -> line 3 interrupts */
+#define	LINE4MASK		0x00001000		/* constant for setting all bits to 0 in the Cause register except for bit 12 -> line 4 interrupts */
+#define	LINE5MASK		0x00002000		/* constant for setting all bits to 0 in the Cause register except for bit 13 -> line 5 interrupts */
+#define	LINE6MASK		0x00004000		/* constant for setting all bits to 0 in the Cause register except for bit 14 -> line 6 interrupts */
+#define	LINE7MASK		0x00008000		/* constant for setting all bits to 0 in the Cause register except for bit 15 -> line 7 interrupts */
+
+
+/* Constants for the different line numbers an interrupt may occur on */
+#define	LINE1			1				/* constant representing line 1 */
+#define	LINE2			2				/* constant representing line 2 */
+#define	LINE3			3				/* constant representing line 3 */
+#define	LINE4			4				/* constant representing line 4 */
+#define	LINE5			5				/* constant representing line 5 */
+#define	LINE6			6				/* constant representing line 6 */
+#define	LINE7			7				/* constant representing line 7 */
+
 /* Interupts constants */
 #define GETIP   0x0000FE00
 #define IPSHIFT 8
@@ -74,7 +107,7 @@
 #define TERMSTATUSMASK 0x000000FF
 
 
-/* syscall exceptions */
+/* syscall */
 #define CREATEPROCESS 1
 #define TERMINATEPROCESS   2
 #define PASSEREN      3
@@ -88,11 +121,7 @@
 #define WRITEPRINTER  11
 #define WRITETERMINAL 12
 #define READTERMINAL  13
-#define DISK_PUT      14
-#define DISK_GET      15
-#define FLASH_PUT     16
-#define FLASH_GET     17
-#define DELAY         18
+
 
 #define SYS1 1
 #define SYS2 2
@@ -142,16 +171,7 @@
 #define IP_MASK     0x0000FF00     
 
 
-/*Cause Register Mask to Isolate the correct corresponding to which line the interupt was generated from*/
-#define	LINE1MASK		0x00000200		/* constant for setting all bits to 0 in the Cause register except for bit 9 -> line 1 interrupts*/
-#define	LINE2MASK		0x00000400		/* constant for setting all bits to 0 in the Cause register except for bit 10 -> line 2 interrupts */
-#define	LINE3MASK		0x00000800		/* constant for setting all bits to 0 in the Cause register except for bit 11 -> line 3 interrupts */
-#define	LINE4MASK		0x00001000		/* constant for setting all bits to 0 in the Cause register except for bit 12 -> line 4 interrupts */
-#define	LINE5MASK		0x00002000		/* constant for setting all bits to 0 in the Cause register except for bit 13 -> line 5 interrupts */
-#define	LINE6MASK		0x00004000		/* constant for setting all bits to 0 in the Cause register except for bit 14 -> line 6 interrupts */
-#define	LINE7MASK		0x00008000		/* constant for setting all bits to 0 in the Cause register except for bit 15 -> line 7 interrupts */
-
-/* Terminal and Device Operations*/
+/* Term and Dev Ops*/
 #define OKCHARTRANS  5
 #define TRANSMITCHAR 2
 #define FLASHREAD  2
@@ -161,18 +181,18 @@
 #define DEVREGSIZE	    16
 #define OFFSET 3 
 
-/* Device Sems*/
+/* Dev Semaphores*/
 #define FLASHSEM 1
 #define PRINTSEM 3
 #define TERMSEM 4
 #define TERMWRSEM 5
 
-/* Time related constants*/
+/* Time constants*/
 #define TIMESLICE  5000     
 #define SECOND     1000000
 #define INITTIMER  100000
 #define INTIMER  100000UL     
-#define PLT_HIGHEST_VAL   0xFFFFFFFFUL 
+#define PLT_HIGHEST_VAL   0xFFFFFFFFUL
 
 /* Phase 3 Constants*/
 #define FLASHADDRSHIFT 8
@@ -206,12 +226,6 @@
 #define TERMINAL_STATUS_RECEIVED 5
 
 
-#define NEVER 0xFFFFFFFF
-#define DELAYASID 0
-
-#define MAXPOINT ((void *)0xFFFFFFFF)
-#define MINPOINT ((void *)0x00000000)
-
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
 #define EXCSTATE ((state_t *) BIOSDATAPAGE)
 #define TIME_TO_TICKS(T) (T) * (*((cpu_t *)TIMESCALEADDR)) /*convert time value into hardware ticks*/
@@ -220,9 +234,7 @@
 #define IP(C) ((C & 0x0000FF00) >> 8)
 #define EXCCODE(C) ((C & 0x0000007C) >> 2)
 
-/* Macro to read current kernel-mode user-mode control bit from Status register */
-#define KUC(S) ((S & 0x00000002) >> 1)
-#define KUP(S) (((S) & 0x00000008) >> 3)
+
 
 #endif
 

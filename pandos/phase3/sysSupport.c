@@ -377,7 +377,10 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
     /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3*/  
 
-    /* Return any values to v0 and load state the sup_exceptState */
+    /*Step 3: Increment PC+4 to execute next instruction on return*/
+    currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
+
+    /*Step 4: Execute appropriate syscall helper method based on requested syscall number*/
     switch(syscall_num_requested) {
         case SYS9:
             terminate(currProc_support_struct);
@@ -404,10 +407,6 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
     }
 
-    /* Increment pc by word size (4) (assuming, the sup_exceptState pc count) */
-    /* Ensure the state is updated and return to the caller */
-    currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
-    /* Return control to the current process to retry the instruction that caused the page fault */
     returnControlSup(currProc_support_struct, GENERALEXCEPT);
 }
 

@@ -387,17 +387,17 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             get_TOD(&currProc_support_struct->sup_exceptState[GENERALEXCEPT]);
         case SYS11:
             /*virtual address of first char in a1, length of string in a2*/
-            write_to_printer(virtualAddr, length, currProc_support_struct);
+            writeToPrinter(virtualAddr, length, currProc_support_struct);
         case SYS12:
             /*virtual address of first char in a1, length of string in a2*/
-            write_to_terminal(virtualAddr, length, currProc_support_struct);
+            writeToTerminal(virtualAddr, length, currProc_support_struct);
         case SYS13:
-            read_from_terminal(virtualAddr,currProc_support_struct);
+            readTerminal(virtualAddr,currProc_support_struct);
         default:
             trapExcHandler(currProc_support_struct);
             break;
     }
-    return_control(GENERALEXCEPT,currProc_support_struct); /*Context switch*/
+    returnControlSup(GENERALEXCEPT,currProc_support_struct); /*Context switch*/
 }
 
 /**************************************************************************************************

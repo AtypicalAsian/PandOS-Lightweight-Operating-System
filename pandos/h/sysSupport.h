@@ -16,7 +16,7 @@ extern void sysSupportGenHandler();
 extern void trapExcHandler(support_t *currentSupport);
 void supportSyscallHandler(int exc_code, support_t *support_struct);
 void terminate(support_t *support_struct);
-void getTOD(support_t *support_struct);
+void getTOD(state_PTR excState);
 void writeToPrinter(char *virtualAddr, int len, support_t *support_struct);
 void writeToTerminal(char *virtualAddr, int len, support_t *support_struct);
 void readTerminal(char *virtualAddr, support_t *support_struct);

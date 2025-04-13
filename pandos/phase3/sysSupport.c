@@ -63,6 +63,7 @@ void terminate(support_t *support_struct)
 {
     int dev_num = support_struct->sup_asid - 1;
 
+    /*If the process is currently holding mutex of devices -> release all those locks*/
     int i;
     for (i = 0; i < DEVICE_TYPES; i++) {
         int index = i * DEVICE_INSTANCES + dev_num;
@@ -71,6 +72,7 @@ void terminate(support_t *support_struct)
         }
     }
 
+    /*When u-proc terminates, mark all frames it occupy as free (no longer in use)*/
     for (i = 0; i < MAXPAGES; i++) {
         if(support_struct->sup_privatePgTbl[i].entryLO & VALIDON){
             setSTATUS(INTSOFF);
@@ -79,9 +81,9 @@ void terminate(support_t *support_struct)
             setSTATUS(INTSON);
         }
     }
-    SYSCALL(VERHOGEN, (memaddr) &masterSema4, 0, 0);
+    SYSCALL(SYS4, (memaddr) &masterSema4, 0, 0);
     deallocate(support_struct);
-    SYSCALL(TERMINATEPROCESS, 0, 0, 0);
+    SYSCALL(SYS2, 0, 0, 0); /*Make the call to sys2 to terminate the uproc and its child processes*/
 }
 
 
@@ -90,9 +92,15 @@ void terminate(support_t *support_struct)
  * Returns the number of microseconds since system boot
  * The method calls the hardware TOD clock and stores in register v0
  **************************************************************************************************/
-void getTOD(support_t *support_struct)
+void getTOD(state_PTR excState)
 {
-    STCK(support_struct->sup_exceptState[GENERALEXCEPT].s_v0);
+    /* Get number of ticks per seconds from the last time the system was booted/reset
+
+    Ref: pandos section 4.7.2
+    */
+   cpu_t currTime;
+   STCK(currTime);
+   excState->s_v0 = currTime;
 }
 
 
@@ -273,7 +281,7 @@ void supportSyscallHandler(int exc_code, support_t *support_struct)
             break;
 
         case GET_TOD:
-            getTOD(support_struct);
+            getTOD(&support_struct->sup_exceptState[GENERALEXCEPT]);
             break;
 
         case WRITEPRINTER:

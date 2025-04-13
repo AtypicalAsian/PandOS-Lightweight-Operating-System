@@ -5,7 +5,7 @@
 
 
 /* 2D Array of support level device semaphores */
-int support_device_sems[DEVICE_TYPES][DEVICE_INSTANCES];
+int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES];
 
 
 
@@ -88,8 +88,9 @@ void terminate(support_t *support_struct)
 
     int i;
     for (i = 0; i < DEVICE_TYPES; i++) {
-        if (support_device_sems[i][dev_num] == 0) {
-            SYSCALL(VERHOGEN, (memaddr) &support_device_sems[i][dev_num], 0, 0);
+        int index = i * DEVICE_INSTANCES + dev_num;
+        if (support_device_sems[index] == 0){
+            SYSCALL(SYS4, (memaddr)&support_device_sems[index],0,0);
         }
     }
 
@@ -115,7 +116,9 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     int device_instance = support_struct->sup_asid - 1;
     int charCount = 0;
 
-    SYSCALL(PASSEREN, (memaddr) &support_device_sems[PRINTSEM][device_instance], 0, 0);
+    int semIndex = (PRINTSEM * DEVICE_INSTANCES) + device_instance;
+
+    SYSCALL(PASSEREN, (memaddr) &support_device_sems[semIndex], 0, 0);
 
     device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
     
@@ -138,15 +141,17 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     }
 
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
-    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[PRINTSEM][device_instance], 0, 0);  
+    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);  
 
 }
 
 void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     int device_instance = support_struct->sup_asid - 1;
     unsigned int charCount = 0;
+
+    int semIndex = (TERMWRSEM * DEVICE_INSTANCES) + device_instance;
     
-    SYSCALL(PASSEREN, (memaddr) &support_device_sems[TERMWRSEM][device_instance], 0, 0);
+    SYSCALL(PASSEREN, (memaddr) &support_device_sems[semIndex], 0, 0);
 
     device_t *device_int = (device_t *) (DEVICEREGSTART + ((TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
     int status = OKCHARTRANS;
@@ -171,7 +176,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
 
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
 
-    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[TERMWRSEM][device_instance], 0, 0);  
+    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);  
 
 }
 
@@ -181,7 +186,9 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     int status;
     char string = ' ';
 
-    SYSCALL(PASSEREN, (memaddr) &support_device_sems[TERMSEM][device_instance], 0, 0);
+    int semIndex = (TERMSEM * DEVICE_INSTANCES) + device_instance;
+
+    SYSCALL(PASSEREN, (memaddr) &support_device_sems[semIndex], 0, 0);
 
     device_t* device_int = (device_t *)(DEVICEREGSTART + ((TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
 
@@ -213,7 +220,7 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     if((device_int->d_status & TERMSTATUSMASK) != READY || (status & TERMSTATUSMASK) != OKCHARTRANS) {
         charCount = -(status);
     }
-    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[TERMSEM][device_instance], 0, 0);
+    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
 
 }

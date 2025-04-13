@@ -5,7 +5,7 @@
 #include "const.h"
 #include "types.h"
 
-extern int support_device_sems[DEVICE_TYPES][DEVICE_INSTANCES];
+extern int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES];
 
 void returnControl();
 void returnControlSup(support_t *support, int exc_code);

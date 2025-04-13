@@ -47,11 +47,9 @@ int semaphore_swapPool;              /*swap pool sempahore*/
  * TO-DO
  **************************************************************************************************/
 void init_deviceSema4s(){
-    int i, j;
-    for (i = 0; i < DEVICE_TYPES; i++) {
-        for (j = 0; j < DEVICE_INSTANCES; j++) {
-            support_device_sems[i][j] = 1;
-        }
+    int i;
+    for (i=0; i < DEVICE_INSTANCES * DEVICE_TYPES;i++){
+        support_device_sems[i] = 1;
     }
     semaphore_swapPool = 1;
 }
@@ -144,7 +142,9 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     /*f_device = (device_t *) ((DEV_STARTING_REG + ((FLASHINT - DISKINT) * (DEVPERINT * DEVREGSIZE)) + (deviceNum * DEVREGSIZE)));*/
 
     /*Perform SYS3 to lock flash device semaphore*/
-    SYSCALL(SYS3, (memaddr)&support_device_sems[1][deviceNum], 0, 0);
+    /*SYSCALL(SYS3, (memaddr)&support_device_sems[1][deviceNum], 0, 0);*/
+    SYSCALL(SYS3, (memaddr)&support_device_sems[(1 * DEVICE_INSTANCES) + deviceNum], 0, 0);
+
 
     /*Read DATA1 field to get max number of blocks the flash device supports*/
     max_block = f_device->d_data1; /*pops - [section 5.4]*/
@@ -172,7 +172,8 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     setSTATUS(INTSON); /*enable interrupts*/
     
     /*Perform SYS4 to unlock flash device semaphore*/
-    SYSCALL(SYS4, (memaddr)&support_device_sems[1][deviceNum], 0, 0);
+    /*SYSCALL(SYS4, (memaddr)&support_device_sems[1][deviceNum], 0, 0);*/
+    SYSCALL(SYS4, (memaddr)&support_device_sems[(1 * DEVICE_INSTANCES) + deviceNum], 0, 0);
     /*If operation failed (check device status) -> program trap handler*/
     if (device_status != READY){
         trapExcHandler(currSuppStruct);
@@ -319,9 +320,7 @@ void tlb_exception_handler() {
 
             /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device) - pandOS [section 4.5.1]*/
             /*need to input: flash device no, block num, op_type, frame_num (or frame_address)*/
-            /*SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flash_no], 0, 0);*/
             flash_read_write(flash_no, occp_pageNum,FLASHWRITE, frame_addr);
-            /*SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flash_no], 0, 0);*/
         }
         /*If frame is not occupied*/
         
@@ -336,9 +335,7 @@ void tlb_exception_handler() {
         /*First, get flash device number that is associated with the current u-proc*/
 
         /*Perform flash read operation*/
-        /*SYSCALL(PASSEREN, (memaddr)&support_device_sems[1][flash_no], 0, 0);*/
         flash_read_write(flash_no, missing_page_no, FLASHREAD,frame_addr);
-        /*SYSCALL(VERHOGEN, (memaddr)&support_device_sems[1][flash_no], 0, 0);*/
 
         /*Step 10: Update the Swap Pool Table to reflect the new contents (atomic operations)*/
         /*First, we disable Interrupts by getting current status and clearing the IEc (global interrupt) bit*/
@@ -367,6 +364,5 @@ void tlb_exception_handler() {
 
         /*Step 14: Return control (context switch) to the instruction that caused the page fault*/
         LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));
-        /*LDST(&(currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT]));*/
     }
 }

@@ -3,13 +3,17 @@
  *  
  * 
  * @brief  
- * This module implements test() and exports the Support Level's global variables.
+ * This module implements test() (instantiator process) and exports the Support Level's global variables.
  * 
  * @details  
+ * The module is responsible for setting up the initial processor state for user processes,
+ * initializing the I/O device semaphores, support structure free pool, and virtual memory
+ * (swap pool). It also creates and launches (up to) 8 user processes by setting up their ASIDs,
+ * exception contexts, page tables and calling phase 2's SYS1. Finally, it synchronizes the 
+ * termination of user processes using a master semaphore. 
  * 
- *  
- * @note  
- * 
+ * @ref
+ * pandOS - section 4.9 & 4.10
  *  
  * @authors  
  * Nicolas & Tran  
@@ -27,36 +31,61 @@
 #include "../h/sysSupport.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
-/* GLOBAL VARIABLES DECLARATION */
+/* GLOBAL VARIABLES & DATA STRUCTURES */
 int deviceSema4s[DEVICE_TYPES * DEVPERINT]; /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
-int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully by calling HALT() instead of PANIC() */
-int freeSupIndex; /*iterator to index into free support stack*/
-support_t *free_support_pool[UPROCMAX+1]; /*Allocate one more slot than support_structs_pool to act as a sentinel*/
-support_t support_structs_pool[UPROCMAX];
+int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully */
+int freeSupIndex; /*Iterator to index into the free support pool stack*/
+support_t *free_support_pool[MAXUPROCS+1]; /*Array of pointers to free support structures. One extra slot is allocated to serve as a sentinel*/
+support_t support_structs_pool[MAXUPROCS]; /*Array of support structure objects for user procs*/
 
 /**************************************************************************************************
- * TO-DO
- * Initialize Base (initial) processor state for a user process
+ * @brief
+ *
+ * This function sets up the initial state for a user process by initializing:
+ *  - The status register
+ *  - The program counter (PC) and register t9
+ *  - The stack pointer (SP)
+ *
+ * @param base_state Pointer to a state_t structure that will be initialized with the base state
+ * @return None
  **************************************************************************************************/
 /*Initialize base processor state for user-process (define a function for this)*/
 void init_base_state(state_t *base_state){
-    base_state->s_status = IMON | TEBITON | USERPON | IEPON;
+    base_state->s_status = IMON | TEBITON | USERPON | IEPON; /*Enable timer, user mode, interrupts*/
     base_state->s_pc = TEXT_START; /*initialize PC*/
     base_state->s_t9 = TEXT_START; /*have to set t9 register after setting s_pc*/
     base_state->s_sp = SP_START; /*stack pointer*/
 }
 
 /**************************************************************************************************
- * TO-DO
+ * @brief Return a support structure to the free pool
+ *
+ * This function return the given support structure to the free_support_pool array. It effectively
+ * "deallocates" the support structure so that it can be reused by future processes
+ *
+ * @param support Pointer to the support_t structure to be deallocated
+ * @return None
+ * 
+ * @ref
+ * pandOS - section 4.10
  **************************************************************************************************/
-void deallocate(support_t *support){
+void deallocate(support_t *supStruct){
     if (freeSupIndex < MAX_SUPPORTS){ /*Verify that we're not overflowing the pool*/
-        free_support_pool[freeSupIndex++] = support; /*Return the support struct to the free pool*/
+        free_support_pool[freeSupIndex++] = supStruct; /*Return the support struct to the free pool*/
     }
 }
 
 /**************************************************************************************************
- * TO-DO
+ * @brief Retrieve a support structure from the free pool.
+ *
+ * This function returns a pointer to a support structure from the free_support_pool if one is
+ * available. If the pool is empty (freeSupIndex is 0), it returns NULL.
+ *
+ * @param: None
+ * @return Pointer to a support_t structure if available, otherwise NULL
+ * 
+ * @ref
+ * pandOS - section 4.10
  **************************************************************************************************/
 support_t* allocate() {    
     if (freeSupIndex != 0){ /*If we still have available support structs from the free pool*/
@@ -66,7 +95,7 @@ support_t* allocate() {
         return newSupStruct;
     }
     else{
-        return NULL;
+        return NULL; /*no more support structs available*/
     }
 }
 
@@ -76,7 +105,7 @@ support_t* allocate() {
 void initSupport() {
     freeSupIndex = 0;
     int i;
-    for (i = 0; i < UPROCMAX; i++){
+    for (i = 0; i < MAXUPROCS; i++){
         deallocate(&support_structs_pool[i]);
     }
 }
@@ -150,13 +179,13 @@ void test() {
     /*create and launch MAXUPROCESS user processes*/
     /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/
 
-    for (process_id= 1; process_id < UPROCMAX+1; process_id++) {
+    for (process_id= 1; process_id < MAXUPROCS+1; process_id++) {
         summon_process(process_id,&base_state); /*Helper method to set up asid, exception contexts and page tables for each process*/
     }
     
     /*Wait for all uprocs to finish*/
     int i;
-    for (i = 0; i < UPROCMAX; i++){
+    for (i = 0; i < MAXUPROCS; i++){
         SYSCALL(SYS3, (memaddr) &masterSema4, 0, 0);
     }
 

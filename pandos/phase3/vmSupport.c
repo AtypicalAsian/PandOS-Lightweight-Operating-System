@@ -40,7 +40,7 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Support Level Data Structures*/
-swap_pool_t swap_pool[UPROCMAX * 2];    /*swap pool table*/
+swap_pool_t swap_pool[MAXUPROCS * 2];    /*swap pool table*/
 int semaphore_swapPool;              /*swap pool sempahore*/
 
 /**************************************************************************************************

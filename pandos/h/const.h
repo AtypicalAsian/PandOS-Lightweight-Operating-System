@@ -10,8 +10,8 @@
 #define WORDLEN			  4				  /* word size in bytes	*/
 #define MAXPROC 20 
 #define MAXPAGES      32
-#define UPROCMAX 8
-#define POOLSIZE (UPROCMAX * 2)
+#define MAXUPROCS 8
+#define POOLSIZE (MAXUPROCS * 2)
 #define STACKSIZE 499
 
 

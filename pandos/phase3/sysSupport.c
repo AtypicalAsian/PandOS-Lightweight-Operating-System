@@ -37,7 +37,7 @@
  #include "../h/initProc.h"
  #include "../h/vmSupport.h"
  #include "../h/sysSupport.h"
- #include "/usr/include/umps3/umps/libumps.h"
+//  #include "/usr/include/umps3/umps/libumps.h"
 
 int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES]; /*Support level device semaphores*/
 
@@ -218,6 +218,9 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     int pid;
     int baseTerminalIndex;
     int semIndex;
+    int status;
+    int transmittedChars;
+    transmittedChars = 0;
 
     pid = support_struct->sup_asid-1;
     baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + pid;
@@ -237,10 +240,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
 
     SYSCALL(SYS3,(memaddr) &support_device_sems[semIndex], 0, 0);
 
-    int transmittedChars;
-    transmittedChars = 0;
     int i;
-    int status;
 
     for (i = 0; i < len; i ++) {
         memaddr transmitterStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
@@ -263,48 +263,74 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
 }
 
 void readTerminal(char *virtualAddr, support_t *support_struct){
-    int device_instance = support_struct->sup_asid - 1;
-    int charCount = 0;
-    int status;
-    char string = ' ';
+    /* 
+    STEPS:
+    1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
+    2. Modify the base semaphore index since it's terminal device and the operation is READ -> we maintain the same base index
+    3. Use While loop to interate each character received from the device until there is no more character to read
+    4. Before saving the character into the buffer, disable interrupt by setSTATUS and clear all the bits
+    5. Retrieve the received command for terminal device and add bit shift to get character value
+        5.1. If getting char is not successful, save the negative device status to an existing defined variable and get out of the loop
+    6. Perform SYS5 to request I/O
+    7. Issue ACK to let the device return to ready state after each iteration
+    8. Save the character count (success) or device's status value (FAIL) to v0
+    9. Unlock the semaphore by calling SYS4 & restore the device status 
+    Ref: pandos section 4.7.5, princOfOperations chapter 5.7 
+    */
+    if (virtualAddr == NULL) {
+        SYSCALL(SYS9, 0, 0, 0);
+    }
 
-    int semIndex = (TERMSEM * DEVICE_INSTANCES) + device_instance;
+    /*Local variables*/
+    int pid;
+    int baseTerminalIndex;
+    int semIndex;
 
-    SYSCALL(PASSEREN, (memaddr) &support_device_sems[semIndex], 0, 0);
+    pid = support_struct->sup_asid-1;
+    baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + pid;
+    semIndex = baseTerminalIndex;
+    /*Calculate the offset for the terminal device row relative to disk*/
+    unsigned int terminalOffset = (TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE);
 
-    device_t* device_int = (device_t *)(DEVICEREGSTART + ((TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
+    /*Calculate the offset for the specific device instance (column) within that row*/
+    unsigned int instanceOffset = pid * DEVREGSIZE;
 
-    while(((device_int->d_status & TERMSTATUSMASK) == READY) && (string != EOS)) {
+    /*The total offset is the sum of the row offset and the instance offset*/
+    unsigned int totalOffset = terminalOffset + instanceOffset;
+
+    /*Add the total offset to the base address of the device registers*/
+    device_t *terminalDevice = (device_t *)(DEVICEREGSTART + totalOffset);
+
+    SYSCALL(SYS3,(memaddr) &support_device_sems[semIndex], 0, 0);
+
+
+    int receivedChars;
+    receivedChars = 0;
+    int readStatus;
+
+    while (1) {
+        readStatus = (terminalDevice->d_status & TERMINAL_STATUS_MASK);
         
-        setSTATUS(INTSOFF);
-
-        device_int->d_command = TRANSMITCHAR;
-
-        status = SYSCALL(WAITIO, TERMINT, device_instance, TRUE);
-
-        setSTATUS(INTSON);
-
-        if((status & TERMSTATUSMASK) == OKCHARTRANS) {
-            
-            string = (status >> DEVICE_INSTANCES);
-
-            if(string != EOS) {
-                *virtualAddr = string;
-                virtualAddr++;
-                charCount++;
-            }
-        }
-        else {
-            string = EOS;
+        if (readStatus == TERMINAL_STATUS_RECEIVED) {
+            /* memaddr oldStatus = getSTATUS(); */
+            setSTATUS(INTSOFF);
+            char receivedChar = (char) (terminalDevice->d_command & TERMINAL_STATUS_MASK);
+            /* Save the read chars to buffer */
+            *(virtualAddr + receivedChars) = receivedChar;
+            receivedChars++;
+            SYSCALL(SYS5, semIndex, pid, 0);
+            setSTATUS(INTSON);
+        } else if (readStatus != TERMINAL_STATUS_READY) {
+            receivedChars = -(readStatus);
+            break;
+        } else {
+            break;
         }
     }
 
-    if((device_int->d_status & TERMSTATUSMASK) != READY || (status & TERMSTATUSMASK) != OKCHARTRANS) {
-        charCount = -(status);
-    }
-    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
-
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
+    SYSCALL(SYS4,(memaddr) &support_device_sems[semIndex], 0, 0);
+    /*IMPLEMENTATION ENDS*/
 }
 
 /**************************************************************************************************

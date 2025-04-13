@@ -358,46 +358,50 @@ void trapExcHandler(support_t *support_struct)
  *      4. Execute appropriate syscall handler
  *      5. LDST to return to process that requested SYSCALL
  **************************************************************************************************/
-void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
-    /*--------------Declare local variables---------------------*/
-    char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
-    int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
-    /*int param3;*/     /*value stored in a3*/
-    /*----------------------------------------------------------*/
-
-    /*Step 1: Check syscall number (must fall within syscall 9 to 13)*/
-    if (syscall_num_requested > SYS13 || syscall_num_requested < SYS9){ /*Have to change this for future phases*/
-        trapExcHandler(currProc_support_struct);
+void syscall_excp_handler(support_t *support_struct,int exc_code){
+    /* Validate syscall number */
+    if (exc_code < TERMINATE || exc_code > DELAY) {
+        /* Invalid syscall number, treat as Program Trap */
+        trapExcHandler(support_struct);
         return;
     }
 
-    /*Step 2: Read values in registers a1-a3*/
-    virtualAddr = (char *) currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
-    length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
-    /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3*/  
+    /* Get a1 (arg1) and a2 (arg2) from sup_exceptState to pass to syscalls */
+    int arg1 = support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    int arg2 = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
 
+    /* Return any values to v0 and load state the sup_exceptState */
+    switch(exc_code) {
+        case TERMINATE:
+            terminate(support_struct);
+            break;
 
-    /*Step 4: Execute appropriate syscall helper method based on requested syscall number*/
-    switch(syscall_num_requested){
-        case SYS9:
-            terminate(currProc_support_struct);
-        case SYS10:
-            getTOD(&currProc_support_struct->sup_exceptState[GENERALEXCEPT]);
-        case SYS11:
-            /*virtual address of first char in a1, length of string in a2*/
-            writeToPrinter(virtualAddr, length, currProc_support_struct);
-        case SYS12:
-            /*virtual address of first char in a1, length of string in a2*/
-            writeToTerminal(virtualAddr, length, currProc_support_struct);
-        case SYS13:
-            readTerminal(virtualAddr,currProc_support_struct);
+        case GET_TOD:
+            getTOD(&support_struct->sup_exceptState[GENERALEXCEPT]);
+            break;
+
+        case WRITEPRINTER:
+            writeToPrinter((char *) arg1, arg2, support_struct);
+            break;
+
+        case WRITETERMINAL:
+            writeToTerminal((char *) arg1, arg2, support_struct);  
+            break;
+
+        case READTERMINAL:
+            readTerminal((char *) arg1, support_struct);
+            break;
+
         default:
-            trapExcHandler(currProc_support_struct);
+            trapExcHandler(support_struct);
             break;
     }
-    /*Step 3: Increment PC+4 to execute next instruction on return*/
-    currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
-    returnControlSup(currProc_support_struct,GENERALEXCEPT); /*Context switch*/
+
+    /* Increment pc by word size (4) (assuming, the sup_exceptState pc count) */
+    /* Ensure the state is updated and return to the caller */
+    support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
+    /* Return control to the current process to retry the instruction that caused the page fault */
+    returnControlSup(support_struct, GENERALEXCEPT);
 }
 
 /**************************************************************************************************

@@ -191,40 +191,74 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
 }
 
 
-
+/**************************************************************************************************
+ * TO-DO 
+ **************************************************************************************************/
 void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
-    int device_instance = support_struct->sup_asid - 1;
-    unsigned int charCount = 0;
-
-    int semIndex = (TERMWRSEM * DEVICE_INSTANCES) + device_instance;
-    
-    SYSCALL(PASSEREN, (memaddr) &support_device_sems[semIndex], 0, 0);
-
-    device_t *device_int = (device_t *) (DEVICEREGSTART + ((TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
-    int status = OKCHARTRANS;
-
-
-    int i;
-    for (i = 0; i < len; i++) {
-        if(((device_int->d_data0 & TERMSTATUSMASK) == READY) && ((status & TERMSTATUSMASK) == OKCHARTRANS)) {
-            setSTATUS(INTSOFF);
-
-            device_int->d_data1 = (((int) *(virtualAddr + i)) << TERMTRANSHIFT) | TRANSMITCHAR;
-            status = SYSCALL(WAITIO, TERMINT, device_instance, 0);
-
-            setSTATUS(INTSON);
-            charCount++;
-        }
-        else{
-            charCount = -(status);
-            i = len;
-        }
+    if (len < 0 || len > 128 || (unsigned int) virtualAddr < KUSEG) {
+        SYSCALL(SYS9, 0, 0, 0);
     }
 
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
+    /* STEPS: Similar to write_to_printer(),
+    1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
+    2. Modify the base semaphore index since it's terminal device and the operation is WRITE -> we need to increment by DEVPRINT (8)
+    3. Use For loop to interate each character starting from virtAddr to (virtAddr + len)
+    4. Before transmitting, disable interrupt by setSTATUS and clear all the bits
+    5. Set the command for terminal device with bit shift (like the guide in Ref)
+    6. Request I/O to pass the character to terminal device
+    7. Check terminal transmitted status
+    8. Issue ACK to let the device return to ready state after each iteration
+    9. Save the character count (success) or device's status value (FAIL) to v0
+    10. Unlock the semaphore by calling SYS4 & restore the device status 
 
-    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);  
+    Ref: princOfOperations section 5.7
+         pandos section 3.5.5, pg 27,28
+    */
 
+    /*Local variables*/
+    int pid;
+    int baseTerminalIndex;
+    int semIndex;
+
+    pid = support_struct->sup_asid-1;
+    baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + pid;
+    semIndex = baseTerminalIndex + DEVPERINT;
+
+    devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;
+    device_t *terminalDevice = &(devRegArea->devreg[semIndex]);
+    SYSCALL(SYS3,(memaddr) &support_device_sems[semIndex], 0, 0);
+
+    int transmittedChars;
+    transmittedChars = 0;
+    int i;
+
+    for (i = 0; i < len; i ++) {
+        memaddr transmitterStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
+        if (transmitterStatus == TERMINAL_STATUS_READY) {
+            /* memaddr oldStatus = getSTATUS(); */
+            setSTATUS(INTSOFF);
+
+            char transmitChar = *(virtualAddr + i);
+            terminalDevice->d_data1 = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
+            memaddr newStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
+
+            SYSCALL(SYS5, semIndex, pid, 0);
+
+            setSTATUS(INTSON);
+
+            if (newStatus == TERMINAL_STATUS_TRANSMITTED) {
+                transmittedChars ++;
+            } else {
+                transmittedChars = -(newStatus);
+                break;
+            }
+        } else if (transmitterStatus != READY) {
+            transmittedChars = -(transmitterStatus);
+            break;
+        }
+    }
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;
+    SYSCALL(SYS4,(memaddr) &support_device_sems[semIndex], 0, 0);
 }
 
 void readTerminal(char *virtualAddr, support_t *support_struct){

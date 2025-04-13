@@ -97,11 +97,11 @@ typedef struct state_t {
 } state_t, *state_PTR;
 
 /*define the swap pool struct*/
-typedef struct swap_t {
-    int         sw_asid;  
-    int         sw_pageNo;
-    pte_entry_t *sw_pte;  
-} swap_t;
+typedef struct swap_pool_t {
+    int         asid;  
+    int         pg_number;
+    pte_entry_t *ownerEntry;  
+} swap_pool_t;
 
 typedef struct support_t {
     int       sup_asid;            /* process Id (asid) */
@@ -144,8 +144,6 @@ pcb_t 		   *s_procQ;  /* tail ptr to process queue */
 
 } semd_t, *semd_PTR;
 
-
-/*typedef int semaphore;*/
 
 #define	s_at	s_reg[0]
 #define	s_v0	s_reg[1]

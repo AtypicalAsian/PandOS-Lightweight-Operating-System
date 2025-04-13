@@ -40,7 +40,7 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Support Level Data Structures*/
-swap_t swap_pool[UPROCMAX * 2];    /*swap pool table*/
+swap_pool_t swap_pool[UPROCMAX * 2];    /*swap pool table*/
 int semaphore_swapPool;              /*swap pool sempahore*/
 
 /**************************************************************************************************
@@ -61,7 +61,7 @@ void init_deviceSema4s(){
 void initSwapPool() {
     int k;
     for (k = 0; k < POOLSIZE; k++) {
-        swap_pool[k].sw_asid = NOPROC;
+        swap_pool[k].asid = NOPROC;
     }
 }
 
@@ -300,22 +300,22 @@ void tlb_exception_handler() {
         /*We get frame address by multiplying the page size with the frame number then adding the offset which is the starting address of the swap pool*/
 
         /*Step 7 + 8: If the frame is occupied -> need to evict it (invalidate the page occupying this frame)*/
-        if (swap_pool[free_frame_num].sw_asid != -1){
+        if (swap_pool[free_frame_num].asid != -1){
             /*Updating TLB and Swap Pool must be atomic -> DISABLE INTERRUPTS - pandOS [section 4.5.3]*/
             setSTATUS(INTSOFF);
 
             /*Step 1: Mark old page currently occupying the frame number as invalid*/
-            swap_pool[free_frame_num].sw_pte->entryLO &= VALIDBITOFF; /*go to page table entry of owner process and set valid bit to off*/
+            swap_pool[free_frame_num].ownerEntry->entryLO &= VALIDBITOFF; /*go to page table entry of owner process and set valid bit to off*/
 
             /*Step 2: Update the TLB*/
-            update_tlb_handler(swap_pool[free_frame_num].sw_pte);
+            update_tlb_handler(swap_pool[free_frame_num].ownerEntry);
 
             /*ENABLE INTERRUPTS*/
             setSTATUS(INTSON);
 
-            unsigned int occp_pageNum = swap_pool[free_frame_num].sw_pageNo; /*get the page number of the page occupying the frame at swap_pool[frame_number]*/
+            unsigned int occp_pageNum = swap_pool[free_frame_num].pg_number; /*get the page number of the page occupying the frame at swap_pool[frame_number]*/
             occp_pageNum = occp_pageNum % 32; /*mod to map page to range 0-31*/    
-            unsigned int occp_asid = swap_pool[free_frame_num].sw_asid; /*get ASID of process whose page owns the frame at swap_pool[frame_number]*/
+            unsigned int occp_asid = swap_pool[free_frame_num].asid; /*get ASID of process whose page owns the frame at swap_pool[frame_number]*/
             flash_no = occp_asid - 1;
 
             /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device) - pandOS [section 4.5.1]*/
@@ -343,9 +343,9 @@ void tlb_exception_handler() {
         
 
         /*Update swap pool table with new entry*/
-        swap_pool[free_frame_num].sw_asid = asid; /*set asid of the u-proc that now owns this frame*/
-        swap_pool[free_frame_num].sw_pageNo = missing_page_no; /*record virtual page number that is now occupying this frame*/
-        swap_pool[free_frame_num].sw_pte = &(currProc_supp_struct->sup_privatePgTbl[missing_page_no]); /*store pointer to page table entry for this page*/
+        swap_pool[free_frame_num].asid = asid; /*set asid of the u-proc that now owns this frame*/
+        swap_pool[free_frame_num].pg_number = missing_page_no; /*record virtual page number that is now occupying this frame*/
+        swap_pool[free_frame_num].ownerEntry = &(currProc_supp_struct->sup_privatePgTbl[missing_page_no]); /*store pointer to page table entry for this page*/
 
 
         /*Step 11: Update the Page Table for the new process, marking the page as valid (V bit)*/

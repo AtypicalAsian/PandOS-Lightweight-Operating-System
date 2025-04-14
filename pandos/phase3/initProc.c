@@ -38,24 +38,7 @@ int freeSupIndex; /*Iterator to index into the free support pool stack*/
 support_t *free_support_pool[MAXUPROCS+1]; /*Array of pointers to free support structures. One extra slot is allocated to serve as a sentinel*/
 support_t support_structs_pool[MAXUPROCS]; /*Array of support structure objects for user procs*/
 
-/**************************************************************************************************
- * @brief
- *
- * This function sets up the initial state for a user process by initializing:
- *  - The status register
- *  - The program counter (PC) and register t9
- *  - The stack pointer (SP)
- *
- * @param base_state Pointer to a state_t structure that will be initialized with the base state
- * @return None
- **************************************************************************************************/
-/*Initialize base processor state for user-process (define a function for this)*/
-void init_base_state(state_t *base_state){
-    base_state->s_status = IMON | TEBITON | USERPON | IEPON; /*Enable timer, user mode, interrupts*/
-    base_state->s_pc = TEXT_START; /*initialize PC*/
-    base_state->s_t9 = TEXT_START; /*have to set t9 register after setting s_pc*/
-    base_state->s_sp = SP_START; /*stack pointer*/
-}
+
 
 /**************************************************************************************************
  * @brief Return a support structure to the free pool
@@ -100,9 +83,13 @@ support_t* allocate() {
 }
 
 /**************************************************************************************************
- * TO-DO
+ * @brief Initializes the support structure pool
+ *
+ * @details This function resets the free index (freeSupIndex) to 0 and then iterates over 
+ *          the pool of support structures. Each support structure is deallocated (pushed
+ *          onto the free support pool) using the deallocate() helper function.
  **************************************************************************************************/
-void initSupport() {
+void initSuppPool() {
     freeSupIndex = 0;
     int i;
     for (i = 0; i < MAXUPROCS; i++){
@@ -111,41 +98,77 @@ void initSupport() {
 }
 
 /**************************************************************************************************
- * TO-DO
- * Helper method to create a process
+ * @brief
+ *
+ * This function sets up the initial state for a user process by initializing:
+ *  - The status register
+ *  - The program counter (PC) and register t9
+ *  - The stack pointer (SP)
+ *
+ * @param base_state Pointer to a state_t structure that will be initialized with the base state
+ * @return None
+ * 
+ * @ref
+ * pandOS - section 4.9.1
+ **************************************************************************************************/
+/*Initialize base processor state for user-process (define a function for this)*/
+void init_base_state(state_t *base_state){
+    base_state->s_status = IMON | TEBITON | USERPON | IEPON; /*Enable timer, user mode, interrupts*/
+    base_state->s_pc = TEXT_START; /*initialize PC*/
+    base_state->s_t9 = TEXT_START; /*have to set t9 register after setting s_pc*/
+    base_state->s_sp = SP_START; /*stack pointer*/
+}
+
+/**************************************************************************************************
+ * @brief Initialize a u-proc's support structure and process
+ *        state, and then calling SYS1 to create and launch the process.
+ *
+ * @details
+ * 1. Allocates a support structure from the free pool
+ * 2. Sets up the unique ASID for the new process
+ * 3. Configures two exception contexts in the support structure:
+ *       - The general exception context uses sysSupportGenHandler
+ *       - The page fault exception context uses the TLB exception handler
+ * 4. Initializes the process's private page table:
+ *       - The first 31 entries are for program pages
+ *       - The last entry (index 31) is reserved for the process stack
+ * 5. Finally, invokes SYS1 to create and launch the process
+ * 
+ * @ref
+ * pandOS - section 4.9.1
  **************************************************************************************************/
 void summon_process(int process_id, state_t *base_state){
-    support_t *suppStruct = allocate();
+    support_t *suppStruct = allocate(); /*allocate a support struct from the free pool*/
     if (suppStruct == NULL){
         PANIC();
     }
     state_t base_state_copy = *base_state; /*make a copy of base state to avoid modifying the same struct for multiple processes*/
-    base_state_copy.s_entryHI = (process_id << ASIDSHIFT);
+    base_state_copy.s_entryHI = (process_id << SHIFT_ASID); /*Set unique ASID in state*/
         
-    suppStruct->sup_asid = process_id;
+    suppStruct->sup_asid = process_id; /*Set unique ASID in support structure*/
 
     /*Set Up General Exception Context*/
-    suppStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) &sysSupportGenHandler; 
-    suppStruct->sup_exceptContext[GENERALEXCEPT].c_status = IEPON | IMON | TEBITON;
-    suppStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackGen[STACKSIZE]);
+    suppStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) &sysSupportGenHandler; /*set to address of support level's gen exception handler*/
+    suppStruct->sup_exceptContext[GENERALEXCEPT].c_status = IEPON | IMON | TEBITON; /*kernel mode, interrupts & PLT enabled*/
+    suppStruct->sup_exceptContext[GENERALEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackGen[STACKSIZE]); /*set sp to stack space allocated in support struct*/
 
     /*Set Up Page Fault Exception Context*/
-    suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) &tlb_exception_handler;
-    suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = IEPON | IMON | TEBITON;
-    suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackTLB[STACKSIZE]);
+    suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_pc = (memaddr) &tlb_exception_handler; /*set to address of support level's TLB exception handler*/
+    suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_status = IEPON | IMON | TEBITON; /*kernel mode, interrupts & PLT enabled*/
+    suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackTLB[STACKSIZE]); /*set sp to stack space allocated in support struct*/
         
-    /*Set Up process page table*/
+    /*Initialize the private page table: pages 0-30 for data, entry 31 for stack*/
     int k;
     for (k=0; k < 31; k++){
-        suppStruct->sup_privatePgTbl[k].entryHI = 0x80000000 + (k << VPNSHIFT) + (process_id << ASIDSHIFT);
-        suppStruct->sup_privatePgTbl[k].entryLO = DIRTYON;
+        suppStruct->sup_privatePgTbl[k].entryHI = PT_START + (k << SHIFT_VPN) + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
+        suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET;
     }
         
     /*Entry 31 of page table = stack*/
-    suppStruct->sup_privatePgTbl[31].entryHI = 0xBFFFF000 + (process_id << ASIDSHIFT);
-    suppStruct->sup_privatePgTbl[31].entryLO = DIRTYON;
+    suppStruct->sup_privatePgTbl[31].entryHI = PT_START + (PAGE31_NUM << SHIFT_VPN) + (process_id << SHIFT_ASID);
+    suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET;
 
-    /*Call SYS1*/
+    /*Call SYS1 to create and launch the u-proc*/
     SYSCALL(SYS1,(memaddr) &base_state_copy,(memaddr)suppStruct,0);
 }
 
@@ -171,7 +194,7 @@ void test() {
     /* Initalise device reg semaphores */
     init_deviceSema4s(); /*initialize device semaphores array*/
     initSwapPool(); /*Initialize swap pool & swap pool semaphore*/
-    initSupport(); /*Initialize support structs*/
+    initSuppPool(); /*Initialize support structs free pool*/
  
     /*Set up initial proccessor state*/
     init_base_state(&base_state);

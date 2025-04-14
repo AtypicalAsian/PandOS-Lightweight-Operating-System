@@ -200,7 +200,7 @@ void uTLB_RefillHandler() {
 
     state_PTR saved_except_state = (state_PTR) BIOSDATAPAGE; /*get the saved exception state located at start of BIOS data page*/
     unsigned int entryHI = saved_except_state->s_entryHI;   /*get entryHI*/
-    unsigned int missing_virtual_pageNum = (entryHI & 0xFFFFF000) >> VPNSHIFT; /*mask offset bits and shift right 12 bits to get VPN*/
+    unsigned int missing_virtual_pageNum = (entryHI & 0xFFFFF000) >> SHIFT_VPN; /*mask offset bits and shift right 12 bits to get VPN*/
     missing_virtual_pageNum %= 32;
 
     /*WHAT IF VPN exceed size of 32 we defined in types.h? Mod 32?*/
@@ -292,7 +292,7 @@ void tlb_exception_handler() {
         SYSCALL(SYS3,(int)&semaphore_swapPool,0,0);
 
         /*Step 5: Compute missing page number*/
-        missing_page_no = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & 0xFFFFF000) >> VPNSHIFT;
+        missing_page_no = (currProc_supp_struct->sup_exceptState[PGFAULTEXCEPT].s_entryHI & 0xFFFFF000) >> SHIFT_VPN;
 
         /*Step 6: Pick a frame from the swap pool (Page Replacement Algorithm)*/
         free_frame_num = find_frame_swapPool();

@@ -134,10 +134,10 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     /*Check if address we're writing from is outside of the uproc logical address space*/
 
     /*Check if length of string is within bounds (0-128)*/
-    if (len < 0 || len > 128 || (unsigned int) virtualAddr < KUSEG) /*DEFINE CONSTANTS FOR THESE*/
+    /*if (len < 0 || len > 128 || (unsigned int) virtualAddr < KUSEG)
     {
         SYSCALL(SYS9, 0, 0, 0);
-    }
+    }*/
 
     /*--------------Declare local variables---------------------*/
     int semIndex;

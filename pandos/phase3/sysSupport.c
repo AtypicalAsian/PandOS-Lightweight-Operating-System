@@ -154,22 +154,21 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     /*pops 4.2 - Device register area starts from address 0x10000054*/
     /*pops 5.1 - Interrupt lines 3–7 are used for peripheral devices*/
 
-    devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
-    device_t *device_int = &(busRegArea->devreg[semIndex]);
+    devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the bus register area */
+    device_t *printerDev = &(busRegArea->devreg[semIndex]);
 
-    /*device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));*/    
     int i;
     for (i = 0; i < len; i++) {
-        if(device_int->d_status == READY) {
+        if(printerDev->d_status == READY) {
             setSTATUS(INTSOFF);
-            device_int->d_data0 = ((int) *(virtualAddr + i));
-            device_int->d_command = PRINTCHR;
+            printerDev->d_data0 = ((int) *(virtualAddr + i));
+            printerDev->d_command = PRINTCHR;
             SYSCALL(WAITIO, PRNTINT, pid, 0);
             setSTATUS(INTSON);
             char_printed_count++;
         }
         else {
-            char_printed_count = -(device_int->d_status);
+            char_printed_count = -(printerDev->d_status);
             i = len;
         }
     }

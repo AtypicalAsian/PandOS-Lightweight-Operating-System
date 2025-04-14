@@ -166,16 +166,16 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
             setSTATUS(INTSOFF);
             device_int->d_data0 = ((int) *(virtualAddr + i));
             device_int->d_command = PRINTCHR;
-            SYSCALL(WAITIO, PRNTINT, device_instance, 0);
+            SYSCALL(WAITIO, PRNTINT, pid, 0);
             setSTATUS(INTSON);
-            charCount++;
+            char_printed_count++;
         }
         else {
-            charCount = -(device_int->d_status);
+            char_printed_count = -(device_int->d_status);
             i = len;
         }
     }
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
     SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);
 }
 

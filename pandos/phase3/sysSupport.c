@@ -139,12 +139,26 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
         SYSCALL(SYS9, 0, 0, 0);
     }*/
 
-    int device_instance = support_struct->sup_asid - 1;
-    int charCount = 0;
+    /*--------------Declare local variables---------------------*/
+    int semIndex;
+    int pid;
+    int char_printed_count; /*tracks how many characters were printed*/
+    char_printed_count = 0;
+    /*----------------------------------------------------------*/
 
-    SYSCALL(PASSEREN, (memaddr)&support_device_sems[(PRINTSEM * DEVICE_INSTANCES) + device_instance], 0, 0);
+    pid = support_struct->sup_asid - 1;
+    semIndex = ((PRNTINT - OFFSET) * DEVPERINT) + pid;
+    char_printed_count = 0;
 
-    device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
+    SYSCALL(PASSEREN, (memaddr)&support_device_sems[semIndex], 0, 0);
+    /*pops 4.2 - Device register area starts from address 0x10000054*/
+    /*pops 5.1 - Interrupt lines 3–7 are used for peripheral devices*/
+
+    devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
+    device_t *printerDevice = &(devRegArea->devreg[semIndex]);
+
+    /*device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));*/
+    device_t *device_int = (device_t *) 0x10000054 + ((PRNTINT - 3) * 0x80) + (pid * 0x10);
     
     int i;
     for (i = 0; i < len; i++) {
@@ -162,7 +176,7 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
         }
     }
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
-    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[(PRINTSEM * DEVICE_INSTANCES) + device_instance], 0, 0);
+    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);
 }
 
 

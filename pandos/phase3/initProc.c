@@ -35,7 +35,7 @@
 int deviceSema4s[DEVICE_TYPES * DEVPERINT]; /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
 int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully */
 int freeSupIndex; /*Iterator to index into the free support pool stack*/
-support_t *free_support_pool[MAXUPROCS+1]; /*Array of pointers to free support structures. One extra slot is allocated to serve as a sentinel*/
+support_t *free_support_pool[MAX_FREE_POOL]; /*Array of pointers to free support structures. One extra slot is allocated to serve as a sentinel*/
 support_t support_structs_pool[MAXUPROCS]; /*Array of support structure objects for user procs*/
 
 
@@ -159,14 +159,14 @@ void summon_process(int process_id, state_t *base_state){
         
     /*Initialize the private page table: pages 0-30 for data, entry 31 for stack*/
     int k;
-    for (k=0; k < 31; k++){
+    for (k=0; k < PAGE_TABLE_MAX; k++){
         suppStruct->sup_privatePgTbl[k].entryHI = PT_START + (k << SHIFT_VPN) + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
         suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET; /*mark the page as dirty by default - each page will be write-enabled*/
     }
         
     /*Entry 31 of page table = stack*/
-    suppStruct->sup_privatePgTbl[31].entryHI = PAGE31_ADDR + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
-    suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET; /*mark D bit on*/
+    suppStruct->sup_privatePgTbl[PAGE_TABLE_MAX].entryHI = PAGE31_ADDR + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
+    suppStruct->sup_privatePgTbl[PAGE_TABLE_MAX].entryLO = D_BIT_SET; /*mark D bit on*/
 
     /*Call SYS1 to create and launch the u-proc*/
     SYSCALL(SYS1,(memaddr) &base_state_copy,(memaddr)suppStruct,0);

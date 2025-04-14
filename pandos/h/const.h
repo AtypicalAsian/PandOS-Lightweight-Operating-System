@@ -11,6 +11,7 @@
 #define MAXPROC 20 
 #define MAXPAGES      32
 #define MAXUPROCS 8
+#define MAX_FREE_POOL 9
 #define POOLSIZE (MAXUPROCS * 2)
 #define STACKSIZE 499
 
@@ -55,6 +56,7 @@
 #define UPROCSTACKPG 0xBFFFF000
 #define TOPSTKPAGE 0x20001000
 #define PAGE31_ADDR 0xBFFFF000
+#define PAGE_TABLE_MAX 31
 
 
 

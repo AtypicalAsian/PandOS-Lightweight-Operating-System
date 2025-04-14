@@ -154,12 +154,10 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     /*pops 4.2 - Device register area starts from address 0x10000054*/
     /*pops 5.1 - Interrupt lines 3–7 are used for peripheral devices*/
 
-    devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
-    device_t *printerDevice = &(devRegArea->devreg[semIndex]);
+    devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
+    device_t *device_int = &(busRegArea->devreg[semIndex]);
 
-    /*device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));*/
-    device_t *device_int = (device_t *) 0x10000054 + ((PRNTINT - 3) * 0x80) + (pid * 0x10);
-    
+    /*device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));*/    
     int i;
     for (i = 0; i < len; i++) {
         if(device_int->d_status == READY) {

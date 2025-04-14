@@ -165,7 +165,7 @@ void summon_process(int process_id, state_t *base_state){
     }
         
     /*Entry 31 of page table = stack*/
-    suppStruct->sup_privatePgTbl[31].entryHI = PT_START + (PAGE31_NUM << SHIFT_VPN) + (process_id << SHIFT_ASID);
+    suppStruct->sup_privatePgTbl[31].entryHI = PAGE31_ADDR + (process_id << SHIFT_ASID);
     suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET;
 
     /*Call SYS1 to create and launch the u-proc*/

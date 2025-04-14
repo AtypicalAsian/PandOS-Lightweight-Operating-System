@@ -26,20 +26,21 @@
  * 
  **************************************************************************************************/
 
- #include "../h/types.h"
- #include "../h/const.h"
- #include "../h/asl.h"
- #include "../h/pcb.h"
- #include "../h/initial.h"
- #include "../h/scheduler.h"
- #include "../h/exceptions.h"
- #include "../h/interrupts.h"
- #include "../h/initProc.h"
- #include "../h/vmSupport.h"
- #include "../h/sysSupport.h"
- #include "/usr/include/umps3/umps/libumps.h"
+#include "../h/types.h"
+#include "../h/const.h"
+#include "../h/asl.h"
+#include "../h/pcb.h"
+#include "../h/initial.h"
+#include "../h/scheduler.h"
+#include "../h/exceptions.h"
+#include "../h/interrupts.h"
+#include "../h/initProc.h"
+#include "../h/vmSupport.h"
+#include "../h/sysSupport.h"
+#include "/usr/include/umps3/umps/libumps.h"
 
-int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES]; /*Support level device semaphores*/
+/*Support level device semaphores*/
+int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES]; 
 
 
 
@@ -55,9 +56,13 @@ void returnControlSup(support_t *support, int exc_code)
 
 
 
-/**************************************************************************************************
- * TO-DO 
- * terminate() is a essentially a wrapper for the kernel-mode restricted SYS2 service
+/************************************************************************************************** 
+ * @brief terminate() is a essentially a wrapper for the kernel-mode restricted SYS2 service
+ * 
+ * @details
+ * 
+ * @ref
+ * pandOS - section 4.7.1
  **************************************************************************************************/
 void terminate(support_t *support_struct)
 {
@@ -88,16 +93,16 @@ void terminate(support_t *support_struct)
 
 
 /**************************************************************************************************
- * TO-DO 
- * Returns the number of microseconds since system boot
+ * @brief Return the number of microseconds since system boot
  * The method calls the hardware TOD clock and stores in register v0
+ * 
+ * @note Save current TOD to register v0
+ * 
+ * @ref
+ * pandOS - section 4.7.2
  **************************************************************************************************/
 void getTOD(state_PTR excState)
 {
-    /* Get number of ticks per seconds from the last time the system was booted/reset
-
-    Ref: pandos section 4.7.2
-    */
    cpu_t currTime;
    STCK(currTime);
    excState->s_v0 = currTime;
@@ -105,32 +110,32 @@ void getTOD(state_PTR excState)
 
 
 /**************************************************************************************************
- * TO-DO 
+ * @brief The method implements a syscall to perform WRITE operation to printer device
+ * 
+ * @details
+ * 1. Check if address we're writing from is outside of the uproc logical address space
+ * 2. Check if length of string is within bounds (0-128)
+ * 3. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
+ * 4. Perform SYS3 to gain mutex over printer device
+ * 5. Use For Loop to iterating through each character in the range [virtAddr, virtAddr + len], and write one by one to printer: 
+ *  5.1 Given that the printer device is ready:
+        - Retrieve current processor status before disabling all external interrupts
+        - Reset the status to 0x0 and disable all interrupts
+        - Pass character to printer device with d_data0 & d_command
+        - Request I/O to print the passed character
+        - Enable the interrupt again by restoring the previous processor status
+        - Increment transmitted character count
+    5.2 Given that the printer device is busy:
+        - Return the negative of device status in v0
+ * 6. Load the transmitted char count into register v0
+ * 7. Perform SYS4 to release printer device sempahore
+ * 
+ * @ref
+ * pandOS - section 4.7.3
+ * princOfOperations - Chapter 4.2, Device register area starts from address 0x10000054
+ * princOfOperations - Chapter 5.1, 5.6, Interrupt lines 3–7 are used for peripheral devices
  **************************************************************************************************/
 void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
-    /* 
-    Ref: pandos section 4.7.3
-    STEPS:
-    1. Check if address we're writing from is outside of the uproc logical address space
-    2. Check if length of string is within bounds (0-128)
-    3. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
-    4. Perform SYS3 to gain mutex over printer device
-    5. Use For Loop to iterating through each character and write one by one to printer: start at virtAddr, end at virtAddr + len
-    (cond: printer device is not busy (ready))
-       5.1. Retrieve current processor status before disabling all external interrupts
-       5.2. Reset the status to 0x0 and disable all interrupts
-       5.3. Pass character to printer device with d_data0 & d_command
-       5.4. Request I/O to print the passed character
-       5.5. Enable the interrupt again by restoring the previous processor status
-       5.6 Increment transmitted character count
-    (cond: printer device is busy)
-       5.7 Return the negative of device status in v0
-    6. Load the transmitted char count into v0 register
-    7. Perform SYS4 to release printer device sempahore
-
-    Ref: princOfOperations section 5.1, 5.6
-    */
-    
     /*Check if address we're writing from is outside of the uproc logical address space*/
 
     /*Check if length of string is within bounds (0-128)*/
@@ -151,8 +156,6 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     char_printed_count = 0;
 
     SYSCALL(PASSEREN, (memaddr)&support_device_sems[semIndex], 0, 0);
-    /*pops 4.2 - Device register area starts from address 0x10000054*/
-    /*pops 5.1 - Interrupt lines 3–7 are used for peripheral devices*/
 
     devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the bus register area */
     device_t *printerDev = &(busRegArea->devreg[semIndex]);
@@ -178,28 +181,29 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
 
 
 /**************************************************************************************************
- * TO-DO 
+ * @brief The method implements a syscall to perform WRITE operation to terminal device
+ * 
+ * @details
+ * 1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
+ * 2. Modify the base semaphore index since it's terminal device and the operation is WRITE -> we need to increment by DEVPRINT (8)
+ * 3. Use For loop to interate each character starting from virtAddr to (virtAddr + len)
+ * 4. Before transmitting, disable interrupt by setSTATUS and clear all the bits
+ * 5. Set the command for terminal device with bit shift (like the guide in Ref)
+ * 6. Request I/O to pass the character to terminal device
+ * 7. Check terminal transmitted status
+ * 8. Issue ACK to let the device return to ready state after each iteration (no need to do this)
+ * 9. Save the character count (success) or device's status value (FAIL) to v0
+ * 10. Unlock the semaphore by calling SYS4 & restore the device status 
+ * 
+ * @ref 
+ * princOfOperations - section 5.7
+ * pandOS - section 3.5.5
  **************************************************************************************************/
 void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     if (len < 0 || len > 128 || (unsigned int) virtualAddr < KUSEG) {
         SYSCALL(SYS9, 0, 0, 0);
     }
 
-    /* STEPS: Similar to write_to_printer(),
-    1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
-    2. Modify the base semaphore index since it's terminal device and the operation is WRITE -> we need to increment by DEVPRINT (8)
-    3. Use For loop to interate each character starting from virtAddr to (virtAddr + len)
-    4. Before transmitting, disable interrupt by setSTATUS and clear all the bits
-    5. Set the command for terminal device with bit shift (like the guide in Ref)
-    6. Request I/O to pass the character to terminal device
-    7. Check terminal transmitted status
-    8. Issue ACK to let the device return to ready state after each iteration (no need to do this)
-    9. Save the character count (success) or device's status value (FAIL) to v0
-    10. Unlock the semaphore by calling SYS4 & restore the device status 
-
-    Ref: princOfOperations section 5.7
-         pandos section 3.5.5, pg 27,28
-    */
     /*Local variables*/
     int pid;
     int baseTerminalIndex;
@@ -248,21 +252,30 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     SYSCALL(SYS4,(memaddr) &support_device_sems[semIndex], 0, 0);
 }
 
+/**************************************************************************************************
+ * @brief The method implements a syscall to perform READ operation from terminal device
+ *
+ * @details
+ * 1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
+ * 2. Modify the base semaphore index since it's terminal device and the operation is READ 
+ * -> We maintain the same base index
+ * 3. Use While loop to interate each character received from the device until there is no more character to read
+ * 4. Before saving the character into the buffer, disable interrupt by setSTATUS and clear all the bits
+ * 5. Retrieve the received command for terminal device and add bit shift to get character value
+        - If getting char is not successful: 
+            - Save the negative device status to an existing defined variable 
+            - Get out of the loop
+ * 6. Perform SYS5 to request I/O
+ * 7. Issue ACK to let the device return to ready state after each iteration
+ * 8. Save the character count (SUCCESS) or device's status value (FAIL) to register v0
+ * 9. Unlock the semaphore by calling SYS4 & restore the device status
+ * 
+ * @ref
+ * pandOS - section 4.7.5
+ * princOfOperations - chapter 5.7 
+ **************************************************************************************************/
 void readTerminal(char *virtualAddr, support_t *support_struct){
-    /* 
-    STEPS:
-    1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
-    2. Modify the base semaphore index since it's terminal device and the operation is READ -> we maintain the same base index
-    3. Use While loop to interate each character received from the device until there is no more character to read
-    4. Before saving the character into the buffer, disable interrupt by setSTATUS and clear all the bits
-    5. Retrieve the received command for terminal device and add bit shift to get character value
-        5.1. If getting char is not successful, save the negative device status to an existing defined variable and get out of the loop
-    6. Perform SYS5 to request I/O
-    7. Issue ACK to let the device return to ready state after each iteration
-    8. Save the character count (success) or device's status value (FAIL) to v0
-    9. Unlock the semaphore by calling SYS4 & restore the device status 
-    Ref: pandos section 4.7.5, princOfOperations chapter 5.7 
-    */
+
     if (virtualAddr == NULL) {
         SYSCALL(SYS9, 0, 0, 0);
     }

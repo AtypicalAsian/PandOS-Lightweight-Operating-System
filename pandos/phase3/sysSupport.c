@@ -139,90 +139,30 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
         SYSCALL(SYS9, 0, 0, 0);
     }*/
 
-    /*--------------Declare local variables---------------------*/
-    int semIndex;
-    int pid;
-    int char_printed_count; /*tracks how many characters were printed*/
-    char_printed_count = 0;
-    /*----------------------------------------------------------*/
-    pid = support_struct->sup_asid - 1;
+    int device_instance = support_struct->sup_asid - 1;
+    int charCount = 0;
 
-    /** 
-     * Compute the semaphore index using 1D indexing.
-     * index = (PRINTSEM * DEVICE_INSTANCES) + device_instance
-     */
-    semIndex = (PRINTSEM * DEVICE_INSTANCES) + pid;
+    SYSCALL(PASSEREN, (memaddr)&support_device_sems[(PRINTSEM * DEVICE_INSTANCES) + device_instance], 0, 0);
 
-    /** 
-     * Calculate the terminal device register pointer.
-     * Start with the base address (DEVICEREGSTART), then add:
-     * - an offset for the terminal device row: (PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)
-     * - plus an offset for the specific instance: device_instance * DEVREGSIZE
-     */
-    device_t *printerDevice = (device_t *)(DEVICEREGSTART +
-                                ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) +
-                                (pid * DEVREGSIZE));
-
-    /** 
-     * Lock the printer device semaphore.
-     * Use the new 1D index for support_device_sems.
-     */
-    SYSCALL(SYS3, (memaddr)&support_device_sems[semIndex], 0, 0);
-
+    device_t *device_int = (device_t *)(DEVICEREGSTART + ((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (device_instance * DEVREGSIZE));
+    
     int i;
     for (i = 0; i < len; i++) {
-        /** 
-         * Check if the printer is ready for transmission.
-         * (Mask the d_status register with TERMSTATUSMASK and compare with READY.)
-         */
-        if ((printerDevice->d_status & TERMSTATUSMASK) == READY) {
-            /** Disable interrupts for an atomic operation */
+        if(device_int->d_status == READY) {
             setSTATUS(INTSOFF);
-
-            /** 
-             * Write the i-th character from the virtual address to the printer.
-             * Cast the character to an int and assign it to d_data0.
-             */
-            printerDevice->d_data0 = (int)virtualAddr[i];
-            /** Issue the print command */
-            printerDevice->d_command = PRINTCHR;
-
-            /** 
-             * Wait for the I/O operation to complete; 
-             * WAITIO returns a status that includes the transmission result.
-             */
-            int status = SYSCALL(WAITIO, PRNTINT, pid, 0);
-
-            /** Re-enable interrupts after the I/O operation */
+            device_int->d_data0 = ((int) *(virtualAddr + i));
+            device_int->d_command = PRINTCHR;
+            SYSCALL(WAITIO, PRNTINT, device_instance, 0);
             setSTATUS(INTSON);
-
-            /** 
-             * If the I/O status indicates success, increment the transmitted character count.
-             * Otherwise, set the count to a negative error code and exit the loop.
-             */
-            if ((status & TERMSTATUSMASK) == OKCHARTRANS) {
-                char_printed_count++;
-            } else {
-                char_printed_count = -status;
-                break;
-            }
-        } else {
-            /** If the printer is not ready, record the error (as negative status) and exit the loop */
-            char_printed_count = -(printerDevice->d_status);
-            break;
+            charCount++;
+        }
+        else {
+            charCount = -(device_int->d_status);
+            i = len;
         }
     }
-
-    /** 
-     * Store the result (character count or error code) in the support structure's 
-     * general exception state (in the v0 register).
-     */
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
-
-    /** 
-     * Unlock the printer device semaphore using the new 1D index.
-     */
-    SYSCALL(SYS4, (memaddr)&support_device_sems[semIndex], 0, 0);
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = charCount;
+    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[(PRINTSEM * DEVICE_INSTANCES) + device_instance], 0, 0);
 }
 
 

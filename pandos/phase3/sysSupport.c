@@ -145,13 +145,13 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     int char_printed_count; /*tracks how many characters were printed*/
     char_printed_count = 0;
     /*----------------------------------------------------------*/
-    int pid = support_struct->sup_asid - 1;
+    pid = support_struct->sup_asid - 1;
 
     /** 
      * Compute the semaphore index using 1D indexing.
      * index = (PRINTSEM * DEVICE_INSTANCES) + device_instance
      */
-    int semIndex = (PRINTSEM * DEVICE_INSTANCES) + pid;
+    semIndex = (PRINTSEM * DEVICE_INSTANCES) + pid;
 
     /** 
      * Calculate the terminal device register pointer.

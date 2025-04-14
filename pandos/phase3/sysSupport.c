@@ -146,10 +146,10 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     char_printed_count = 0;
     /*----------------------------------------------------------*/
     pid = support_struct->sup_asid-1;
-    semIndex = ((PRNTINT - OFFSET) * DEVPERINT) + pid;
+    semIndex = (PRINTSEM * DEVICE_INSTANCES) + pid;
 
     devregarea_t *devRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the device register area */
-    device_t *printerDevice = &(devRegArea->devreg[semIndex]);
+    device_t *printerDevice = (device_t *)(DEVICEREGSTART +((PRNTINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE)) + (pid * DEVREGSIZE));
 
     SYSCALL(SYS3, (memaddr) &support_device_sems[semIndex], 0, 0);
 

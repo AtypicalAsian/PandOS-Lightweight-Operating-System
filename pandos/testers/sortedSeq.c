@@ -4,6 +4,7 @@
 
 #define MAX_INPUT 100
 #define MAX_NUMS 20
+#define INT_MAX  2147483647
 
 /* Converts a string to an integer */
 int atoiConversion(char *str, int *val) {

@@ -37,6 +37,7 @@
 #define INITPROCCNT 0
 #define INITSBLOCKCNT 0
 #define GETEXCPCODE 0x0000007C
+#define MASTER_SEMA4_START 0
 
 /* device register addresses */
 #define DEVICEREGSTART  0x10000054
@@ -54,7 +55,6 @@
 #define UPROCSTACKPG 0xBFFFF000
 #define TOPSTKPAGE 0x20001000
 #define PAGE31_ADDR 0xBFFFF000
-#define PAGE31_NUM 31
 
 
 

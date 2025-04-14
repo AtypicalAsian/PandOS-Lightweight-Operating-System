@@ -161,35 +161,42 @@ void summon_process(int process_id, state_t *base_state){
     int k;
     for (k=0; k < 31; k++){
         suppStruct->sup_privatePgTbl[k].entryHI = PT_START + (k << SHIFT_VPN) + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
-        suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET;
+        suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET; /*mark the page as dirty by default - each page will be write-enabled*/
     }
         
     /*Entry 31 of page table = stack*/
-    suppStruct->sup_privatePgTbl[31].entryHI = PAGE31_ADDR + (process_id << SHIFT_ASID);
-    suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET;
+    suppStruct->sup_privatePgTbl[31].entryHI = PAGE31_ADDR + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
+    suppStruct->sup_privatePgTbl[31].entryLO = D_BIT_SET; /*mark D bit on*/
 
     /*Call SYS1 to create and launch the u-proc*/
     SYSCALL(SYS1,(memaddr) &base_state_copy,(memaddr)suppStruct,0);
 }
 
-/**************************************************************************************************
- * TO-DO  
- * Implement test() function 
- *      1. Initialize I/O device semaphores + master semaphore 
- *      2. Initialize Virtual Memory (swap pool table) 
- *      3. Initialize base processor state for all user processes 
- *      4. Create and launch max number of processes 
- *      5. Optimization (perform P op on master sema4 MAXUPROCESS times) 
- *      6. Terminate test() 
+/************************************************************************************************** 
+ * @details
+ * The Instantiator Process (named “test”) is created in phase2.This process is responsible for:
+ *   1. Initializing Level 4/Phase 3 data structures:
+ *      - Setting up the Swap Pool table and initializing the Swap Pool semaphore.
+ *      - Initializing mutual exclusion semaphores for all sharable peripheral I/O devices.
+ *        For terminal devices, two semaphores are set up – one for reading and one for writing.
+ * 
+ *   2. Creating and launching between 1 and 8 user processes
+ * 
+ *   3. Waiting for all U-proc child processes to finish:
+ *      - This is done by performing the P (SYS3) operation on a master semaphore
+ * 
+ *   4. Terminating itself via SYS2
+ * 
+ * @ref
+ * pandos - section 4.9 & 4.10
  **************************************************************************************************/
 void test() {
     /*Declare local variables*/
-    int process_id; /*unique process id (asid) associated with each user process that's created (instantiated)*/
-    state_t base_state;
-    /*support_t *suppStruct;*/
+    int process_id; /*unique process id (asid) associated with each user process that's created*/
+    state_t base_state; /*Base processor state for user processes*/
 
     /*Initialize master semaphore to 0*/
-    masterSema4 = 0; /*DEFINE CONSTANT FOR 0*/
+    masterSema4 = MASTER_SEMA4_START;
 
     /* Initalise device reg semaphores */
     init_deviceSema4s(); /*initialize device semaphores array*/
@@ -199,19 +206,19 @@ void test() {
     /*Set up initial proccessor state*/
     init_base_state(&base_state);
 
-    /*create and launch MAXUPROCESS user processes*/
+    /*create and launch 8 user processes*/
     /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/
 
     for (process_id= 1; process_id < MAXUPROCS+1; process_id++) {
-        summon_process(process_id,&base_state); /*Helper method to set up asid, exception contexts and page tables for each process*/
+        summon_process(process_id,&base_state);
     }
     
-    /*Wait for all uprocs to finish*/
+    /*Perform P operation MAXUPROCS times on the master semaphore*/
     int i;
     for (i = 0; i < MAXUPROCS; i++){
         SYSCALL(SYS3, (memaddr) &masterSema4, 0, 0);
     }
 
-    /* Terminate the current process */
+    /* Terminate the instantiator process */
     SYSCALL(SYS2, 0, 0, 0);
 }

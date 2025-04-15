@@ -112,7 +112,7 @@ void update_tlb_handler(pte_entry_t *ptEntry) {
     /*In Index CP0 control register, check INDEX.P bit (bit 31 of INDEX). We perform bitwise AND with 0x8000000 to isolate bit 31*/
     if ((P_BIT_MASK & getINDEX()) == 0){ /*If P bit == 0 -> found a matching entry. Else P bit == 1 if not found*/
         setENTRYLO(ptEntry->entryLO); /*set content of entryLO to write to Index.TLB-INDEX*/ 
-        setENTRYHI(ptEntry->entryHI); /*set content of entryHI to write to Index.TLB-INDEX*/ 
+        /*setENTRYHI(ptEntry->entryHI);*/ /*set content of entryHI to write to Index.TLB-INDEX*/ 
         TLBWI(); /* Write content of entryHI and entryLO CP0 registers into Index.TLB-INDEX -> This updates the cached entry to match the page table*/
     }
 

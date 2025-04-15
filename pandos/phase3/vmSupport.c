@@ -64,18 +64,37 @@ void initSwapStructs(){
 }
 
 /**************************************************************************************************
- * @brief Implements a simple Round Robin page replacement algorithm for the swap pool.
+ * @brief Implements a simple Round Robin page replacement algorithm for the swap pool. As we cycle
+ * through frames, we check to see if it's occupied or not to replace the number of write-backs to
+ * flash devices
  *
  * @param: None
  * @return: integer index of next frame in swap pool to be used for page replacement
  * 
  * @ref
- * pandOS - section 4.5.4
+ * pandOS - section 4.5.4 & 4.10
  **************************************************************************************************/
 int find_frame_swapPool(){
-    static int frame_no = 0;
-    frame_no = (frame_no + 1) % SWAP_POOL_CAP; /*round robin*/
-    return frame_no;
+    static int last_replaced_idx = 0; /*last index of page swapped*/
+    int iterator; 
+
+    /*Search the swap table starting from last_replaced_idx for a free page*/
+    for (iterator = 0; iterator < SWAP_POOL_CAP; iterator++) {
+        int index = (last_replaced_idx + iterator) % SWAP_POOL_CAP;
+        /*If current index is free -> pick this victim (frame)*/
+        if (swapTable[index].asid == FREE) {
+            break;
+        }
+    }
+
+    /*If no free swap frame was found, set iterator to 1 to evict the next immediate page (unfortunate)*/
+    if (iterator == SWAP_POOL_CAP) {
+        iterator = 1;
+    }
+
+    /*Update and return the new replacement index*/
+    last_replaced_idx = (last_replaced_idx + iterator) % SWAP_POOL_CAP;
+    return last_replaced_idx;
 }
 
 /**************************************************************************************************
@@ -84,15 +103,12 @@ int find_frame_swapPool(){
  * 
  * @details
  * This function is called after the OS updates a page table entry. It performs the following steps:
- *   1. Saves the current CP0 EntryHi register (which contains the current VPN and ASID) to 
- *      preserve the processor's state.
- *   2. Loads the new page table entry’s EntryHi into CP0, so that the TLB can find the 
+ *   1. Loads the new page table entry’s EntryHi into CP0, so that the TLB can find the 
  *      corresponding entry.
- *   3. Calls TLBP() to probe the TLB for a matching entry using the updated EntryHi.
- *   4. If a matching entry is found (valid INDEX.P bit), the function:
+ *   2. Calls TLBP() to probe the TLB for a matching entry using the updated EntryHi.
+ *   3. If a matching entry is found (valid INDEX.P bit), the function:
  *         - Loads the new page's physical frame number into entryLO & entryHI
  *         - Writes the updated entry back into the TLB using TLBWI().
- *   5. Restores the original CP0 entryHI to preserve the previous state.
  * 
  * @param: ptEntry - updated page table entry
  * @return: None
@@ -101,23 +117,14 @@ int find_frame_swapPool(){
  * POPS 6.4, 7.1 and PandOS 4.5.2.
  **************************************************************************************************/
 void update_tlb_handler(pte_entry_t *ptEntry) {
-    /* Save the current value of the CP0 EntryHi register (contains VPN + ASID).
-     * We will restore this later to preserve system state.
-     */
-    unsigned int entry_prev = getENTRYHI();
-
     setENTRYHI(ptEntry->entryHI); /* Load the new page's virtual page number (VPN) and ASID into EntryHi*/
     TLBP(); /*probe the TLB to searches for a matching entry using the current EntryHi*/
 
     /*In Index CP0 control register, check INDEX.P bit (bit 31 of INDEX). We perform bitwise AND with 0x8000000 to isolate bit 31*/
     if ((P_BIT_MASK & getINDEX()) == 0){ /*If P bit == 0 -> found a matching entry. Else P bit == 1 if not found*/
-        setENTRYLO(ptEntry->entryLO); /*set content of entryLO to write to Index.TLB-INDEX*/ 
-        /*setENTRYHI(ptEntry->entryHI);*/ /*set content of entryHI to write to Index.TLB-INDEX*/ 
+        setENTRYLO(ptEntry->entryLO); /*set content of entryLO to write to Index.TLB-INDEX*/
         TLBWI(); /* Write content of entryHI and entryLO CP0 registers into Index.TLB-INDEX -> This updates the cached entry to match the page table*/
     }
-
-    /* Restore the previously saved EntryHi in CP0 register */
-    setENTRYHI(entry_prev);
 }
 
 /**************************************************************************************************

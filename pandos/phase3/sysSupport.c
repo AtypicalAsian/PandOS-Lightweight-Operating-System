@@ -60,9 +60,17 @@ void returnControlSup(support_t *support, int exc_code)
  * @brief terminate() is a essentially a wrapper for the kernel-mode restricted SYS2 service
  * 
  * @details
+ * 1. Calculate the device index based on the U's proccess_id (ASID)
+ * 2. Use first "for" loop to iterate over all device semaphores and release any hold by this U's proc
+ * 3. Use second "for" loop to iterate over all memory pages in U's proc page table, and invalidate all these pages
+ *  - Before set entryLow and entryHigh invalid, disable all external interrupts
+ *  - After updating TLB & invalidating, enable all interrupts again
+ * 4. Release the master semaphore & de-allocate support_struct of U's proc
+ * 5. Make SYSCALL 2 to terminate U's proc and its children processes
  * 
  * @ref
  * pandOS - section 4.7.1
+ * princOfOperations - section 4.6.2
  **************************************************************************************************/
 void terminate(support_t *support_struct)
 {
@@ -235,11 +243,9 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     for (i = 0; i < len; i ++) {
         memaddr transmitterStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
         if (transmitterStatus == TERMINAL_STATUS_READY) {
-            /* memaddr oldStatus = getSTATUS(); */
             setSTATUS(INTSOFF);
             char transmitChar = *(virtualAddr + i);
             terminalDevice->d_data1 = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT);
-            /*memaddr newStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);*/
             status = SYSCALL(SYS5, TERMINT, pid, 0);
             transmittedChars++;
             setSTATUS(INTSON);
@@ -335,9 +341,14 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
 }
 
 /**************************************************************************************************
- * TO-DO 
- * Support Level Program Trap Handler
- * BIG PICTURE
+ * @brief This method implements Support Level Program Trap Handler, which is used to handle program trap 
+ * exception at support level by terminating the faulty U's proc
+ * 
+ * @note
+ * Make call to terminate the U's proc by passing its support_struct
+ * 
+ * @ref 
+ * pandOS - section 4.8
  **************************************************************************************************/
 void trapExcHandler(support_t *support_struct)
 {
@@ -346,16 +357,19 @@ void trapExcHandler(support_t *support_struct)
 
 
 /**************************************************************************************************
- * TO-DO 
- * Support Level Syscall Exception Handler
- * BIG PICTURE
- * Steps:
- *      1. Check if the syscall number falls within the range 9-13
- *            If invalid syscall number, handle as program trap
- *      2. Reads parameters in registers a1,a2,a3
- *      3. Manually imcrement PC+4 to avoid re-executing Syscall on return
- *      4. Execute appropriate syscall handler
- *      5. LDST to return to process that requested SYSCALL
+ * @brief The method implements Support Level Syscall Exception Handler, a user process-level handler that resolves the exceptions
+ * caused by system calls in the user mode 
+ * 
+ * @details
+ * 1. Check if the syscall number falls within the range 9-13
+ *    - If invalid syscall number, handle as program trap
+ * 2. Reads parameters in registers a1,a2,a3
+ * 3. Manually imcrement PC+4 to avoid re-executing Syscall on return
+ * 4. Execute appropriate syscall handler
+ * 5. LDST to return to process that requested SYSCALL
+ * 
+ * @ref
+ * pandOS - section 4.7
  **************************************************************************************************/
 void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
     /*--------------Declare local variables---------------------*/
@@ -408,13 +422,16 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
 }
 
 /**************************************************************************************************
- * DONE
- * TO-DO 
- * Support Level General Exception Handler
- * BIG PICTURE
- *      1. Obtain current process' support structure
- *      2. Examine Cause register in exceptState field of support structure and extract exception code
- *      3. Pass control to either the support level syscall handler or the program trap handler
+ * @brief This method implements Support Level General Exception Handler, which is used to handle all non-syscall exceptions, such as TLB exceptions, 
+ * program trap, etc. 
+ * 
+ * @details
+ * 1. Obtain current process' support structure
+ * 2. Examine Cause register in exceptState field of support structure and extract exception code
+ * 3. Pass control to either the support level syscall handler or the program trap handler
+ * 
+ * @ref
+ * pandOS - section 4.6
  **************************************************************************************************/
 void sysSupportGenHandler() {
     /*--------------Declare local variables---------------------*/

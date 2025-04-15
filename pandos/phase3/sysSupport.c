@@ -220,7 +220,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     }
 
    /*--------------Declare local variables---------------------*/
-    int pid; /*printer id*/
+    int term_id; /*terminal id*/
     int semIndex; /*Index to the device semaphore array*/
     int status;
     int transmittedChars; /*tracks how many characters were printed*/
@@ -228,15 +228,15 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     /*----------------------------------------------------------*/
 
 
-    pid = support_struct->sup_asid-1;
-    int baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + pid;
-    semIndex = baseTerminalIndex + DEVPERINT;
+    term_id = support_struct->sup_asid-1;
+    int baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + term_id;
+    semIndex = baseTerminalIndex + DEVPERINT; /*Transmission device semaphores are 8 bits behind reception for terminal devices*/
 
     /*Calculate the offset for the terminal device row relative to disk*/
     unsigned int terminalOffset = (TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE);
 
     /*Calculate the offset for the specific device within that row*/
-    unsigned int instanceOffset = pid * DEVREGSIZE;
+    unsigned int instanceOffset = term_id * DEVREGSIZE;
 
     /*The total offset is the sum of the row offset and the instance offset*/
     unsigned int totalOffset = terminalOffset + instanceOffset;
@@ -254,7 +254,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
             setSTATUS(INTSOFF); /*disable interrupts*/
             char transmitChar = *(virtualAddr + i); 
             terminalDevice->t_transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT); /*Set data1 (t_transm_command) to the character to issue transmission*/
-            status = SYSCALL(SYS5, TERMINT, pid, 0); /*block the process until I/O completes*/
+            status = SYSCALL(SYS5, TERMINT, term_id, 0); /*block the process until I/O completes*/
             transmittedChars++;
             setSTATUS(INTSON); /*enable interrupts*/
         } else {
@@ -267,7 +267,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
 }
 
 /**************************************************************************************************
- * @brief The method implements a syscall to perform READ operation from terminal device
+ * @brief The method performs a READ operation from a specific terminal device
  *
  * @details
  * 1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
@@ -283,6 +283,14 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
  * 7. Issue ACK to let the device return to ready state after each iteration
  * 8. Save the character count (SUCCESS) or device's status value (FAIL) to register v0
  * 9. Unlock the semaphore by calling SYS4 & restore the device status
+ *
+ *  
+ * @param:
+ *      1. virtualAddr - starting address of the first character in the string to be transmitted to printer
+ *      2. len - length of string to be transmitted to printer
+ *      3. support_struct - pointer to support struct of current uproc
+ * 
+ * @return: None
  * 
  * @ref
  * pandOS - section 4.7.5
@@ -294,21 +302,21 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
         SYSCALL(SYS9, 0, 0, 0);
     }
 
-    /*Local variables*/
-    int pid;
-    int baseTerminalIndex;
-    int semIndex;
+    /*--------------Declare local variables---------------------*/
+    int term_id; /*terminal id*/
+    int semIndex; /*Index to the device semaphore array*/
+    /*----------------------------------------------------------*/
 
-    pid = support_struct->sup_asid-1;
-    baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + pid;
-    semIndex = baseTerminalIndex;
+    term_id = support_struct->sup_asid-1;
+    semIndex = ((TERMINT - OFFSET) * DEVPERINT) + term_id;
+    
     /*Calculate the offset for the terminal device row relative to disk*/
     unsigned int terminalOffset = (TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE);
 
-    /*Calculate the offset for the specific device instance (column) within that row*/
-    unsigned int instanceOffset = pid * DEVREGSIZE;
+    /*Calculate the offset for the specific device instance within that row*/
+    unsigned int instanceOffset = term_id * DEVREGSIZE;
 
-    /*The total offset is the sum of the row offset and the instance offset*/
+    /*Get total offeset to add to starting address of device regs*/
     unsigned int totalOffset = terminalOffset + instanceOffset;
 
     /*Add the total offset to the base address of the device registers*/
@@ -316,34 +324,37 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
 
     SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0);
 
-    char currStr = ' ';
-    int receivedChars;
+    char currChar = ' '; /*build the char being read in*/
+    int receivedChars; /*tracks how many characters were read in*/
     receivedChars = 0;
     int readStatus;
 
-    while(((terminalDevice->d_status & TERMSTATUSMASK) == READY) && (currStr != EOS)) {
-        setSTATUS(INTSOFF);
-        terminalDevice->d_command = TRANSMITCHAR;
-        readStatus = SYSCALL(WAITIO, TERMINT, pid, TRUE);
-        setSTATUS(INTSON);
-        if((readStatus & TERMSTATUSMASK) == OKCHARTRANS) {
-            currStr = (readStatus >> DEVICE_INSTANCES);
-            if(currStr != '\n') {
-                *virtualAddr = currStr;
-                virtualAddr++;
-                receivedChars++;
+    /*iterate through string until we reach end of character*/
+    while(((terminalDevice->d_status & TERMSTATUSMASK) == READY) && (currChar != EOS)) {
+        setSTATUS(INTSOFF); /*disable interrupts*/
+        terminalDevice->d_command = TRANSMITCHAR; /*issue transmit command*/
+        readStatus = SYSCALL(WAITIO, TERMINT, term_id, TRUE); /*block current proc until IO completes*/
+        setSTATUS(INTSON); /*enable interrupts*/
+        if((readStatus & TERMSTATUSMASK) == OKCHARTRANS) { /*if terminal status is OK, */
+            currChar = (readStatus >> DEVICE_INSTANCES);
+            if(currChar != '\n') {
+                *virtualAddr = currChar; /*copy character to currChar*/
+                virtualAddr++; /*move pointer to next char*/
+                receivedChars++; /*increment count*/
             }
         }
         else {
-            currStr = '\n';
+            currChar = '\n'; /*set currChar to exit loop if character trasmission was not successful*/
         }
     }
+
+    /*unsuccessful transmission*/
     if((terminalDevice->d_status & TERMSTATUSMASK) != READY || (readStatus & TERMSTATUSMASK) != OKCHARTRANS) {
-        receivedChars = -(readStatus);
+        receivedChars = -(readStatus); /*return negative of device's status value in v0*/
     }
 
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
-    SYSCALL(SYS4,(memaddr) &devSema4_support[semIndex], 0, 0);
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars; /*return received character count in v0 if successful*/
+    SYSCALL(SYS4,(memaddr) &devSema4_support[semIndex], 0, 0); /*unlock terminal semaphore*/
     /*IMPLEMENTATION ENDS*/
 
 }
@@ -354,19 +365,22 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
  * 
  * @note
  * Make call to terminate the U's proc by passing its support_struct
+ *
+ * @param: suppStruct - pointer to current uproc's support structure
+ * @return: None
  * 
  * @ref 
  * pandOS - section 4.8
  **************************************************************************************************/
-void syslvl_prgmTrap_handler(support_t *support_struct)
+void syslvl_prgmTrap_handler(support_t *suppStruct)
 {
-    get_nuked(support_struct);
+    get_nuked(suppStruct);
 }
 
 
 /**************************************************************************************************
- * @brief The method implements Support Level Syscall Exception Handler, a user process-level handler that resolves the exceptions
- * caused by system calls in the user mode 
+ * @brief The method implements Support Level Syscall Exception Handler, a user process-level handler 
+ * that resolves the exceptions caused by system calls in the user mode 
  * 
  * @details
  * 1. Check if the syscall number falls within the range 9-13
@@ -375,6 +389,11 @@ void syslvl_prgmTrap_handler(support_t *support_struct)
  * 3. Manually imcrement PC+4 to avoid re-executing Syscall on return
  * 4. Execute appropriate syscall handler
  * 5. LDST to return to process that requested SYSCALL
+ *
+ * @param:
+ *      1. currProc_support_struct - pointer to current uproc's support structure
+ *      2. syscall_num_requested - requested syscall value (to select appropriate handler)
+ * @return: None
  * 
  * @ref
  * pandOS - section 4.7
@@ -386,7 +405,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     /*----------------------------------------------------------*/
 
     /* Validate syscall number */
-    if (syscall_num_requested < 9 || syscall_num_requested > 13) {
+    if (syscall_num_requested < SYS9 || syscall_num_requested > SYS13) { /*Will have to change for future phases*/
         /* Invalid syscall number, treat as Program Trap */
         syslvl_prgmTrap_handler(currProc_support_struct);
         return;
@@ -395,7 +414,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     /*Step 2: Read values in registers a1-a3*/
     virtualAddr = (char *) currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
     length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
-    /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3*/  
+    /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3 yet*/  
 
     /*Step 3: Increment PC+4 to execute next instruction on return*/
     currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
@@ -430,13 +449,15 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
 }
 
 /**************************************************************************************************
- * @brief This method implements Support Level General Exception Handler, which is used to handle all non-syscall exceptions, such as TLB exceptions, 
- * program trap, etc. 
+ * @brief This method implements Support Level General Exception Handler
  * 
  * @details
  * 1. Obtain current process' support structure
  * 2. Examine Cause register in exceptState field of support structure and extract exception code
  * 3. Pass control to either the support level syscall handler or the program trap handler
+ * 
+ * @param: None
+ * @return: None
  * 
  * @ref
  * pandOS - section 4.6

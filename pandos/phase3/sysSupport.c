@@ -350,7 +350,7 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
  * @ref 
  * pandOS - section 4.8
  **************************************************************************************************/
-void trapExcHandler(support_t *support_struct)
+void syslvl_prgmTrap_handler(support_t *support_struct)
 {
     terminate(support_struct);
 }
@@ -380,7 +380,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     /* Validate syscall number */
     if (syscall_num_requested < 9 || syscall_num_requested > 13) {
         /* Invalid syscall number, treat as Program Trap */
-        trapExcHandler(currProc_support_struct);
+        syslvl_prgmTrap_handler(currProc_support_struct);
         return;
     }
 
@@ -415,7 +415,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
 
         default:
-            trapExcHandler(currProc_support_struct);
+        syslvl_prgmTrap_handler(currProc_support_struct);
             break;
     }
     returnControlSup(currProc_support_struct, GENERALEXCEPT);
@@ -451,5 +451,5 @@ void sysSupportGenHandler() {
         requested_syscall_num = currProc_supp_struct->sup_exceptState[GENERALEXCEPT].s_a0; /*the syscall number is stored in register a0 [pandOS 3.7.1]*/
         syscall_excp_handler(currProc_supp_struct,requested_syscall_num); /*Pass to support level syscall handler*/
     }
-    trapExcHandler(currProc_supp_struct); /*Otherwise, treat the exception as a program trap*/
+    syslvl_prgmTrap_handler(currProc_supp_struct); /*Otherwise, treat the exception as a program trap*/
 }

@@ -46,8 +46,8 @@ support_t support_structs_pool[MAXUPROCS]; /*Array of support structure objects 
  * This function return the given support structure to the free_support_pool array. It effectively
  * "deallocates" the support structure so that it can be reused by future processes
  *
- * @param support Pointer to the support_t structure to be deallocated
- * @return None
+ * @param: Pointer to the support_t structure to be deallocated
+ * @return: None
  * 
  * @ref
  * pandOS - section 4.10
@@ -65,7 +65,7 @@ void deallocate(support_t *supStruct){
  * available. If the pool is empty (freeSupIndex is 0), it returns NULL.
  *
  * @param: None
- * @return Pointer to a support_t structure if available, otherwise NULL
+ * @return: Pointer to a support_t structure if available, otherwise NULL
  * 
  * @ref
  * pandOS - section 4.10
@@ -88,6 +88,9 @@ support_t* allocate() {
  * @details This function resets the free index (freeSupIndex) to 0 and then iterates over 
  *          the pool of support structures. Each support structure is deallocated (pushed
  *          onto the free support pool) using the deallocate() helper function.
+ * 
+ * @param: None
+ * @return: None
  **************************************************************************************************/
 void initSuppPool() {
     freeSupIndex = 0;
@@ -105,7 +108,7 @@ void initSuppPool() {
  *  - The program counter (PC) and register t9
  *  - The stack pointer (SP)
  *
- * @param base_state Pointer to a state_t structure that will be initialized with the base state
+ * @param: Pointer to a state_t structure that will be initialized with the base state
  * @return None
  * 
  * @ref
@@ -133,6 +136,11 @@ void init_base_state(state_t *base_state){
  *       - The first 31 entries are for program pages
  *       - The last entry (index 31) is reserved for the process stack
  * 5. Finally, invokes SYS1 to create and launch the process
+ * 
+ * @param: 1.process_id - unique id assigned to each uproc
+ *         2.base_state - pointer to state_t struct representing the base processor 
+ *                        state for the process
+ * @return: None
  * 
  * @ref
  * pandOS - section 4.9.1
@@ -187,6 +195,9 @@ void summon_process(int process_id, state_t *base_state){
  * 
  *   4. Terminating itself via SYS2
  * 
+ * @param: None
+ * @return: None
+ * 
  * @ref
  * pandos - section 4.9 & 4.10
  **************************************************************************************************/
@@ -199,7 +210,7 @@ void test() {
     masterSema4 = MASTER_SEMA4_START;
 
     /* Initalise device reg semaphores */
-    initSwapStructs(); /*Initialize swap pool table, swap pool semaphore and associated device semaphores*/
+    initSwapStructs(); /*Initialize swap pool table, swap pool semaphore and associated device semaphores - vmSupport.c function*/
     initSuppPool(); /*Initialize support structs free pool*/
  
     /*Set up initial proccessor state*/

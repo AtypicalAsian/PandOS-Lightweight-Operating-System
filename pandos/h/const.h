@@ -12,7 +12,7 @@
 #define MAXPAGES      32
 #define MAXUPROCS 8
 #define MAX_FREE_POOL 9
-#define POOLSIZE (MAXUPROCS * 2)
+#define SWAP_POOL_CAP (MAXUPROCS * 2)
 #define STACKSIZE 499
 
 
@@ -41,6 +41,7 @@
 #define MASTER_SEMA4_START 0
 #define SWAP_SEMAPHORE_INIT 1
 #define SUPP_SEMA4_INIT 1
+
 
 /* device register addresses */
 #define DEVICEREGSTART  0x10000054
@@ -202,7 +203,7 @@
 
 /* Phase 3 Constants*/
 #define FLASHADDRSHIFT 8
-#define MISSINGPAGESHIFT 0xFFFFF000
+#define VPN_MASK 0xFFFFF000
 #define FRAMEADDRSHIFT 0x20020000
 #define VALIDOFF 0xFFFFFDFF
 #define EOS	 '\n'
@@ -230,6 +231,8 @@
 #define TERMINAL_STATUS_MASK    0xFF
 
 #define TERMINAL_STATUS_RECEIVED 5
+
+#define P_BIT_MASK 0x80000000
 
 
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))

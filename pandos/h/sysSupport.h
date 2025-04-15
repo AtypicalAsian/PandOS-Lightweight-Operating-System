@@ -13,7 +13,7 @@ extern int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES];
 
 void returnControlSup(support_t *support, int exc_code);
 extern void sysSupportGenHandler();
-extern void trapExcHandler(support_t *currentSupport);
+extern void syslvl_prgmTrap_handler(support_t *currentSupport);
 void syscall_excp_handler(support_t *support_struct, int exceptionCode);
 void terminate(support_t *support_struct);
 void getTOD(state_PTR excState);

@@ -34,7 +34,7 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Data structures and Variables Declaration*/
-swap_pool_t swap_pool[MAXUPROCS * 2];    /*swap pool table*/
+swap_pool_t swap_pool[SWAP_POOL_CAP];    /*swap pool table*/
 int semaphore_swapPool;              /*swap pool sempahore*/
 
 /**************************************************************************************************
@@ -49,7 +49,7 @@ int semaphore_swapPool;              /*swap pool sempahore*/
 void initSwapStructs(){
     /*Initialize the swap pool table*/
     int i;
-    for (i=0; i < MAXUPROCS * 2; i++){
+    for (i=0; i < SWAP_POOL_CAP; i++){
         swap_pool[i].asid = FREE; /*init swap pool frames as unoccupied (-1)*/
     }
 
@@ -128,19 +128,43 @@ void update_tlb_handler(pte_entry_t *ptEntry) {
 }
 
 /**************************************************************************************************
- * @brief 
+ * @brief
+ *  Performs a flash device read or write operation
+ *
+ * @details
+ *  This function interacts with a flash device, either reading a block into a memory
+ *  frame or writing a block from a memory frame to the flash device. It:
+ *    1. Retrieves the current process’s support structure.
+ *    2. Computes the address of the flash device registers.
+ *    3. Locks the flash device semaphore
+ *    4. Constructs a command code based on the operation type (read or write).
+ *    5. Writes the memory frame address into the flash device’s data register.
+ *    6. Disables interrupts, sends the command to the flash device, and waits for I/O completion.
+ *    7. Re-enables interrupts and unlocks the flash device semaphore.
+ *    8. Checks the device status and, if an error occurred, invokes the program trap handler.
+ *
+ * @params:
+ *      1. deviceNum - flash device number
+ *      2. block_num - The block number on the flash device (each block = 4KB). This 
+ *                     directly corresponds to the page number (missing or occupied)
+ *      3. op_type - The operation type: 3 for flash write, or 2 for flash read
+ *      4. frame_dest - The physical address of the memory frame that serves as the source (for writes)
+ *                      or destination (for reads)
+ * @return: None
  * 
- * @ref 
- * pandos - section 4.5.1
- * pops - section 5.4
+ * 
+ * @ref
+ *  pandos - section 4.5.1
+ *  pops   - section 5.4
  **************************************************************************************************/
 void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest) {
     /*Local variables to thid method*/
-    unsigned int device_status; /*status of the device (success or no)*/
+    unsigned int device_status; /*Status returned by the flash device after the operation*/
     unsigned int command;       /*command to write to COMMAND field of flash device*/
-    device_t* f_device;      /*pointer to the flash device we want to work with*/
+    device_t* f_device;      /*pointer to the flash device reg*/
 
-    support_t *currSuppStruct = (support_t*) SYSCALL(SYS8,0,0,0);
+    /*Retrieve the current process support structure*/
+    support_t *currSuppStruct = (support_t*) SYSCALL(SYS8,0,0,0); 
 
     /*Calculate address of specific flash device register block*/
     int devIdx = (FLASHINT-DISKINT) * DEVPERINT + deviceNum;
@@ -148,29 +172,26 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     f_device = &busRegArea->devreg[devIdx];
 
     /*Perform SYS3 to lock flash device semaphore*/
-    /*SYSCALL(SYS3, (memaddr)&support_device_sems[1][deviceNum], 0, 0);*/
-    SYSCALL(SYS3, (memaddr)&support_device_sems[(1 * DEVICE_INSTANCES) + deviceNum], 0, 0);
+    SYSCALL(SYS3, (memaddr)&support_device_sems[(DEVICE_INSTANCES) + deviceNum], 0, 0);
 
     /*Build command code*/
-    if (op_type == 3){ /*If it's a write operation*/
-        command = 3 | (block_num << 8);
+    if (op_type == FLASHWRITE){ /*If it's a write operation*/
+        command = (block_num << BLOCK_SHIFT)| FLASHWRITE;
     }
     else { /*If it's a read operation*/
-        command = 2 | (block_num << 8);
+        command = (block_num << BLOCK_SHIFT) | FLASHREAD;
     }
 
     /*Write the flash device’s DATA0 field with the starting physical address of the 4kb block to be read (or written)*/
     f_device->d_data0 = frame_dest;
 
-    
     setSTATUS(INTSOFF); /*Disable interrupts*/
     f_device->d_command = command;  /*write the flash device's COMMAND field*/
     device_status = SYSCALL(SYS5,FLASHINT,deviceNum,0); /*immediately issue SYS5 (wait for IO) to block the current process*/
     setSTATUS(INTSON); /*enable interrupts*/
     
     /*Perform SYS4 to unlock flash device semaphore*/
-    /*SYSCALL(SYS4, (memaddr)&support_device_sems[1][deviceNum], 0, 0);*/
-    SYSCALL(SYS4, (memaddr)&support_device_sems[(1 * DEVICE_INSTANCES) + deviceNum], 0, 0);
+    SYSCALL(SYS4, (memaddr)&support_device_sems[(DEVICE_INSTANCES) + deviceNum], 0, 0);
     /*If operation failed (check device status) -> program trap handler*/
     if (device_status != READY){
         syslvl_prgmTrap_handler(currSuppStruct);
@@ -307,7 +328,7 @@ void tlb_exception_handler() {
             unsigned int occp_asid = swap_pool[free_frame_num].asid; /*get ASID of process whose page owns the frame at swap_pool[frame_number]*/
             flash_no = occp_asid - 1; /*Get corresponding flash device number*/
 
-            /*Step 3: Write the old (at this point evicted) page back to its backing store (flash device) - pandOS [section 4.5.1]*/
+            /*Step 3: Write the old page back to its backing store (flash device) - pandOS [section 4.5.1]*/
             flash_read_write(flash_no, occp_pageNum,FLASHWRITE, frame_addr);
         }
         /*If frame is not occupied*/

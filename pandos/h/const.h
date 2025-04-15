@@ -233,6 +233,7 @@
 #define TERMINAL_STATUS_RECEIVED 5
 
 #define P_BIT_MASK 0x80000000
+#define BLOCK_SHIFT 8
 
 
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))

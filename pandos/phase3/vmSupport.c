@@ -82,7 +82,7 @@ int find_frame_swapPool(){
     for (iterator = 0; iterator < SWAP_POOL_CAP; iterator++) {
         int index = (last_replaced_idx + iterator) % SWAP_POOL_CAP;
         /*If current index is free -> pick this victim (frame)*/
-        if (swapTable[index].asid == FREE) {
+        if (swap_pool[index].asid == FREE) {
             break;
         }
     }

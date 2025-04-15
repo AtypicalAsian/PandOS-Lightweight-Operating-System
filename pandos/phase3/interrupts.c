@@ -61,19 +61,16 @@
 
 #include "/usr/include/umps3/umps/libumps.h"
 
-/**************** METHOD DECLARATIONS***************************/ 
-HIDDEN void nontimerInterruptHandler();
-HIDDEN void pltInterruptHandler();
-HIDDEN void systemIntervalInterruptHandler();
-HIDDEN int getInterruptLine();
-HIDDEN int getDevNum();
 
-
-cpu_t time_left;    /*Amount of time remaining in the current process' quantum slice (of 5ms) when the interrupt was generated*/
-
+/**************** METHOD DECLARATIONS***************************/
+int getInterruptLine(unsigned int interruptMap);
+void nontimerInterruptHandler(int deviceType);
+void pltInterruptHandler();
+void systemIntervalInterruptHandler();
+void interruptsHandler();
 
 /****************************************************************************
- * getInterruptLine()
+ * getInterruptLine(unsigned int interruptMap)
  * 
  * @brief Identifies the highest-priority pending interrupt line.  
  * 
@@ -84,53 +81,29 @@ cpu_t time_left;    /*Amount of time remaining in the current process' quantum s
  *   line (highest priority) is returned first.
  * - If no interrupts are detected, the function returns -1.  
  * 
- * @return int - The interrupt line number (3-7), or -1 if no interrupt is pending.  
+ * @param - interruptMap - bitmap representing the status of potential interrupt lines
+ * 
+ * @return int - The interrupt line number, or -1 if no interrupt is pending.  
  *****************************************************************************/
-int getInterruptLine(){
-    if ((savedExceptState->s_cause & LINE3MASK) != STATUS_ALL_OFF) return LINE3;        /* Check if an interrupt is pending on line 3 */
-    else if ((savedExceptState->s_cause & LINE4MASK) != STATUS_ALL_OFF) return LINE4;   /* Check if an interrupt is pending on line 4 */
-    else if ((savedExceptState->s_cause & LINE5MASK) != STATUS_ALL_OFF) return LINE5;   /* Check if an interrupt is pending on line 5 */
-    else if ((savedExceptState->s_cause & LINE6MASK) != STATUS_ALL_OFF) return LINE6;   /* Check if an interrupt is pending on line 6 */
-    else if ((savedExceptState->s_cause & LINE7MASK) != STATUS_ALL_OFF) return LINE7;   /* Check if an interrupt is pending on line 7 */
-    return NO_INTERRUPTS;  /* No interrupt detected */
-}
+int getInterruptLine(unsigned int interruptMap){
+    if (interruptMap == 0) {
+        PANIC();
+        return -1;
+    }
 
-
-
-/****************************************************************************
- * getDevNum()
- * 
- * 
- * @brief Determines the specific device that generated an interrupt on a given line.
- * 
- * @details  
- * - This function is called after identifying the interrupt line (via getInterruptLine()).  
- * - It accesses the device register area to retrieve a bit map that represents  
- *   pending interrupts for up to 8 devices on the specified interrupt line.  
- * - Using bitwise operations, the function scans through the devices from highest priority (lowest index) to lowest priority,  
- *   returning the first device number with a pending interrupt.  
- * - If no device on the given line has a pending interrupt, the function returns -1.  
- * 
- * @param int line_num - The interrupt line number (3-7) on which an interrupt was detected.  
- * @return int - The device number (0-7) that generated the interrupt, or -1 if none are pending.  
- *****************************************************************************/
-int getDevNum(int line_num){
-    devregarea_t *devRegArea = (devregarea_t *) RAMBASEADDR;  /* Get a pointer to the Device Register Area */
-    unsigned int bitMap = devRegArea->interrupt_dev[line_num - OFFSET]; /* Retrieve the pending interrupt bit map for the given line */
-    
-    /* Iterate through all possible devices (8 per line) to find the highest-priority pending interrupt */
+	/*isolate lowest set bit in the bitmap*/
+    unsigned int isolated = interruptMap & (-interruptMap);
     int i;
-    for (i = 0; i < DEVPERINT; i++) {
-        if (bitMap & (INTERRUPT_BITMASK_INITIAL << i)) { /* Check if the i-th bit is set, meaning this device triggered an interrupt */
-            return i; /* Return the first (highest-priority) device with a pending interrupt */
+    for (i = 0; i < 32; i++) {
+        if (isolated == (1u << i)) {
+            return i;
         }
     }
-    /*No pending interrupts*/
-    return NO_INTERRUPTS;
+    return -1;
 }
 
 /**************************************************************************** 
- * nontimerInterruptHandler()
+ * nontimerInterruptHandler(int deviceType)
  * 
  * @brief 
  * Handles all non-timer interrupts (I/O device and terminal interrupts).  
@@ -138,76 +111,83 @@ int getDevNum(int line_num){
  * unblocks the waiting process if necessary, and resumes execution.
  * 
  * @details  
- * - Step 1: Identify the interrupt line where the highest-priority interrupt occurred.  
- * - Step 2: Identify the specific device that generated the interrupt on that line  
- * - Step 3: If a process was blocked on this device, unblock it.  
- * - Step 4: If no process was waiting, restore and continue executing the current process.  
- * - Step 5: If a process was unblocked, move it to the Ready Queue.  
- * - Step 6: Perform a context switch to resume execution where we left off.  
+ * 1. Calculate the address for this device’s device register. [Section 5.1-pops]
+ * 2. Save off the status code from the device’s device registers
+ * 3. Acknowledge the outstanding interrupt. This is accomplished by writing 
+ *    the acknowledge command code in the interrupting device’s device register.
+ * 4. Perform a V operation on the Nucleus maintained semaphore associated
+ *    with this (sub)device. This operation should unblock the process (pcb)
+ *    which initiated this I/O operation and then requested to wait for its 
+ *    completion via a SYS5 operation.
+ * 5. Place the stored off status code in the newly unblocked pcb’s v0 register.
+ * 6. Insert the newly unblocked pcb on the Ready Queue, transitioning this process from 
+ *    the “blocked” state to the “ready” state.
+ * 7. Return control to the Current Process: Perform a LDST on the saved exception 
+ *    state (located at the start of the BIOS Data Page [Section 3.4]). 
  * 
- * 
+ * @param - int corresponding to device type that gen the interrupt
  * @return None
  *****************************************************************************/
-void nontimerInterruptHandler() {
-    
-    int lineNum;     /* The line number where the highest-priority interrupt occurred */
-    int devNum;      /* The device number where the highest-priority interrupt occurred */
-    int index;       /* Index in device register array of the interrupting device */
-    devregarea_t *devRegPtr; /* Pointer to the device register area */
-    int statusCode;  /* Status code from the interrupting device's device register */
-    pcb_PTR unblockedPcb; /* Process that originally initiated the I/O request */
+void nontimerInterruptHandler(int deviceType){
+	devregarea_t *deviceRegisters = (devregarea_t *)RAMBASEADDR;  /*get pointer to devreg struct*/
+	int device_intMap = deviceRegisters->interrupt_dev[deviceType]; /*retrieve interrupt status bitmap for specific device type*/
+	unsigned int statusCode;
 
-    /* Step 1: Identify the interrupt line */
-    lineNum = getInterruptLine(); /* Retrieve the highest-priority interrupt line */
+	int mask = 1;  /*Start with the least significant bit*/
+	while (!(device_intMap & mask)) {
+		mask <<= 1;  /*Shift the mask one bit to the left*/
+	}
+	device_intMap = mask;  /*device_intMap contains only the lowest set bit*/
+	int deviceInstance = getInterruptLine(device_intMap);
 
-    /* Step 2: Identify the specific device that triggered the interrupt */
-    devNum = getDevNum(lineNum);  /*get the device number of the device that generated the interrupt*/
-    index = ((lineNum - OFFSET) * DEVPERINT) + devNum; /* Compute device index */
-    devRegPtr = (devregarea_t *) RAMBASEADDR;  /* Load the base address of the device register area */
-
-     /* ---------------- Step 3: Handle Terminal Device Interrupts (Line 7) ---------------- */
-     if ((lineNum == LINE7) && (((devRegPtr->devreg[index].t_transm_status) & TERM_DEV_STATUSFIELD_ON) != READY)) {
-        /* Transmission (Write) Interrupt */
-        statusCode = devRegPtr->devreg[index].t_transm_status; /* Read status of transmission */
-        devRegPtr->devreg[index].t_transm_command = ACK; /* Acknowledge the transmission interrupt */
-        unblockedPcb = removeBlocked(&deviceSemaphores[index + DEVPERINT]); /* Unblock the process waiting on transmission */
-        deviceSemaphores[index + DEVPERINT]++;  /* Perform V operation to release the semaphore */
-    } 
-    else {
-        /* Reception (Read) Interrupt or Non-Terminal Device Interrupt */
-        statusCode = devRegPtr->devreg[index].t_recv_status; /* Read status of reception */
-        devRegPtr->devreg[index].t_recv_command = ACK; /* Acknowledge interrupt */
-        unblockedPcb = removeBlocked(&deviceSemaphores[index]); /* Unblock the process waiting on reception */
-        deviceSemaphores[index]++;  /* Perform V operation to release the semaphore */
-    }
-
-    /* ---------------- Step 4: If no process was waiting, return control ---------------- */
-    if (unblockedPcb == NULL) {
-        if (currProc != NULL) { /* If a process is already running, continue its execution */
-            update_pcb_state(); /* Save the current process state */
-            update_accumulated_CPUtime(start_TOD,at_interrupt_TOD,currProc); /* Update CPU time usage */
-            setTIMER(time_left); /* Restore remaining time slice */
-            swContext(currProc);  /* Resume execution */
+	/*Case 1: Interrupt device is not terminal devs*/
+	if (deviceType != 4){
+		int regIndex = deviceType * 8 + deviceInstance;
+		statusCode = deviceRegisters->devreg[regIndex].d_status; /*Save off the status code from the device’s device registers*/
+		deviceRegisters->devreg[regIndex].d_command = ACK; /*Acknowledge the interrupt*/
+		int semIndex = deviceType * 8 + deviceInstance;
+		pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*perform v op on semaphore*/
+		if (pcb_unblocked != NULL){
+			softBlockCnt--;
+			pcb_unblocked->p_s.s_v0 = statusCode; /*Place the stored off status code in the newly unblocked pcb’s v0 register*/
+		}
+	}
+	/*Case 2: Handle Terminal devices separately*/
+	else{
+		int regIndex = deviceType * 8 + deviceInstance;
+		device_t *tStat = &(deviceRegisters->devreg[regIndex]);
+		/*Terminal devices have 2 subdevices: transmission and reception*/
+		/*Case 1: If device is transmission*/
+        if ((tStat->d_data0 & 0x000000FF) == 5) {
+            statusCode = tStat->d_data0;  /*Retrieve the status*/
+            deviceRegisters->devreg[regIndex].d_data1 = ACK; /*ACK the interrupt*/
+            
+            /*For transmit interrupts, use the next device type slot (deviceType + 1)*/
+			/*Transmission device semaphores are 8 bits behind reception for terminal devices (plus 8 to index)*/
+			int semIndex = (deviceType + 1) * 8 + deviceInstance;
+			pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*do v op on device semaphore*/
+            if (pcb_unblocked != NULL) {
+				softBlockCnt--;
+                pcb_unblocked->p_s.s_v0 = statusCode;
+            }
         }
-        switchProcess();  /* Call scheduler if no current process exists */
-    }
-
-    /* ---------------- Step 5: If a process was unblocked, move it to Ready Queue ---------------- */
-    unblockedPcb->p_s.s_v0 = statusCode; /* Store the device status in the v0 register of unblocked process */
-    insertProcQ(&ReadyQueue, unblockedPcb); /* Move the unblocked process to the Ready Queue */
-    softBlockCnt--; /* Decrease soft-blocked process count */
-
-    /* ---------------- Step 6: Resume Execution ---------------- */
-    /*If there is a current process to return to*/
-    if (currProc != NULL) { 
-        update_pcb_state(); /* Save the current process state */
-        setTIMER(time_left); /* Restore process time slice */
-        update_accumulated_CPUtime(start_TOD,at_interrupt_TOD,currProc);  /* Update CPU time accounting */
-        STCK(curr_TOD); /* Store the current Time-of-Day clock value */
-        update_accumulated_CPUtime(at_interrupt_TOD,curr_TOD,unblockedPcb); /* Charge CPU time to unblocked process */
-        swContext(currProc); /* Restore execution context */
-    }
-    switchProcess(); /* Call the scheduler if there is no current process to return to -> schedule next process */
+		/*Case 2: If device is reception*/
+		if ((tStat->d_status & 0x000000FF) == 5) {
+            statusCode = tStat->d_status;  /*Retrieve the status*/
+            deviceRegisters->devreg[regIndex].d_command = ACK; /*ACK the interrupt*/
+			int semIndex = deviceType * 8 + deviceInstance;
+            pcb_PTR pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*do v op on device semaphore*/
+            if (pcb_unblocked != NULL) {
+				softBlockCnt--;
+                pcb_unblocked->p_s.s_v0 = statusCode;                   
+            }
+        }
+	}
+	state_PTR savedState = (state_t *) BIOSDATAPAGE;
+	if (currProc != NULL){
+		LDST(savedState);
+	}
+	switchProcess();
 }
 
 /**************************************************************************** 
@@ -229,24 +209,21 @@ void nontimerInterruptHandler() {
  * 
  * @return None
  *****************************************************************************/
+
 void pltInterruptHandler() {
-    cpu_t curr_TOD; /* Stores the current Time-of-Day clock value */
+	state_t *savedState = (state_t *) BIOSDATAPAGE;
 
-    /*If there is a running process when the interrupt was generated*/
-    if (currProc != NULL){
-        setTIMER(LARGETIME);   /* Reset the Process Local Timer (PLT) with a large value to prevent further interrupts */
-        update_pcb_state();    /* Save the current process state into its PCB */
-        STCK(curr_TOD);        /* Store the current Time-of-Day clock value */
-        update_accumulated_CPUtime(start_TOD,curr_TOD,currProc);   /* Update the accumulated CPU time for the current process */
-        insertProcQ(&ReadyQueue,currProc);  /* Move the current process back to the Ready Queue since it used up its time slice */
-        currProc = NULL;       /* Clear the current process pointer switch to the next process */
-        switchProcess();       /* Call the scheduler to select and run the next process */
-    }
-    PANIC(); /* If no process was running when the interrupt occurred, trigger a kernel panic */
-
+	/*If there is a running process when the interrupt was generated*/
+	if (currProc != NULL){
+		setTIMER(TIMER_RESET_CONST); /*Reset the timer*/
+		currProc->p_s = *savedState; /*Saves the current process state (from the BIOS Data Page)*/
+		currProc->p_time = currProc->p_time + get_elapsed_time(); /*Updates the CPU time used by the current process*/
+		insertProcQ(&ReadyQueue, currProc); /* Move the current process back to the Ready Queue since it used up its time slice */
+		currProc = NULL; /* Clear the current process pointer switch to the next process */
+		switchProcess();  /* Call the scheduler to select and run the next process */
+	}
+	PANIC();
 }
-
-
 
 /**************************************************************************** 
  * systemIntervalInterruptHandler()
@@ -270,32 +247,25 @@ void pltInterruptHandler() {
  * 
  * @return None
  *****************************************************************************/
+
 void systemIntervalInterruptHandler() {
-    pcb_PTR unblockedProc; /*pointer to a process being unblocked*/
-    LDIT(INITTIMER);       /* Load the Interval Timer with 100ms to maintain periodic interrupts */
+	pcb_PTR unblockedProc = NULL; /*pointer to a process being unblocked*/
+	LDIT(INITTIMER);       /* Load the Interval Timer with 100ms to maintain periodic interrupts */
 
+	/* Unblock all processes waiting on the pseudo-clock semaphore */
+	while (headBlocked(&semIntTimer) != NULL){
+		unblockedProc = removeBlocked(&semIntTimer); /* Remove a blocked process */
+		insertProcQ(&ReadyQueue, unblockedProc); /* Move it to the Ready Queue */
+		softBlockCnt--; /* Decrease the count of soft-blocked processes */
+	}
+	semIntTimer = 0; /* Reset the pseudo-clock semaphore to 0 */
+	state_t *savedState = (state_t *) BIOSDATAPAGE;
 
-    /* Unblock all processes waiting on the pseudo-clock semaphore */
-    while (headBlocked(&deviceSemaphores[PSEUDOCLOCKIDX]) != NULL){
-        unblockedProc = removeBlocked(&deviceSemaphores[PSEUDOCLOCKIDX]);  /* Remove a blocked process */
-        insertProcQ(&ReadyQueue,unblockedProc);   /* Move it to the Ready Queue */
-        softBlockCnt--;  /* Decrease the count of soft-blocked processes */
-    }
-
-    /* Reset the pseudo-clock semaphore to 0 */
-    deviceSemaphores[PSEUDOCLOCKIDX] = PSEUDOCLOCKSEM4INIT;
-
-    /* If there is a currently running process, resume execution */
-    if (currProc != NULL){
-        setTIMER(time_left);    /* Restore the remaining process quantum */
-        update_pcb_state();     /* Save the updated processor state */
-        update_accumulated_CPUtime(start_TOD,at_interrupt_TOD,currProc);  /* Update accumulated CPU time */
-        swContext(currProc);    /*return control to current process (switch back to context of current process)*/
-    }
-
-    /*If no curr process to return to -> call scheduler to run next job*/
-    switchProcess();
-
+	/* If there is a currently running process, resume execution */
+	if (currProc != NULL){
+		LDST(savedState);
+	}
+	switchProcess(); /*If no curr process to return to -> call scheduler to run next job*/
 }
 
 
@@ -312,31 +282,26 @@ void systemIntervalInterruptHandler() {
  * - The Process Local Timer (PLT) and System Interval Timer have dedicated handlers.  
  * - All other interrupts (I/O devices, terminal, disk, etc.) are handled by nontimerInterruptHandler().
  * 
- * @details
- * Interrupt Handling Flow:
- * 1. Store the current Time-of-Day (TOD) clock value to track execution time.  
- * 2. Retrieve the remaining process quantum (time slice) before servicing the interrupt.  
- * 3. Check for Process Local Timer (PLT) interrupts (Line 1) → Call pltInterruptHandler().  
- * 4. Check for System-Wide Interval Timer interrupts (Line 2) → Call systemIntervalInterruptHandler().  
- * 5. If neither of the above, assume an I/O interrupt and call nontimerInterruptHandler().  
  * 
  * @return None
  *****************************************************************************/
-void interruptsHandler(){
-    STCK(at_interrupt_TOD); /* Store the current Time-of-Day (TOD) clock value for CPU timing purposes */
-    time_left = getTIMER(); /* Get the remaining time from the current process quantum (if any) */
-    savedExceptState = (state_PTR) BIOSDATAPAGE; /* Retrieve the saved processor state from BIOS Data Page */
+void interruptsHandler() {
+	state_t *savedState = (state_t *)BIOSDATAPAGE; /*Get saved processor state*/
+	unsigned int causeReg = savedState->s_cause; /*Extract value from cause register*/
+	int interrupt = (causeReg & 0x0000FE00); /*Mask out the bits corresponding to the pending interrupts*/
+	interrupt &= -interrupt; /*Isolate the lowest set bit (highest priority interrupt)*/
 
-    /* Check if the interrupt came from the Process Local Timer (PLT) (Line 1) */
-    if (((savedExceptState->s_cause) & LINE1MASK) != STATUS_ALL_OFF){
+	/* Check if the interrupt came from the Process Local Timer (PLT) (Line 1) */
+    if (((savedState->s_cause) & LINE1MASK) != ALLOFF){
         pltInterruptHandler();  /* Call method to handle the Process Local Timer (PLT) interrupt */
     }
 
     /* Check if the interrupt came from the System-Wide Interval Timer (Line 2) */
-    if (((savedExceptState->s_cause) & LINE2MASK) != STATUS_ALL_OFF){
+    if (((savedState->s_cause) & LINE2MASK) != ALLOFF){
         systemIntervalInterruptHandler(); /* Call method to the System Interval Timer interrupt */
     }
-
+	
+	int nonTimerDeviceType = getInterruptLine(interrupt >> 8) - OFFSET; /*subtract offset since interrupts start at 3-7*/
     /*Handle non-timer interrupts*/
-    nontimerInterruptHandler();  /* Call method to the handle non-timer interrupts */
+    nontimerInterruptHandler(nonTimerDeviceType);  /* Call method to the handle non-timer interrupts */
 }

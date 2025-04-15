@@ -56,85 +56,85 @@
  * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project  
  ****************************************************************************/
 
-
-#include "../h/asl.h"
-#include "../h/types.h"
-#include "../h/const.h"
-#include "../h/pcb.h"
-#include "../h/scheduler.h"
-#include "../h/exceptions.h"
-#include "../h/interrupts.h"
-#include "../h/initial.h"
+ #include "../h/asl.h"
+ #include "../h/types.h"
+ #include "../h/const.h"
+ #include "../h/pcb.h"
+ #include "../h/scheduler.h"
+ #include "../h/exceptions.h"
+ #include "../h/interrupts.h"
+ #include "../h/initial.h"
 
 #include "/usr/include/umps3/umps/libumps.h"
 
-
-/**************** METHOD DECLARATIONS***************************/ 
 HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given semaphore (helper method) */
-HIDDEN void createProcess(state_PTR stateSYS, support_t *suppStruct); /*SYS1 - Create a new process and add it to the Ready Queue.*/
-HIDDEN void terminateProcess(pcb_PTR proc); /* SYS2 - Recursively terminate the given process and its children.*/
-HIDDEN void passeren(int *sem); /* SYS3 - Perform a P (passeren) operation: decrement semaphore and block if negative.*/
-HIDDEN void verhogen(int *sem);  /*SYS 4 - Perform a V (verhogen) operation: increment semaphore and unblock a process if needed. */
-HIDDEN void waitForIO(int lineNum, int deviceNum, int readBool); /*SYS5 - Block the process until an I/O operation completes.*/
-HIDDEN void getCPUTime(); /*SYS6 - Retrieve the CPU time used by the current process.*/
-HIDDEN void waitForClock(); /*SYS7 - Block the process on the clock semaphore until the next tick.*/
-HIDDEN void getSupportData(); /*SYS8 - Retrieve the current process's support structure pointer*/
-
 int syscallNo; /*stores the syscall number (1-8)*/
+HIDDEN void recursive_terminate(pcb_PTR proc);
 
 
-/**************************************************************************** 
- * update_pcb_state()
- * 
- * 
- * @brief
- * Copies the saved exception state from the BIOS Data Page into the 
- * process control block (PCB) of the currently running process. This ensures 
- * that the current process retains an accurate record of its execution state 
- * before handling an exception or system call.
- * 
- * 
- * @details
- * This function is used whenever the processor state needs to be preserved 
- * before switching contexts or handling an exception. The saved exception 
- * state (stored at BIOSDATAPAGE) contains all relevant register values at 
- * the time of the exception.
- * 
- * 
- * @param None
- * @return None
- *****************************************************************************/
-void update_pcb_state(){
-    copyState(savedExceptState,&(currProc->p_s)); 
+
+/**************** HELPER METHODS ***************************/
+
+/*Helper method to calculate elapsed time since process quantum began*/
+cpu_t get_elapsed_time() {
+	volatile cpu_t clockTime;
+	STCK(clockTime); /*Read the current clock tick*/
+	return clockTime - quantum; /*Return the elapsed time relative to the process's quantum*/
 }
 
+/*Helper method to copy 'len' bytes from the source memory block 'src' to the destination memory block 'dest' */
+void* memcpy(void *dest, const void *src, unsigned int len) {
+	char *d = dest;
+	const char *s = src;
+	while (len--) {
+		*d++ = *s++;
+	}
+	return dest;
+}
 
-/**************************************************************************** 
- * blockCurrProc()
- * 
- * 
- * @brief
- * Blocks the current process by updating its CPU time usage, adding it to 
- * the Active Semaphore List (ASL), and marking it as inactive.
- * 
- * 
- * @details
- * - This function first updates the process's accumulated CPU time by 
- *   calculating the difference between the current Time of Day (TOD) clock 
- *   and the recorded start time.
- * - It then inserts the process into the ASL under the associated semaphore, 
- *   effectively blocking it until it is unblocked by another process.
- * - Finally, currProc is set to NULL, indicating that no process is actively running.
- * 
- * @param sem Pointer to the semaphore on which the process is to be blocked.
- * @return None
- *****************************************************************************/
+/*Helper method to block the currently running process (currProc) on a specified semaphore.*/
 void blockCurrProc(int *sem){
-    STCK(curr_TOD);  /* Store the current Time of Day (TOD) clock value */
-    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Update the accumulated CPU time of the current process */
-    insertBlocked(sem,currProc); /* Insert the current process into the Active Semaphore List (ASL), effectively blocking it */
-    currProc = NULL; /* Set the current process pointer to NULL, indicating that no process is currently running */
+	currProc->p_s = *((state_t *) BIOSDATAPAGE); /*get current processor state*/
+	currProc->p_time += get_elapsed_time(); /*update process's accumulated CPU time by adding elapsed time since quantum began*/
+	insertBlocked((int *) sem, currProc); /*insert current proc into blocked queue associated with the given semaphore*/
+	currProc = NULL; /*reset currProc global variable*/
 }
+
+/*Recurisve function - helper to SYS2 terminateProcess()*/
+void recursive_terminate(pcb_PTR proc){
+	pcb_PTR child_proc; /*point to current child (pcb) of process to be terminated*/
+	int *processSem;
+	processSem = proc->p_semAdd;
+
+	/* Terminate all child processes of proc */
+    while ((child_proc = removeChild(proc)) != NULL) {
+        outProcQ(&ReadyQueue, child_proc);  /*Remove child from the Ready Queue*/
+        recursive_terminate(child_proc);       /*Recursively terminate the child process*/
+    }
+
+	/* Check if process p is blocked on a device semaphore.
+       It is considered blocked on a device if its semaphore pointer (p->p_semAdd)
+       falls within the range of deviceSemaphores[] or is equal to the address of semIntTimer. */
+	   int blockedOnDevice = 
+	   ((processSem >= (int *) deviceSemaphores) &&
+		(processSem < ((int *) deviceSemaphores + (sizeof(int) * DEVICE_TYPES * DEVICE_INSTANCES))))
+		|| (processSem == (int *) &semIntTimer);
+
+   /* Remove p from its blocked queue (if it is currently blocked) */
+   pcb_PTR removedPcb = outBlocked(proc);
+
+   /* If the process was removed from a blocking queue and is not blocked on a device,
+	  then increment the associated semaphore value (signaling that a resource has been freed). */
+   if (!blockedOnDevice && removedPcb != NULL) {
+	   (*(processSem))++;
+   }
+
+   /* Free the process control block for p and update the global process count */
+   freePcb(proc);
+   procCnt--;
+}
+
+
 
 /****************************************************************************  
  * createProcess() - SYS1  
@@ -168,27 +168,25 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
 
      /* If a new PCB was successfully allocated */
     if (newProc != NULL){
+		/*newProc->p_s = *stateSYS;*/
         copyState(stateSYS, &(newProc->p_s));        /* Copy the given processor state to the new process */
         newProc->p_supportStruct = suppStruct;       /* Assign the provided support structure */
-        newProc->p_time = INITIAL_TIME;              /* Initialize CPU time usage to 0 */
+        newProc->p_time = 0;              			 /* Initialize CPU time usage to 0 */
         newProc->p_semAdd = NULL;                    /* New process is not blocked on a semaphore */
      
         insertChild(currProc, newProc);              /* Insert the new process as a child of the current process */
         insertProcQ(&ReadyQueue, newProc);           /* Add the new process to the Ready Queue for scheduling */
 
-        currProc->p_s.s_v0 = SUCCESS;                /* Indicate success (0) in the caller's v0 register */
+        currProc->p_s.s_v0 = 0;                		 /* Indicate success (0) in the caller's v0 register */
         procCnt++;                                   /* Increment the active process count */
     }
     /* If no PCB was available (Free PCB Pool exhausted) */
     else{
-        currProc->p_s.s_v0 = NULL_PTR_ERROR;         /* Indicate failure (assign -1) in v0 */
+        currProc->p_s.s_v0 = -1;         /* Indicate failure (assign -1) in v0 */
     }
-
-    /* Update CPU time (charge time spent in SYSCALL 1 handler) for the calling process */
-    STCK(curr_TOD); /* Store the current Time-of-Day (TOD) clock value */
-    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Charge accumulated CPU time spent in exception handler to currProc */
-    swContext(currProc); /* Perform a context switch to resume execution from the calling process */
 }
+
+
 
 /****************************************************************************  
  * terminateProcess() - SYS2  
@@ -213,44 +211,12 @@ void createProcess(state_PTR stateSYS, support_t *suppStruct) {
  *  
  * @return None  
  *****************************************************************************/
-void terminateProcess(pcb_PTR proc) {
-    int *processSem; /* Pointer to the semaphore that the process is blocked on (if any) */
-    processSem = proc->p_semAdd;  /* Retrieve the semaphore the process is currently waiting on */
-
-    /* Recursively terminate all child processes */
-    while (!(emptyChild(proc))){
-        terminateProcess(removeChild(proc)); /* Recursively remove and terminate child processes */
-    }
-    
-
-    /* Remove the process from its current state (Running, Blocked, or Ready) */
-    if (proc == currProc) {  
-        /* If the process is currently running, detach it from its parent */
-        outChild(proc);  
-    }  
-    else if (processSem != NULL) {  
-        /* If the process is blocked, remove it from the ASL */
-        outBlocked(proc);
-        
-        /*  If the process was NOT blocked on a device semaphore.  */
-        if (!(processSem >= &deviceSemaphores[DEV0] && processSem <= &deviceSemaphores[INDEXCLOCK])){ 
-			(*(processSem))++; /* incrementing the val of sema4*/
-		}
-        else {  
-            softBlockCnt--;  /* Decrease soft-blocked process count */
-        }  
-    }  
-    else {  
-        /* Otherwise, the process was in the Ready Queue, so remove it */
-        outProcQ(&ReadyQueue, proc);  
-    }  
-
-    /* Free the process's PCB and update system process count */
-    freePcb(proc);   /* Return the PCB to the free list */
-    procCnt--;       /* Decrement the count of active processes */
-    proc = NULL;     /* Nullify the pointer*/
+void terminateProcess() {
+    outChild(currProc);
+	recursive_terminate(currProc);
+	currProc = NULL;
+	switchProcess();
 }
-
 
 
 /****************************************************************************  
@@ -274,22 +240,15 @@ void terminateProcess(pcb_PTR proc) {
  *  
  * @return None  
  *****************************************************************************/
-
 void passeren(int *sem){
     (*sem)--;  /* Decrement the semaphore */
     
     /*If semaphore value < 0, process is blocked on the ASL (transitions from running to blocked)*/
-    if (*sem < SEM4BLOCKED) {
-        blockCurrProc(sem); /*block the current process and perform the necessary steps associated with blocking a process*/  
+    if (*sem < 0) {
+        blockCurrProc(sem);
         switchProcess();  /* Call the scheduler to run another process */
     }
-
-    /*return control to the Current Process*/
-    STCK(curr_TOD); /* Store the current Time-of-Day (TOD) clock value */
-    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Charge accumulated CPU time spent in exception handler to currProc */
-    swContext(currProc); /* Perform a context switch to resume execution from the calling process */
 }
-
 
 /****************************************************************************  
  * verhogen() - SYS4  
@@ -310,20 +269,17 @@ void passeren(int *sem){
  *  
  * @return None  
  *****************************************************************************/
-
-void verhogen(int *sem) {
+pcb_PTR verhogen(int *sem) {
+	pcb_PTR p = NULL;
     (*sem)++; /* Increment the semaphore value, signaling that a resource is available */
     /* Check if there were processes blocked on this semaphore */
-    if (*sem <= SEM4BLOCKED) { 
-        pcb_PTR p = removeBlocked(sem); /* Unblock the first process waiting on this semaphore */
-        insertProcQ(&ReadyQueue,p);     /* Add the unblocked process to the Ready Queue */
+
+    if (*sem <= 0) { 
+        p = removeBlocked(sem); /* Unblock the first process waiting on this semaphore */
+		if (p != NULL){insertProcQ(&ReadyQueue,p);}    /* Add the unblocked process to the Ready Queue */
     }
-    STCK(curr_TOD); /* Store the current Time-of-Day (TOD) clock value */
-    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc);  /* Charge accumulated CPU time spent in exception handler to currProc */
-    swContext(currProc); /* Perform a context switch to resume execution from the calling process */
+    return p; /*return pointer to unblocked process pcb*/
 }
-
-
 
 /****************************************************************************  
  * waitForIO(int lineNum, int deviceNum, int readBool) - SYS5  
@@ -352,32 +308,35 @@ void verhogen(int *sem) {
  *  
  * @return None  
  *****************************************************************************/
+void waitForIO(int lineNum, int deviceNum, int readBool) {
+	softBlockCnt++;  /*Increment count of soft-blocked (waiting) processes*/
+    
+    /*Save the current process state from the BIOS Data Page*/
+    currProc->p_s = *((state_t *) BIOSDATAPAGE);
 
- void waitForIO(int lineNum, int deviceNum, int readBool) {    
-    int semIndex;  /*Index representing the semaphore associated with the device requesting I/O */
+    int semIndex;  /*This will hold the index into the deviceSemaphores array*/
 
-    /* 
-    * Compute the semaphore index for the given device.
-    * - Each interrupt line (3-7) manages up to 8 devices.
-    * - Subtract OFFSET from lineNum: Adjusts the line number to index from 0 (since OFFSET is the base interrupt line, typically 3).
-    * - DEVPERINT: Multiplies by 8 to allocate a block of 8 semaphores for each interrupt line.
-    * - Add deviceNum: Adds the specific device number (0-7) within the interrupt line.
-    * - The resulting semIndex maps the device to its corresponding semaphore.
-    */
-    semIndex = ((lineNum - OFFSET) * DEVPERINT) + deviceNum;
-
-
-    /* If the device is terminal and waiting for a write operation */
-    if (lineNum == LINENUM7 && readBool != TRUE) {
-        semIndex += DEVPERINT; /* We increment semIndex by 8 because the semaphore for a read operation is located 8 positions before the semaphore for a write operation for the same device*/
+    /*For device interrupts (assumed to be in the range [DISKINT, ...]),*/
+    /*compute semIndex based on lineNum*/
+    if (lineNum >= 3 && lineNum <= 6) {
+        semIndex = lineNum - OFFSET;  
     }
-
-    softBlockCnt++;  /* Increment the count of processes blocked on I/O */
-    (deviceSemaphores[semIndex])--;  /* Perform a P operation on the semaphore to block the process */
-    blockCurrProc(&deviceSemaphores[semIndex]); /* Block the current process, inserting it into the ASL (Active Semaphore List) */
-    switchProcess(); /* Call scheduler to switch to another process while waiting for I/O completion */
-
- }
+    /*If lineNum corresponds to a terminal interrupt (e.g., TERMINT == 7),*/
+    /*choose the semaphore index based on the readBool flag:*/
+    /* - If readBool is true, use index 4.*/
+    /* - Otherwise, use index 5.*/
+    else if (lineNum == 7) {
+        semIndex = (readBool) ? 4 : 5;
+    }
+    /*If the lineNum doesn't match expected values, terminate the process.*/
+    else {
+        terminateProcess();
+        return;
+    }
+	int index = semIndex * DEVPERINT + deviceNum;
+    /*Perform the "passeren" (P or wait) operation on the chosen device semaphore.*/
+    passeren(&deviceSemaphores[index]);
+}
 
 /****************************************************************************  
  * getCPUTime() - SYS6  
@@ -393,12 +352,13 @@ void verhogen(int *sem) {
  *  
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
-void getCPUTime(){
-    STCK(curr_TOD);   /* Store the current Time-of-Day (TOD) clock value */
-    currProc->p_s.s_v0 = currProc->p_time + (curr_TOD - start_TOD); /* put the accumulated processor taken up spent by the calling process in v0 */
-    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Update accumulated CPU time to correctly track process execution time */
-    swContext(currProc); /* Perform a context switch back to the calling process */
+void getCPUTime(state_t *savedState){
+	cpu_t totalTime;
+    totalTime = currProc->p_time + get_elapsed_time();
+	savedState->s_v0 = totalTime;
+    currProc->p_s.s_v0 = totalTime;
 }
+
 
 /****************************************************************************  
  * waitForClock() - SYS7  
@@ -414,14 +374,10 @@ void getCPUTime(){
  *  
  * @return None  
  *****************************************************************************/
-
-void waitForClock(){
-    (deviceSemaphores[INDEXCLOCK])--; /* Perform a wait operation on the clock semaphore - decrement the semaphore's value by 1 */
-    blockCurrProc(&deviceSemaphores[INDEXCLOCK]); /* Block the current process until the next interval timer interrupt */
-    softBlockCnt++; /* Increase the count of soft-blocked processes */
-	switchProcess(); /* Call the scheduler to run the next available process */
+void waitForClock() {
+	softBlockCnt++;
+	passeren(&semIntTimer);
 }
-
 
 /****************************************************************************  
  * getSupportData() - SYS8  
@@ -436,13 +392,10 @@ void waitForClock(){
  *  
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
-
-void getSupportData(){
-    currProc->p_s.s_v0 = (int) (currProc->p_supportStruct); /* Store the address of the support structure in the v0 register */
-    STCK(curr_TOD); /* Store the current Time-of-Day (TOD) clock value */
-    update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /* Update accumulated CPU time to correctly track process execution time */
-    swContext(currProc); /* Perform a context switch back to the calling process */
+void getSupportData(state_t *savedState) {
+	savedState->s_v0 = (int) currProc->p_supportStruct;
 }
+
 
 
 /****************************************************************************  
@@ -468,20 +421,64 @@ void getSupportData(){
  * @return None (This function either transfers control to the user-level handler  
  *               or terminates the process and schedules another one).  
  *****************************************************************************/
-void exceptionPassUpHandler(int exceptionCode){
-    /*If current process has a support structure -> pass up exception to the exception handler */
-    if (currProc->p_supportStruct != NULL){
-        copyState(savedExceptState, &(currProc->p_supportStruct->sup_exceptState[exceptionCode])); /* copy saved exception state from BIOS Data Page to currProc's sup_exceptState field */
-        STCK(curr_TOD); /*get current time on TOD clock*/
-        update_accumulated_CPUtime(start_TOD,curr_TOD,currProc); /*update currProc with accumulated CPU time*/
-        LDCXT(currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_stackPtr, currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_status,currProc->p_supportStruct->sup_exceptContext[exceptionCode].c_pc); /* Load the user-level exception handler context */
-    }
-    /* No user-level handler defined, so terminate the process */
-    else{
-        terminateProcess(currProc); /* Recursively terminates the process and its children */
-        currProc = NULL; /* Clear the current process pointer */
-        switchProcess(); /* Call the scheduler to switch to the next ready process */
-    }
+HIDDEN void exceptionPassUpHandler(int exceptionCode) {
+	/*If current process has a support structure -> pass up exception to the exception handler */
+	if (currProc->p_supportStruct != NULL){
+		copyState(((state_t *) BIOSDATAPAGE),&(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
+		context_t *ctx = &(currProc->p_supportStruct->sup_exceptContext[exceptionCode]);
+		LDCXT(ctx->c_stackPtr, ctx->c_status, ctx->c_pc);
+	}
+	/* No user-level handler defined, so terminate the process */
+	else{
+		terminateProcess();
+	}
+}
+
+
+/****************************************************************************  
+ * prgmTrapHandler()  
+ *  
+ * @brief  
+ * Handles program-related exceptions, including illegal operations,  
+ * invalid memory accesses, and arithmetic errors.  
+ *  
+ * @details  
+ * - This function is called when a General Exception occurs.  
+ * - Instead of resolving the exception itself, it delegates the task to  
+ *   exceptionPassUpHandler(), which determines if the process has a  
+ *   user-defined exception handler using the GENERALEXCEPT index value  
+ * - If a handler is available, the exception is passed up for processing.  
+ * - If no handler exists, the process is terminated.  
+ *  
+ * @return None (This function does not return, as it either transfers control  
+ *               to a user-defined handler or terminates the process).  
+ *****************************************************************************/  
+void prgmTrapHandler() {
+	exceptionPassUpHandler(GENERALEXCEPT);
+}
+
+/****************************************************************************  
+ * tlbTrapHandler()  
+ *  
+ * 
+ * @brief  
+ * Handles TLB exceptions, typically triggered when a process accesses an 
+ * invalid or unmapped virtual address.  
+ *  
+ * 
+ * @details  
+ * - This function is called when a Page Fault Exception occurs.  
+ * - Instead of handling the exception directly, it delegates the handling  
+ *   to exceptionPassUpHandler(), which determines whether the process  
+ *   has a user-defined exception handler using the PGFAULTEXCEPT index value
+ * - If a handler exists, the exception state is passed up to user space.  
+ * - If no handler is present, the process is terminated.  
+ *  
+ * 
+ * @return None  
+ *****************************************************************************/ 
+void tlbTrapHanlder() {
+	exceptionPassUpHandler(PGFAULTEXCEPT);
 }
 
 
@@ -509,111 +506,82 @@ void exceptionPassUpHandler(int exceptionCode){
  *  
  * @return None  
  *****************************************************************************/  
-void sysTrapHandler(){
+void sysTrapHandler() {
+	/*Retrieve saved processor state (located at start of the BIOS Data Page) & extract the syscall number to find out which type of exception was raised*/
+	state_t *savedState = (state_t *)BIOSDATAPAGE;
+	syscallNo = savedState->s_a0;
+	unsigned int reg_a1 = savedState->s_a1;
+	unsigned int reg_a2 = savedState->s_a2;
+	unsigned int reg_a3 = savedState->s_a3;
 
-    /*Retrieve saved processor state (located at start of the BIOS Data Page) & extract the syscall number to find out which type of exception was raised*/
-    savedExceptState = (state_PTR) BIOSDATAPAGE;  
-    syscallNo = savedExceptState->s_a0;  
+	/*Increment PC by 4 avoid infinite loops*/
+    savedState->s_pc = savedState->s_pc + WORDLEN;
 
-    /*Increment PC by 4 avoid infinite loops*/
-    savedExceptState->s_pc = savedExceptState->s_pc + WORDLEN;
-
-    /*If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
-    if (((savedExceptState->s_status) & STATUS_USERPON) != STATUS_ALL_OFF){
-        savedExceptState->s_cause = (savedExceptState->s_cause) & RESINSTRCODE; /* Set exception cause to Reserved Instruction */
+	/*If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
+    if (((savedState->s_status) & USERPON) != ALLOFF){
+        savedState->s_cause = (savedState->s_cause) & 0xFFFFFF28; /* Set exception cause to Reserved Instruction */
         prgmTrapHandler();  /* Handle it as a Program Trap */
-    } 
-
-    /*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
-    if ((syscallNo < SYS1) || (syscallNo > SYS8)) {  
-        prgmTrapHandler();  /* Invalid syscall, treat as Program Trap */
     }
 
-    /*save processor state into cur */
-    update_pcb_state(currProc);  
+	/*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
+    if ((syscallNo < 1) || (syscallNo > 8)) {  
+        exceptionPassUpHandler(GENERALEXCEPT);  /* Invalid syscall, try pass up or die to see if we can handle it */
+    }
+	unsigned int kup_check = ((savedState->s_status) & 0x00000008) >> 3; /*KUp bit, which checks whether the process is in user or kernel mode*/
+	/*Phase 2 requires one to be in kernel mode*/
 
-     /*  
-     * Execute the appropriate system call function based on the syscall number.  
-     * Each case corresponds to a specific system call (SYS1 to SYS8).  
+	/*If we're in kernel mode -> safe to proceed*/
+	if (kup_check == 0) {
+		switch (syscallNo) {
+		case SYS1:
+			createProcess((state_t *) reg_a1, (support_t *) reg_a2);
+			break;
+		case SYS2:
+			terminateProcess();
+			break;
+		case SYS3:
+			passeren((int *) reg_a1);
+			break;
+		case SYS4:
+			verhogen((int *) reg_a1);
+			break;
+		case SYS5:
+			waitForIO(reg_a1, reg_a2, reg_a3);
+			break;
+		case SYS6:
+			getCPUTime(savedState);
+			break;
+		case SYS7:
+			waitForClock();
+			break;
+		case SYS8:
+			getSupportData(savedState);
+			break;
+		default:
+			terminateProcess();
+			break;
+		}
+	
+    /* 
+     * After handling the system call, check if there is a current process.
+     * If no process is available (i.e., currProc is NULL), switch to the next available process.
+     * Otherwise, load the processor state from the saved state to resume execution.
      */
-    switch (syscallNo) {  
-        case SYS1:  
-            createProcess((state_PTR) (currProc->p_s.s_a1), (support_t *) (currProc->p_s.s_a2));    /*call SYS1 handler*/
-
-        case SYS2:  
-            terminateProcess(currProc);  /*call SYS2 handler*/
-            currProc = NULL;  
-            switchProcess();
-
-        case SYS3:  
-            passeren((int *) (currProc->p_s.s_a1));     /*call SYS3 handler*/
-
-        case SYS4:  
-            verhogen((int *) (currProc->p_s.s_a1));     /*call SYS4 handler*/
-
-        case SYS5:  
-            waitForIO(currProc->p_s.s_a1, currProc->p_s.s_a2, currProc->p_s.s_a3);     /*call SYS5 handler*/
-
-        case SYS6:  
-            getCPUTime();  /*call SYS6 handler*/
-
-        case SYS7:  
-            waitForClock();  /*call SYS7 handler*/
-
-        case SYS8:  
-            getSupportData();  /*call SYS8 handler*/
-
-    }  
-
+	if (currProc == NULL)
+		switchProcess();
+	else
+		LDST(savedState);
+	}
+	else {
+	/* 
+     * If kup_check is not 0, the process is not in kernel mode
+     * which is an error condition since privileged system calls must be executed in kernel mode.
+     */
+		savedState->s_cause &= ~GETEXECCODE; /* Clear the current exception code bits from the cause field */
+		savedState->s_cause |= 10 << CAUSESHIFT; /* Set the new cause by shifting the exception code into place */
+		prgmTrapHandler(); /*Handle as program trap*/
+	}
 }
-
-
-/****************************************************************************  
- * tlbTrapHandler()  
- *  
- * 
- * @brief  
- * Handles TLB exceptions, typically triggered when a process accesses an 
- * invalid or unmapped virtual address.  
- *  
- * 
- * @details  
- * - This function is called when a Page Fault Exception occurs.  
- * - Instead of handling the exception directly, it delegates the handling  
- *   to exceptionPassUpHandler(), which determines whether the process  
- *   has a user-defined exception handler using the PGFAULTEXCEPT index value
- * - If a handler exists, the exception state is passed up to user space.  
- * - If no handler is present, the process is terminated.  
- *  
- * 
- * @return None  
- *****************************************************************************/ 
-void tlbTrapHanlder(){
-    exceptionPassUpHandler(PGFAULTEXCEPT); /* Pass up the TLB exception (Page Fault) */
-}
-
-/****************************************************************************  
- * prgmTrapHandler()  
- *  
- * @brief  
- * Handles program-related exceptions, including illegal operations,  
- * invalid memory accesses, and arithmetic errors.  
- *  
- * @details  
- * - This function is called when a General Exception occurs.  
- * - Instead of resolving the exception itself, it delegates the task to  
- *   exceptionPassUpHandler(), which determines if the process has a  
- *   user-defined exception handler using the GENERALEXCEPT index value  
- * - If a handler is available, the exception is passed up for processing.  
- * - If no handler exists, the process is terminated.  
- *  
- * @return None (This function does not return, as it either transfers control  
- *               to a user-defined handler or terminates the process).  
- *****************************************************************************/  
-void prgmTrapHandler(){
-    exceptionPassUpHandler(GENERALEXCEPT); /* Pass up the TLB exception */
-}
-
 
 /****************************************************************************  
  * gen_exception_handler()  
@@ -640,25 +608,26 @@ void prgmTrapHandler(){
  *  
  * @return None  
  *****************************************************************************/
-void gen_exception_handler(){
-    state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
+void gen_exception_handler()
+{	
+	state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
     int exception_code; /* Stores the extracted exception type */  
 
     saved_state = (state_t *) BIOSDATAPAGE;  /* Retrieve the saved processor state from BIOS data page */
     exception_code = ((saved_state->s_cause) & GETEXCPCODE) >> CAUSESHIFT; /* Extract exception code from the cause register */
 
-    if (exception_code == INTCONST) {  
+	if (exception_code == 0) {  
         /* Case 1: Exception Code 0 - Device Interrupt */
         interruptsHandler();  /* call the Nucleus' device interrupt handler function */
     }  
-    if (exception_code <= CONST3) {  
+    else if ((exception_code <= 3) && (exception_code >= 1)) {  
         /* Case 2: Exception Codes 1-3 - TLB Exceptions */
         tlbTrapHanlder();  /* call the Nucleus' TLB exception handler function */
     }  
-    if (exception_code == SYSCONST) {  
+    else if (exception_code == 8) {  
         /* Case 3: Exception Code 8 - System Calls */
         sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
     }
     /* Case 4: All Other Exceptions - Program Traps */
     prgmTrapHandler(); /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/
- }
+}

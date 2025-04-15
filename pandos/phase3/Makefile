@@ -40,8 +40,12 @@ AS = mipsel-linux-gnu-as -KPIC
 EF = umps3-elf2umps
 UDEV = umps3-mkdev
 
+# Device generation variables
+TERMINALS := $(addprefix term, $(addsuffix .umps, $(shell seq 0 7)))
+PRINTERS  := $(addprefix print, $(addsuffix .umps, $(shell seq 0 7)))
+
 #main target
-all: kernel.core.umps 
+all: kernel.core.umps $(TERMINALS) $(PRINTERS)
 
 kernel.core.umps: kernel
 	$(EF) -k kernel
@@ -52,6 +56,9 @@ kernel: $(OBJS)
 %.o: %.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
+# Rule to generate .umps devices (termX.umps, printX.umps)
+%.umps:
+	$(UDEV) -d $@
 
 clean:
 	rm -f *.o *.umps kernel

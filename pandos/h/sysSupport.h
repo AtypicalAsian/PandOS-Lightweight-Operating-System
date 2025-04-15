@@ -3,19 +3,22 @@
  * Declaration File for sysSupport.c module
  * 
  ****************************************************************************/
-#ifndef SYSSUPPORT
-#define SYSSUPPORT
+#ifndef SYSUPPORT
+#define SYSUPPORT
 #include "../h/types.h"
 #include "../h/const.h"
 
-extern int deviceSema4s[MAXSHAREIODEVS];
+extern int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES];
 
-extern void gen_excp_handler();
-extern void program_trap_handler();
-extern void init_deviceSema4s();
-void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested);
-extern void return_control(int exception_code, support_t *supportStruct);
-void terminate();
 
+void returnControlSup(support_t *support, int exc_code);
+extern void sysSupportGenHandler();
+extern void trapExcHandler(support_t *currentSupport);
+void syscall_excp_handler(support_t *support_struct, int exceptionCode);
+void terminate(support_t *support_struct);
+void getTOD(state_PTR excState);
+void writeToPrinter(char *virtualAddr, int len, support_t *support_struct);
+void writeToTerminal(char *virtualAddr, int len, support_t *support_struct);
+void readTerminal(char *virtualAddr, support_t *support_struct);
 
 #endif

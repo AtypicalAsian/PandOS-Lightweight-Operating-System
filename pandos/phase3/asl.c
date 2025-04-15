@@ -25,6 +25,9 @@ To view version history and changes:
 HIDDEN semd_PTR semd_h;             /*ptr to head of active semaphore list (ASL)*/
 HIDDEN semd_PTR semdFree_h;         /*ptr to head of free semaphore list*/
 
+#define MAXPROC_SEM (MAXPROC + 2)
+#define LARGEST_ADDR  0x0FFFFFFF
+#define SMALLEST_ADDR 0x00000000
 
 /**************************************************************************** 
  *  freeSemaphore 
@@ -290,5 +293,3 @@ pcb_PTR headBlocked(int *semAdd) {
     /* Return the head of the process queue */
     return headProcQ(curr_ptr->s_procQ);
 }
-
-

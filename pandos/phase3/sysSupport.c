@@ -8,22 +8,9 @@
  *      - SYSCALL exception handler. [Section 4.7]
  *      - Program Trap exception handler. [Section 4.8]
  * 
- * @details  
- * 
- *  
- * @note  
- * 
- *  
  * @authors  
  * Nicolas & Tran  
  * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
- * 
- * TODO
- * This module implements
- *       general exception handler. [Section 4.6]
- *       SYSCALL exception handler. [Section 4.7]
- *       Program Trap exception handler. [Section 4.8] - vmSupport pass control here if page fault is a modification type (should not happen in pandOS)
- * 
  **************************************************************************************************/
 
 #include "../h/types.h"
@@ -40,7 +27,7 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Support level device semaphores*/
-int support_device_sems[DEVICE_TYPES * DEVICE_INSTANCES]; 
+int devSema4_support[DEVICE_TYPES * DEVICE_INSTANCES]; 
 
 
 
@@ -57,22 +44,24 @@ void returnControlSup(support_t *support, int exc_code)
 
 
 /************************************************************************************************** 
- * @brief terminate() is a essentially a wrapper for the kernel-mode restricted SYS2 service
+ * @brief get_nuked() (or SYS9) is a essentially a wrapper for the kernel-mode restricted SYS2 service
  * 
  * @details
- * 1. Calculate the device index based on the U's proccess_id (ASID)
- * 2. Use first "for" loop to iterate over all device semaphores and release any hold by this U's proc
- * 3. Use second "for" loop to iterate over all memory pages in U's proc page table, and invalidate all these pages
- *  - Before set entryLow and entryHigh invalid, disable all external interrupts
- *  - After updating TLB & invalidating, enable all interrupts again
- * 4. Release the master semaphore & de-allocate support_struct of U's proc
+ * 1. Calculate the device index based on the uproc's proccess_id (ASID)
+ * 2. Release all device semaphores the uproc is holding
+ * 3. Invalidate all frames in the page table of the current uproc
+ * 4. Decrement the master semaphore & de-allocate support_struct of U's proc (return back to free pool of suppStructs)
  * 5. Make SYSCALL 2 to terminate U's proc and its children processes
+ * 
+ * @param: support_struct - pointer to the support structure of the current uproc. This makes it easier to access
+ *                          fields like asid and the private page table
+ * @return: None
  * 
  * @ref
  * pandOS - section 4.7.1
  * princOfOperations - section 4.6.2
  **************************************************************************************************/
-void terminate(support_t *support_struct)
+void get_nuked(support_t *support_struct)
 {
     int dev_num = support_struct->sup_asid - 1;
 
@@ -80,8 +69,8 @@ void terminate(support_t *support_struct)
     int i;
     for (i = 0; i < DEVICE_TYPES; i++) {
         int index = i * DEVICE_INSTANCES + dev_num;
-        if (support_device_sems[index] == 0){
-            SYSCALL(SYS4, (memaddr)&support_device_sems[index],0,0);
+        if (devSema4_support[index] == 0){
+            SYSCALL(SYS4, (memaddr)&devSema4_support[index],0,0);
         }
     }
 
@@ -89,20 +78,20 @@ void terminate(support_t *support_struct)
     for (i = 0; i < MAXPAGES; i++) {
         if(support_struct->sup_privatePgTbl[i].entryLO & VALIDON){
             setSTATUS(INTSOFF);
-            support_struct->sup_privatePgTbl[i].entryLO &= ~VALIDON;
-            update_tlb_handler(&(support_struct->sup_privatePgTbl[i]));
+            support_struct->sup_privatePgTbl[i].entryLO &= ~VALIDON; /*invalidate the page*/
+            update_tlb_handler(&(support_struct->sup_privatePgTbl[i])); /*update TLB to maintain consistency with page tables*/
             setSTATUS(INTSON);
         }
     }
     SYSCALL(SYS4, (memaddr) &masterSema4, 0, 0);
-    deallocate(support_struct);
+    deallocate(support_struct); /*de-allocate the support structure*/
     SYSCALL(SYS2, 0, 0, 0); /*Make the call to sys2 to terminate the uproc and its child processes*/
 }
 
 
 /**************************************************************************************************
  * @brief Return the number of microseconds since system boot
- * The method calls the hardware TOD clock and stores in register v0
+ * The method calls the hardware TOD clock and stores the return value in register v0
  * 
  * @note Save current TOD to register v0
  * 
@@ -113,19 +102,19 @@ void getTOD(state_PTR excState)
 {
    cpu_t currTime;
    STCK(currTime);
-   excState->s_v0 = currTime;
+   excState->s_v0 = currTime; /*Place time in register v0*/
 }
 
 
 /**************************************************************************************************
- * @brief The method implements a syscall to perform WRITE operation to printer device
+ * @brief The method performs a write operation to a specific printer device
  * 
  * @details
- * 1. Check if address we're writing from is outside of the uproc logical address space
- * 2. Check if length of string is within bounds (0-128)
- * 3. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
- * 4. Perform SYS3 to gain mutex over printer device
- * 5. Use For Loop to iterating through each character in the range [virtAddr, virtAddr + len], and write one by one to printer: 
+ * 1. Check if address we're writing from is outside of the uproc logical address space & if length
+ *    of string to be written is within bounds (0-128)
+ * 2. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
+ * 3. Perform SYS3 to gain mutex over printer device
+ * 4. Use For Loop to iterating through each character in the range [virtAddr, virtAddr + len], and write one by one to printer: 
  *  5.1 Given that the printer device is ready:
         - Retrieve current processor status before disabling all external interrupts
         - Reset the status to 0x0 and disable all interrupts
@@ -153,8 +142,8 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     }*/
 
     /*--------------Declare local variables---------------------*/
-    int semIndex;
-    int pid;
+    int semIndex; /*Index to the device semaphore array*/
+    int pid; /*printer id*/
     int char_printed_count; /*tracks how many characters were printed*/
     char_printed_count = 0;
     /*----------------------------------------------------------*/
@@ -163,28 +152,28 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     semIndex = ((PRNTINT - OFFSET) * DEVPERINT) + pid;
     char_printed_count = 0;
 
-    SYSCALL(PASSEREN, (memaddr)&support_device_sems[semIndex], 0, 0);
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[semIndex], 0, 0); /*Lock the printer device*/
 
     devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the bus register area */
-    device_t *printerDev = &(busRegArea->devreg[semIndex]);
+    device_t *printerDev = &(busRegArea->devreg[semIndex]); /*Pointer to printer device register*/
 
     int i;
-    for (i = 0; i < len; i++) {
+    for (i = 0; i < len; i++) { /*Iterate over each character in the string to be printed*/
         if(printerDev->d_status == READY) {
-            setSTATUS(INTSOFF);
-            printerDev->d_data0 = ((int) *(virtualAddr + i));
-            printerDev->d_command = PRINTCHR;
+            setSTATUS(INTSOFF); /*disable interrupts*/
+            printerDev->d_data0 = ((int) *(virtualAddr + i)); /*Set data0 to the character to be transmitted to printer*/
+            printerDev->d_command = PRINTCHR; /*Set command field to 2 to transmit the character in data0 to printer*/
             SYSCALL(WAITIO, PRNTINT, pid, 0);
-            setSTATUS(INTSON);
-            char_printed_count++;
+            setSTATUS(INTSON); /*enable interrupts*/
+            char_printed_count++; /*increment transmitted character count*/
         }
-        else {
-            char_printed_count = -(printerDev->d_status);
-            i = len;
+        else { /*If printer device is BUSY*/
+            char_printed_count = -(printerDev->d_status); /*return negative of device's status value in v0*/
+            break;
         }
     }
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count;
-    SYSCALL(VERHOGEN, (memaddr) &support_device_sems[semIndex], 0, 0);
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count; /*return transmitted character count in v0 if successful print*/
+    SYSCALL(VERHOGEN, (memaddr) &devSema4_support[semIndex], 0, 0); /*unlock printer device*/
 }
 
 
@@ -236,7 +225,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     /*Add the total offset to the base address of the device registers*/
     device_t *terminalDevice = (device_t *)(DEVICEREGSTART + totalOffset);
 
-    SYSCALL(SYS3,(memaddr) &support_device_sems[semIndex], 0, 0);
+    SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0);
 
     int i;
 
@@ -255,7 +244,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
         }
     }
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars;
-    SYSCALL(SYS4,(memaddr) &support_device_sems[semIndex], 0, 0);
+    SYSCALL(SYS4,(memaddr) &devSema4_support[semIndex], 0, 0);
 }
 
 /**************************************************************************************************
@@ -306,7 +295,7 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     /*Add the total offset to the base address of the device registers*/
     device_t *terminalDevice = (device_t *)(DEVICEREGSTART + totalOffset);
 
-    SYSCALL(SYS3,(memaddr) &support_device_sems[semIndex], 0, 0);
+    SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0);
 
     char currStr = ' ';
     int receivedChars;
@@ -335,7 +324,7 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     }
 
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars;
-    SYSCALL(SYS4,(memaddr) &support_device_sems[semIndex], 0, 0);
+    SYSCALL(SYS4,(memaddr) &devSema4_support[semIndex], 0, 0);
     /*IMPLEMENTATION ENDS*/
 
 }
@@ -352,7 +341,7 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
  **************************************************************************************************/
 void syslvl_prgmTrap_handler(support_t *support_struct)
 {
-    terminate(support_struct);
+    get_nuked(support_struct);
 }
 
 
@@ -395,7 +384,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     /*Step 4: Execute appropriate syscall helper method based on requested syscall number*/
     switch(syscall_num_requested) {
         case SYS9:
-            terminate(currProc_support_struct);
+            get_nuked(currProc_support_struct);
             break;
 
         case SYS10:

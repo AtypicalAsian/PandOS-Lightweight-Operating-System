@@ -59,7 +59,7 @@ void initSwapStructs(){
     /*Initialize associated semaphores*/
     int j;
     for (j=0; j < DEVICE_TYPES * DEVICE_INSTANCES; j++){
-        support_device_sems[j] = SUPP_SEMA4_INIT; /*initialize device semaphores to 1*/
+        devSema4_support[j] = SUPP_SEMA4_INIT; /*initialize device semaphores to 1*/
     }
 }
 
@@ -172,7 +172,7 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     f_device = &busRegArea->devreg[devIdx];
 
     /*Perform SYS3 to lock flash device semaphore*/
-    SYSCALL(SYS3, (memaddr)&support_device_sems[(DEVICE_INSTANCES) + deviceNum], 0, 0);
+    SYSCALL(SYS3, (memaddr)&devSema4_support[(DEVICE_INSTANCES) + deviceNum], 0, 0);
 
     /*Build command code*/
     if (op_type == FLASHWRITE){ /*If it's a write operation*/
@@ -191,7 +191,7 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
     setSTATUS(INTSON); /*enable interrupts*/
     
     /*Perform SYS4 to unlock flash device semaphore*/
-    SYSCALL(SYS4, (memaddr)&support_device_sems[(DEVICE_INSTANCES) + deviceNum], 0, 0);
+    SYSCALL(SYS4, (memaddr)&devSema4_support[(DEVICE_INSTANCES) + deviceNum], 0, 0);
     /*If operation failed (check device status) -> program trap handler*/
     if (device_status != READY){
         syslvl_prgmTrap_handler(currSuppStruct);

@@ -199,8 +199,7 @@ void test() {
     masterSema4 = MASTER_SEMA4_START;
 
     /* Initalise device reg semaphores */
-    init_deviceSema4s(); /*initialize device semaphores array*/
-    initSwapPool(); /*Initialize swap pool & swap pool semaphore*/
+    initSwapStructs(); /*Initialize swap pool table, swap pool semaphore and associated device semaphores*/
     initSuppPool(); /*Initialize support structs free pool*/
  
     /*Set up initial proccessor state*/

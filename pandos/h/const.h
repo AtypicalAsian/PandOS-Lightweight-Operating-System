@@ -34,11 +34,13 @@
 #define READY			    1
 #define ON         1
 #define OK         0
-#define NOPROC     -1
+#define FREE     -1
 #define INITPROCCNT 0
 #define INITSBLOCKCNT 0
 #define GETEXCPCODE 0x0000007C
 #define MASTER_SEMA4_START 0
+#define SWAP_SEMAPHORE_INIT 1
+#define SUPP_SEMA4_INIT 1
 
 /* device register addresses */
 #define DEVICEREGSTART  0x10000054

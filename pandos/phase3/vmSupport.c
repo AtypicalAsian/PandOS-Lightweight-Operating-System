@@ -1,30 +1,29 @@
 /**************************************************************************************************  
  * @file vmSupport.c  
  *  
- * 
  * @brief  
- * This module implements the TLB exception handler (The Pager). Additionally, the Swap Pool 
- * table and Swap Pool semaphore are local to this module. Instead of declaring them globally 
- * in initProc.c they are declared module-wide in vmSupport.c
- * 
+ * This module implements the TLB exception handler (the Pager) and TLB refill handler for virtual memory support.
+ *
  * @details  
+ * The vmSupport.c module is responsible for handling page faults by implementing the TLB 
+ * exception handler (Pager). It manages the virtual memory system by initializing and operating 
+ * the Swap Pool table and its accompanying Swap Pool semaphore—resources. In addition, the module 
+ * provides helper functions for:
+ *    - Reading from and writing to flash devices used for paging,
+ *    - Enabling/disabling interrupts via updates to the status register,
+ *    - Gaining and releasing mutual exclusion, and
+ *    - Returning control back to a specific process after handling an exception.
+ *
+ * The test function in phase 3 now invokes a new public function in vmSupport.c, initSwapStructs(), which 
+ * initializes both the Swap Pool table and the associated semaphore.
  * 
- *  
- * @note  
+ * @ref
+ * pandOS - sections 4.2, 4.3, 4.4, 4.5
  * 
- *  
  * @authors  
  * Nicolas & Tran  
  * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
  * 
- * 
- * TO-DO
- * This module implements the TLB exception handler (The Pager). Since reading and writing to each U-proc’s flash device is limited 
- * to supporting paging, this module should also contain the function(s) for 
- * reading and writing flash devices. Additionally, the Swap Pool table and Swap Pool semaphore are local to 
- * this module. Instead of declaring them globally in initProc.c they can be 
- * declared module-wide in vmSupport.c. The test function will now invoke a new “public” function initSwapStructs which will do the work 
- * of initializing both the Swap Pool table and accompanying semaphore.
  **************************************************************************************************/
 #include "../h/types.h"
 #include "../h/const.h"
@@ -39,29 +38,27 @@
 #include "../h/sysSupport.h"  
 #include "/usr/include/umps3/umps/libumps.h"
 
-/*Support Level Data Structures*/
+
 swap_pool_t swap_pool[MAXUPROCS * 2];    /*swap pool table*/
 int semaphore_swapPool;              /*swap pool sempahore*/
 
 /**************************************************************************************************
- * TO-DO
+ * Initialize the swap pool table and associated semaphores
  **************************************************************************************************/
-void init_deviceSema4s(){
+void initSwapStructs(){
+    /*Initialize the swap pool table*/
     int i;
-    for (i=0; i < DEVICE_INSTANCES * DEVICE_TYPES;i++){
-        support_device_sems[i] = 1;
+    for (i=0; i < MAXUPROCS * 2; i++){
+        swap_pool[i].asid = FREE;
     }
-    semaphore_swapPool = 1;
-}
 
-/**************************************************************************************************
- * DONE
- * Initialize swap pool table
- **************************************************************************************************/
-void initSwapPool() {
-    int k;
-    for (k = 0; k < POOLSIZE; k++) {
-        swap_pool[k].asid = NOPROC;
+    /*Initialize swap pool semaphore*/
+    semaphore_swapPool = SWAP_SEMAPHORE_INIT;
+
+    /*Initialize associated semaphores*/
+    int j;
+    for (j=0; j < DEVICE_TYPES * DEVICE_INSTANCES; j++){
+        support_device_sems[j] = SUPP_SEMA4_INIT;
     }
 }
 

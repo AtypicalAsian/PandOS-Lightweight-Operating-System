@@ -314,22 +314,32 @@ void read_from_terminal(char *virtualAddr, support_t *support_struct){
     receivedChars = 0;
     int readStatus;
 
-    /*iterate through string until we reach end of character*/
-    while(((terminalDevice->d_status & TERMSTATUSMASK) == READY) && (currChar != EOS)) {
-        setSTATUS(NO_INTS); /*disable interrupts*/
-        terminalDevice->d_command = TRANSMITCHAR; /*issue transmit command*/
-        readStatus = SYSCALL(SYS5, TERMINT, term_id, TRUE); /*block current proc until IO completes*/
-        setSTATUS(YES_INTS); /*enable interrupts*/
-        if((readStatus & TERMSTATUSMASK) == OKCHARTRANS) { /*if terminal status is OK, */
-            currChar = (readStatus >> DEV_UNITS);
-            if(currChar != '\n') {
-                *virtualAddr = currChar; /*copy character to currChar*/
-                virtualAddr++; /*move pointer to next char*/
-                receivedChars++; /*increment count*/
+    bool continueReading = true;
+
+    /* Keep reading while the device is ready, no EOS seen, and no error flagged */
+    while (continueReading && ((terminalDevice->d_status & TERMSTATUSMASK) == READY) && currChar != EOS) {
+
+        /* Disable interrupts around the I/O command */
+        setSTATUS(NO_INTS);
+        terminalDevice->d_command = TRANSMITCHAR;
+        readStatus = SYSCALL(SYS5, TERMINT, term_id, TRUE);
+        setSTATUS(YES_INTS);
+
+        /* Did the I/O succeed? */
+        if ((readStatus & TERMSTATUSMASK) == OKCHARTRANS) {
+            currChar = (readStatus >> DEV_UNITS);  /* Extract the received character */
+
+            if (currChar != '\n') {
+                /* Store valid character and advance */
+                *virtualAddr++ = currChar;
+                receivedChars++;
+            } else {
+                /* Newline signals end-of-input */
+                continueReading = false;
             }
-        }
-        else {
-            currChar = '\n'; /*set currChar to newline to force exit loop if character trasmission was not successful*/
+        } else {
+            /* I/O error: flag to exit and handle below */
+            continueReading = false;
         }
     }
 

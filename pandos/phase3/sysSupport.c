@@ -315,40 +315,36 @@ void read_from_terminal(char *virtualAddr, support_t *support_struct){
     int readStatus;
 
     int continueReading = 1;
-
+    
     /* Keep reading while the device is ready, no EOS seen, and no error flagged */
     while (continueReading && ((terminalDevice->d_status & TERMSTATUSMASK) == READY) && currChar != EOS) {
+        setSTATUS(NO_INTS); /*disable interrupts*/
+        terminalDevice->d_command = TRANSMITCHAR; /*write to d_command to issue read from terminal command*/
+        readStatus = SYSCALL(SYS5, TERMINT, term_id, TRUE); /*block current process until IO finishes*/
+        setSTATUS(YES_INTS); /*enable interrupts*/
 
-        /* Disable interrupts around the I/O command */
-        setSTATUS(NO_INTS);
-        terminalDevice->d_command = TRANSMITCHAR;
-        readStatus = SYSCALL(SYS5, TERMINT, term_id, TRUE);
-        setSTATUS(YES_INTS);
-
-        /* Did the I/O succeed? */
+        /*if character transfer is successful*/
         if ((readStatus & TERMSTATUSMASK) == OKCHARTRANS) {
             currChar = (readStatus >> DEV_UNITS);  /* Extract the received character */
 
             if (currChar != '\n') {
-                /* Store valid character and advance */
-                *virtualAddr++ = currChar;
-                receivedChars++;
-            } else {
-                /* Newline signals end-of-input */
-                continueReading = 0;
+                *virtualAddr++ = currChar; /*store currChar into buffer and advance the pointer*/
+                receivedChars++; /*incrememnt received character count*/
+            } else { /*encounter newline character -> stop reading*/
+                continueReading = 0; /*force exit loop*/
             }
-        } else {
-            /* I/O error: flag to exit and handle below */
-            continueReading = 0;
+        } else { /*terminal status not ready -> stop reading*/
+            continueReading = 0; /*force exit loop*/
         }
     }
 
     /*unsuccessful transmission*/
     if((terminalDevice->d_status & TERMSTATUSMASK) != READY || (readStatus & TERMSTATUSMASK) != OKCHARTRANS) {
-        receivedChars = -(readStatus); /*return negative of device's status value in v0*/
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -(readStatus); /*return negative of device's status value in v0*/
     }
-
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars; /*return received character count in v0 if successful*/
+    else{
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars; /*return received character count in v0 if successful*/
+    }
     SYSCALL(SYS4,(memaddr) &devSema4_support[semIndex], 0, 0); /*unlock terminal semaphore*/
 }
 

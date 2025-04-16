@@ -329,7 +329,7 @@ void read_from_terminal(char *virtualAddr, support_t *support_struct){
 
             if (currChar != '\n') {
                 *virtualAddr++ = currChar; /*store currChar into buffer and advance the pointer*/
-                receivedChars++; /*incrememnt received character count*/
+                receivedChars++; /*increment received character count*/
             } else { /*encounter newline character -> stop reading*/
                 continueReading = 0; /*force exit loop*/
             }

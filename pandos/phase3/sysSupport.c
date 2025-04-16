@@ -167,7 +167,7 @@ void write_to_printer(char *virtualAddr, int len, support_t *support_struct) {
         }
         else { /*If printer device is BUSY*/
             char_printed_count = -(printerDev->d_status); /*return negative of device's status value in v0*/
-            break;
+            i = len; /*force exit the loop*/
         }
     }
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count; /*return transmitted character count in v0 if successful print*/
@@ -217,8 +217,6 @@ void write_to_terminal(char *virtualAddr, int len, support_t *support_struct) {
     int baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + term_id;
     semIndex = baseTerminalIndex + DEVPERINT; /*Transmission device semaphores are 8 bits behind reception for terminal devices*/
 
-    SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0); /*Lock terminal device*/
-
     /*Calculate the offset for the terminal device row relative to disk*/
     unsigned int terminalOffset = (TERMINT - DISKINT) * (DEV_UNITS * DEVREGSIZE);
 
@@ -230,6 +228,8 @@ void write_to_terminal(char *virtualAddr, int len, support_t *support_struct) {
 
     /*Add the total offset to the base address of the device registers*/
     device_t *terminalDevice = (device_t *)(DEVICEREGSTART + totalOffset);
+
+    SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0); /*Lock terminal device*/
 
     /*Iterate through each character in the string*/
     int i;
@@ -244,7 +244,7 @@ void write_to_terminal(char *virtualAddr, int len, support_t *support_struct) {
             setSTATUS(YES_INTS); /*enable interrupts*/
         } else {
             transmittedChars = -(status); /*return negative of device's status value in v0*/
-            break;
+            i = len;
         }
     }
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars; /*return transmitted character count in v0 if successful print*/

@@ -31,18 +31,17 @@
 #include "../h/sysSupport.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
-/* GLOBAL VARIABLES & DATA STRUCTURES */
+/* DECLARE VARIABLES & DATA STRUCTURES */
 int deviceSema4s[DEVICE_TYPES * DEVPERINT]; /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
 int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully */
-int freeSupIndex; /*Iterator to index into the free support pool stack*/
-support_t *free_support_pool[MAX_FREE_POOL]; /*Array of pointers to free support structures. One extra slot is allocated to serve as a sentinel*/
+int freeSupIndex; /*Iterator to index into the free support pool*/
+support_t *free_support_pool[MAX_FREE_POOL]; /*Array of pointers to free support structures*/
 support_t support_structs_pool[MAXUPROCS]; /*Array of support structure objects for user procs*/
 
 
 
 /**************************************************************************************************
- * @brief Return a support structure to the free pool
- *
+ * @brief 
  * This function return the given support structure to the free_support_pool array. It effectively
  * "deallocates" the support structure so that it can be reused by future processes
  *
@@ -59,8 +58,7 @@ void deallocate(support_t *supStruct){
 }
 
 /**************************************************************************************************
- * @brief Retrieve a support structure from the free pool.
- *
+ * @brief
  * This function returns a pointer to a support structure from the free_support_pool if one is
  * available. If the pool is empty (freeSupIndex is 0), it returns NULL.
  *
@@ -83,24 +81,6 @@ support_t* allocate() {
 }
 
 /**************************************************************************************************
- * @brief Initializes the support structure pool
- *
- * @details This function resets the free index (freeSupIndex) to 0 and then iterates over 
- *          the pool of support structures. Each support structure is deallocated (pushed
- *          onto the free support pool) using the deallocate() helper function.
- * 
- * @param: None
- * @return: None
- **************************************************************************************************/
-void initSuppPool() {
-    freeSupIndex = 0;
-    int i;
-    for (i = 0; i < MAXUPROCS; i++){
-        deallocate(&support_structs_pool[i]);
-    }
-}
-
-/**************************************************************************************************
  * @brief
  *
  * This function sets up the initial state for a user process by initializing:
@@ -114,13 +94,27 @@ void initSuppPool() {
  * @ref
  * pandOS - section 4.9.1
  **************************************************************************************************/
-/*Initialize base processor state for user-process (define a function for this)*/
 void init_base_state(state_t *base_state){
     base_state->s_status = IMON | TEBITON | USERPON | IEPON; /*Enable timer, user mode, interrupts*/
     base_state->s_pc = TEXT_START; /*initialize PC*/
     base_state->s_t9 = TEXT_START; /*have to set t9 register after setting s_pc*/
     base_state->s_sp = SP_START; /*stack pointer*/
 }
+
+/**************************************************************************************************
+ * @brief Initializes the support structure pool
+ * 
+ * @param: None
+ * @return: None
+ **************************************************************************************************/
+void initSuppPool() {
+    freeSupIndex = 0;
+    int i;
+    for (i = 0; i < MAXUPROCS; i++){
+        deallocate(&support_structs_pool[i]);
+    }
+}
+
 
 /**************************************************************************************************
  * @brief Initialize a u-proc's support structure and process
@@ -133,7 +127,7 @@ void init_base_state(state_t *base_state){
  *       - The general exception context uses sysSupportGenHandler
  *       - The page fault exception context uses the TLB exception handler
  * 4. Initializes the process's private page table:
- *       - The first 31 entries are for program pages
+ *       - The first 30 entries are for program pages
  *       - The last entry (index 31) is reserved for the process stack
  * 5. Finally, invokes SYS1 to create and launch the process
  * 
@@ -166,18 +160,21 @@ void summon_process(int process_id, state_t *base_state){
     suppStruct->sup_exceptContext[PGFAULTEXCEPT].c_stackPtr = (memaddr) &(suppStruct->sup_stackTLB[STACKSIZE]); /*set sp to stack space allocated in support struct*/
         
     /*Initialize the private page table: pages 0-30 for data, entry 31 for stack*/
+
+    /*Entry 31 of page table = stack*/
+    suppStruct->sup_privatePgTbl[PAGE_TABLE_MAX].entryHI = PAGE31_ADDR + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
+    suppStruct->sup_privatePgTbl[PAGE_TABLE_MAX].entryLO = D_BIT_SET; /*mark D bit on*/
+
+    /*The other entries 0-30 are initialized the same way*/
     int k;
     for (k=0; k < PAGE_TABLE_MAX; k++){
         suppStruct->sup_privatePgTbl[k].entryHI = PT_START + (k << SHIFT_VPN) + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
         suppStruct->sup_privatePgTbl[k].entryLO = D_BIT_SET; /*mark the page as dirty by default - each page will be write-enabled*/
     }
-        
-    /*Entry 31 of page table = stack*/
-    suppStruct->sup_privatePgTbl[PAGE_TABLE_MAX].entryHI = PAGE31_ADDR + (process_id << SHIFT_ASID); /*pandos - 4.2.1*/
-    suppStruct->sup_privatePgTbl[PAGE_TABLE_MAX].entryLO = D_BIT_SET; /*mark D bit on*/
 
     /*Call SYS1 to create and launch the u-proc*/
-    SYSCALL(SYS1,(memaddr) &base_state_copy,(memaddr)suppStruct,0);
+    int syscall_status = SYSCALL(SYS1,(memaddr) &base_state_copy,(memaddr)suppStruct,0);
+    if (syscall_status != OK) {SYSCALL(SYS2,0,0,0);}
 }
 
 /************************************************************************************************** 
@@ -202,16 +199,14 @@ void summon_process(int process_id, state_t *base_state){
  * pandos - section 4.9 & 4.10
  **************************************************************************************************/
 void test() {
-    /*Declare local variables*/
     int process_id; /*unique process id (asid) associated with each user process that's created*/
     state_t base_state; /*Base processor state for user processes*/
 
     /*Initialize master semaphore to 0*/
     masterSema4 = MASTER_SEMA4_START;
 
-    /* Initalise device reg semaphores */
-    initSwapStructs(); /*Initialize swap pool table, swap pool semaphore and associated device semaphores - vmSupport.c function*/
     initSuppPool(); /*Initialize support structs free pool*/
+    initSwapStructs(); /*Initialize swap pool table, swap pool semaphore and associated device semaphores - function in vmSupport.c*/
  
     /*Set up initial proccessor state*/
     init_base_state(&base_state);

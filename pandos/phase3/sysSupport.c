@@ -30,19 +30,6 @@
 int devSema4_support[DEVICE_TYPES * DEV_UNITS]; 
 
 
-
-/**************************************************************************************************
- * DONE
- * This function is a wrapper to perform LDST
- * Can't use LDST directly in phase 3?
- **************************************************************************************************/
-void returnControlSup(support_t *support, int exc_code)
-{
-    LDST(&(support->sup_exceptState[exc_code]));
-}
-
-
-
 /************************************************************************************************** 
  * @brief get_nuked() (or SYS9) is a essentially a wrapper for the kernel-mode restricted SYS2 service
  * 
@@ -51,7 +38,7 @@ void returnControlSup(support_t *support, int exc_code)
  * 2. Release all device semaphores the uproc is holding
  * 3. Invalidate all frames in the page table of the current uproc
  * 4. Decrement the master semaphore & de-allocate support_struct of U's proc (return back to free pool of suppStructs)
- * 5. Make SYSCALL 2 to terminate U's proc and its children processes
+ * 5. Make SYSCALL 2 to terminate uproc and its children processes
  * 
  * @param: support_struct - pointer to the support structure of the current uproc. This makes it easier to access
  *                          fields like asid and the private page table
@@ -115,18 +102,19 @@ void getTOD(state_PTR excState)
  * @details
  * 1. Check if address we're writing from is outside of the uproc logical address space & if length
  *    of string to be written is within bounds (0-128)
- * 2. Find semaphore index corresponding with printer device (like SYS5, for printer device, its interrupt line is 6, device number ???)
+ * 2. Find semaphore index corresponding with printer device
  * 3. Perform SYS3 to gain mutex over printer device
  * 4. Use For Loop to iterating through each character in the range [virtAddr, virtAddr + len], and write one by one to printer: 
  *  5.1 Given that the printer device is ready:
-        - Retrieve current processor status before disabling all external interrupts
-        - Reset the status to 0x0 and disable all interrupts
+        - Retrieve current processor status
+        - Disable interrupts
         - Pass character to printer device with d_data0 & d_command
-        - Request I/O to print the passed character
-        - Enable the interrupt again by restoring the previous processor status
+        - Writing to d_command field will issue the I/O to print the passed character
+        - Enable the interrupt again
         - Increment transmitted character count
     5.2 Given that the printer device is busy:
         - Return the negative of device status in v0
+        - End transmission process
  * 6. Load the transmitted char count into register v0 (or negative status value if print was unsuccessful)
  * 7. Perform SYS4 to release printer device sempahore
  * 
@@ -142,7 +130,7 @@ void getTOD(state_PTR excState)
  * princOfOperations - Chapter 4.2, Device register area starts from address 0x10000054
  * princOfOperations - Chapter 5.1, 5.6, Interrupt lines 3–7 are used for peripheral devices
  **************************************************************************************************/
-void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
+void write_to_printer(char *virtualAddr, int len, support_t *support_struct) {
     /*Check if address we're writing from is outside of the uproc logical address space*/
 
     /*Check if length of string is within bounds (0-128)*/
@@ -162,7 +150,7 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     semIndex = ((PRNTINT - OFFSET) * DEVPERINT) + pid;
     char_printed_count = 0;
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[semIndex], 0, 0); /*Lock the printer device*/
+    SYSCALL(SYS3, (memaddr)&devSema4_support[semIndex], 0, 0); /*Lock the printer device*/
 
     devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR; /* Pointer to the bus register area */
     device_t *printerDev = &(busRegArea->devreg[semIndex]); /*Pointer to printer device register*/
@@ -171,9 +159,9 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     for (i = 0; i < len; i++) { /*Iterate over each character in the string to be printed*/
         if(printerDev->d_status == READY) {
             setSTATUS(NO_INTS); /*disable interrupts*/
-            printerDev->d_data0 = ((int) *(virtualAddr + i)); /*Set data0 to the character to be transmitted to printer*/
+            printerDev->d_data0 = ((int) *(virtualAddr + i)); /*Set data0 to the char to be transmitted to printer*/
             printerDev->d_command = PRINTCHR; /*Set command field to 2 to transmit the character in data0 to printer*/
-            SYSCALL(WAITIO, PRNTINT, pid, 0); /*block the process until I/O completes*/
+            SYSCALL(SYS5, PRNTINT, pid, 0); /*block the process until I/O completes*/
             setSTATUS(YES_INTS); /*enable interrupts*/
             char_printed_count++; /*increment transmitted character count*/
         }
@@ -183,7 +171,7 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
         }
     }
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count; /*return transmitted character count in v0 if successful print*/
-    SYSCALL(VERHOGEN, (memaddr) &devSema4_support[semIndex], 0, 0); /*unlock printer device*/
+    SYSCALL(SYS4, (memaddr) &devSema4_support[semIndex], 0, 0); /*unlock printer device*/
 }
 
 
@@ -191,16 +179,13 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
  * @brief The method performs a WRITE operation to terminal device
  * 
  * @details
- * 1. Find the semaphore index corresponding with terminal device
- * 2. Modify the base semaphore index since it's terminal device and the operation is WRITE -> we need to increment by DEVPRINT (8)
- * 3. Use For loop to interate each character starting from virtAddr to (virtAddr + len)
- * 4. Before transmitting, disable interrupt by setSTATUS and clear all the bits
- * 5. Set the command for terminal device with bit shift (referenced @ref)
- * 6. Request I/O to pass the character to terminal device
- * 7. Check terminal transmitted status
- * 8. Issue ACK to let the device return to ready state after each iteration (no need to do this)
- * 9. Save the character count (success) or device's status value (FAIL) to v0
- * 10. Unlock the semaphore by calling SYS4 & restore the device status 
+*  1. Computes the terminal's semaphore index and adjusts it for write operations (transmitters are behind receivers)
+ *  2. Iterates over the characters from virtualAddr to virtualAddr+len.
+ *  3. Disables interrupts, sets the device command with the current to-be-written character,
+ *     and issues an I/O syscall to transmit it.
+ *  4. Checks the device status and, if an error occurs, return negative of device's status value in v0
+ *  5. Saves the total number of characters transmitted (or -status) in v0.
+ *  6. Releases the terminal device semaphore
  * 
  * 
  * @param:
@@ -214,7 +199,7 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
  * princOfOperations - section 5.7
  * pandOS - section 3.5.5
  **************************************************************************************************/
-void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
+void write_to_terminal(char *virtualAddr, int len, support_t *support_struct) {
     if (len < 0 || len > 128 || (unsigned int) virtualAddr < KUSEG) {
         SYSCALL(SYS9, 0, 0, 0);
     }
@@ -232,19 +217,19 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     int baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + term_id;
     semIndex = baseTerminalIndex + DEVPERINT; /*Transmission device semaphores are 8 bits behind reception for terminal devices*/
 
+    SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0); /*Lock terminal device*/
+
     /*Calculate the offset for the terminal device row relative to disk*/
     unsigned int terminalOffset = (TERMINT - DISKINT) * (DEV_UNITS * DEVREGSIZE);
 
-    /*Calculate the offset for the specific device within that row*/
+    /*Calculate the offset for the specific device unit within that row*/
     unsigned int instanceOffset = term_id * DEVREGSIZE;
 
-    /*The total offset is the sum of the row offset and the instance offset*/
+    /*Sum row + instance offset*/
     unsigned int totalOffset = terminalOffset + instanceOffset;
 
     /*Add the total offset to the base address of the device registers*/
     device_t *terminalDevice = (device_t *)(DEVICEREGSTART + totalOffset);
-
-    SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0); /*Lock terminal device*/
 
     /*Iterate through each character in the string*/
     int i;
@@ -270,19 +255,19 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
  * @brief The method performs a READ operation from a specific terminal device
  *
  * @details
- * 1. Find the semaphore index corresponding with terminal device (the interrupt line is 7)
- * 2. Modify the base semaphore index since it's terminal device and the operation is READ 
- * -> We maintain the same base index
- * 3. Use While loop to interate each character received from the device until there is no more character to read
- * 4. Before saving the character into the buffer, disable interrupt by setSTATUS and clear all the bits
- * 5. Retrieve the received command for terminal device and add bit shift to get character value
-        - If getting char is not successful: 
-            - Save the negative device status to an existing defined variable 
-            - Get out of the loop
- * 6. Perform SYS5 to request I/O
- * 7. Issue ACK to let the device return to ready state after each iteration
- * 8. Save the character count (SUCCESS) or device's status value (FAIL) to register v0
- * 9. Unlock the semaphore by calling SYS4 & restore the device status
+ * This function reads characters from a terminal device until either an end-of-string is 
+ * encountered or the device is no longer ready. It:
+ *   1. Determine the semaphore index for the terminal device (receiver)
+ *   2. Calculate pointer to device_t that corresponds to the appropriate receiver terminal device (for the uproc asid)
+ *   3. Lock the device semaphore
+ *   4. Loop to fetch each character until the end-of-string is reached or the device status is not ready.
+ *      5. Disable interrupts before each character is stored in the buffer.
+ *      6. Issue transmit command + block uproc until IO finishes
+ *      7. Retrieve the character via a bit-shifted value from the terminal's status; if unsuccessful,
+ *      force exit loop and return negative of device's status value in v0.
+ *      8. If successful, increment virtualAddr to read next character and increment transmitted character count
+ *   9. Save the total number of characters received (or an error status) in v0.
+ *   10. Release the device semaphore
  *
  *  
  * @param:
@@ -296,7 +281,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
  * pandOS - section 4.7.5
  * princOfOperations - chapter 5.7 
  **************************************************************************************************/
-void readTerminal(char *virtualAddr, support_t *support_struct){
+void read_from_terminal(char *virtualAddr, support_t *support_struct){
 
     if (virtualAddr == NULL) {
         SYSCALL(SYS9, 0, 0, 0);
@@ -333,7 +318,7 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     while(((terminalDevice->d_status & TERMSTATUSMASK) == READY) && (currChar != EOS)) {
         setSTATUS(NO_INTS); /*disable interrupts*/
         terminalDevice->d_command = TRANSMITCHAR; /*issue transmit command*/
-        readStatus = SYSCALL(WAITIO, TERMINT, term_id, TRUE); /*block current proc until IO completes*/
+        readStatus = SYSCALL(SYS5, TERMINT, term_id, TRUE); /*block current proc until IO completes*/
         setSTATUS(YES_INTS); /*enable interrupts*/
         if((readStatus & TERMSTATUSMASK) == OKCHARTRANS) { /*if terminal status is OK, */
             currChar = (readStatus >> DEV_UNITS);
@@ -344,7 +329,7 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
             }
         }
         else {
-            currChar = '\n'; /*set currChar to exit loop if character trasmission was not successful*/
+            currChar = '\n'; /*set currChar to newline to force exit loop if character trasmission was not successful*/
         }
     }
 
@@ -355,8 +340,6 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
 
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = receivedChars; /*return received character count in v0 if successful*/
     SYSCALL(SYS4,(memaddr) &devSema4_support[semIndex], 0, 0); /*unlock terminal semaphore*/
-    /*IMPLEMENTATION ENDS*/
-
 }
 
 /**************************************************************************************************
@@ -430,22 +413,22 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
 
         case SYS11:
-            writeToPrinter(virtualAddr, length, currProc_support_struct);
+            write_to_printer(virtualAddr, length, currProc_support_struct);
             break;
 
         case SYS12:
-            writeToTerminal(virtualAddr, length, currProc_support_struct);  
+            write_to_terminal(virtualAddr, length, currProc_support_struct);  
             break;
 
         case SYS13:
-            readTerminal(virtualAddr, currProc_support_struct);
+            read_from_terminal(virtualAddr, currProc_support_struct);
             break;
 
         default:
         syslvl_prgmTrap_handler(currProc_support_struct);
             break;
     }
-    returnControlSup(currProc_support_struct, GENERALEXCEPT);
+    LDST(&(currProc_support_struct->sup_exceptState[GENERALEXCEPT]));
 }
 
 /**************************************************************************************************

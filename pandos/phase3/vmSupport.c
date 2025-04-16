@@ -77,15 +77,11 @@ void initSwapStructs(){
  **************************************************************************************************/
 int find_frame_swapPool(){
     static int last_replaced_idx = 0; /*last index of page swapped*/
-    int iterator; 
+    int iterator = 0; 
 
     /*Search the swap table starting from last_replaced_idx for a free page*/
-    for (iterator = 0; iterator < SWAP_POOL_CAP; iterator++) {
-        int index = (last_replaced_idx + iterator) % SWAP_POOL_CAP;
-        /*If current index is free -> pick this victim (frame)*/
-        if (swap_pool[index].asid == FREE) {
-            break;
-        }
+    while (iterator < SWAP_POOL_CAP && swap_pool[(last_replaced_idx + iterator) % SWAP_POOL_CAP].asid != FREE){
+        iterator++;
     }
 
     /*If no free swap frame was found, set iterator to 1 to evict the next immediate page (unfortunate)*/

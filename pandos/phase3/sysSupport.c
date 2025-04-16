@@ -167,7 +167,7 @@ void write_to_printer(char *virtualAddr, int len, support_t *support_struct) {
         }
         else { /*If printer device is BUSY*/
             char_printed_count = -(printerDev->d_status); /*return negative of device's status value in v0*/
-            break;
+            i = len; /*force exit the loop*/
         }
     }
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = char_printed_count; /*return transmitted character count in v0 if successful print*/
@@ -244,7 +244,7 @@ void write_to_terminal(char *virtualAddr, int len, support_t *support_struct) {
             setSTATUS(YES_INTS); /*enable interrupts*/
         } else {
             transmittedChars = -(status); /*return negative of device's status value in v0*/
-            break;
+            i = len;
         }
     }
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = transmittedChars; /*return transmitted character count in v0 if successful print*/

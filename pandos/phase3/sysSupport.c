@@ -314,7 +314,7 @@ void read_from_terminal(char *virtualAddr, support_t *support_struct){
     receivedChars = 0;
     int readStatus;
 
-    bool continueReading = true;
+    int continueReading = 1;
 
     /* Keep reading while the device is ready, no EOS seen, and no error flagged */
     while (continueReading && ((terminalDevice->d_status & TERMSTATUSMASK) == READY) && currChar != EOS) {
@@ -335,11 +335,11 @@ void read_from_terminal(char *virtualAddr, support_t *support_struct){
                 receivedChars++;
             } else {
                 /* Newline signals end-of-input */
-                continueReading = false;
+                continueReading = 0;
             }
         } else {
             /* I/O error: flag to exit and handle below */
-            continueReading = false;
+            continueReading = 0;
         }
     }
 

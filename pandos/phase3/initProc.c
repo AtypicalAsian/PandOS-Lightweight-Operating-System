@@ -35,7 +35,7 @@
 int deviceSema4s[DEVICE_TYPES * DEVPERINT]; /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
 int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully */
 int freeSupIndex; /*Iterator to index into the free support pool*/
-support_t *free_support_pool[MAX_FREE_POOL]; /*Array of pointers to free support structures*/
+support_t *free_support_pool[MAXUPROCS]; /*Array of pointers to free support structures*/
 support_t support_structs_pool[MAXUPROCS]; /*Array of support structure objects for user procs*/
 
 

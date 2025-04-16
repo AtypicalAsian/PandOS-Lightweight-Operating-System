@@ -217,8 +217,6 @@ void write_to_terminal(char *virtualAddr, int len, support_t *support_struct) {
     int baseTerminalIndex = ((TERMINT - OFFSET) * DEVPERINT) + term_id;
     semIndex = baseTerminalIndex + DEVPERINT; /*Transmission device semaphores are 8 bits behind reception for terminal devices*/
 
-    SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0); /*Lock terminal device*/
-
     /*Calculate the offset for the terminal device row relative to disk*/
     unsigned int terminalOffset = (TERMINT - DISKINT) * (DEV_UNITS * DEVREGSIZE);
 
@@ -230,6 +228,8 @@ void write_to_terminal(char *virtualAddr, int len, support_t *support_struct) {
 
     /*Add the total offset to the base address of the device registers*/
     device_t *terminalDevice = (device_t *)(DEVICEREGSTART + totalOffset);
+
+    SYSCALL(SYS3,(memaddr) &devSema4_support[semIndex], 0, 0); /*Lock terminal device*/
 
     /*Iterate through each character in the string*/
     int i;

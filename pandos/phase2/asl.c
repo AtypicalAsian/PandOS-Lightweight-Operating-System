@@ -293,5 +293,3 @@ pcb_PTR headBlocked(int *semAdd) {
     /* Return the head of the process queue */
     return headProcQ(curr_ptr->s_procQ);
 }
-
-

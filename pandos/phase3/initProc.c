@@ -173,8 +173,7 @@ void summon_process(int process_id, state_t *base_state){
     }
 
     /*Call SYS1 to create and launch the u-proc*/
-    int syscall_status = SYSCALL(SYS1,(memaddr) &base_state_copy,(memaddr)suppStruct,0);
-    if (syscall_status != OK) {SYSCALL(SYS2,0,0,0);}
+    SYSCALL(SYS1,(memaddr) &base_state_copy,(memaddr)suppStruct,0);
 }
 
 /************************************************************************************************** 

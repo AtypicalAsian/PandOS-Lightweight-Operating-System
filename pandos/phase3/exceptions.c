@@ -117,7 +117,7 @@ void recursive_terminate(pcb_PTR proc){
        falls within the range of deviceSemaphores[] or is equal to the address of semIntTimer. */
 	   int blockedOnDevice = 
 	   ((processSem >= (int *) deviceSemaphores) &&
-		(processSem < ((int *) deviceSemaphores + (sizeof(int) * DEVICE_TYPES * DEVICE_INSTANCES))))
+		(processSem < ((int *) deviceSemaphores + (sizeof(int) * DEVICE_TYPES * DEV_UNITS))))
 		|| (processSem == (int *) &semIntTimer);
 
    /* Remove p from its blocked queue (if it is currently blocked) */

@@ -160,8 +160,8 @@
 #define DIRTYON  0x00000400
 #define VALIDON  0x00000200
 
-#define INTSOFF getSTATUS() & (~IECON)
-#define INTSON getSTATUS() | IECON | IMON
+#define NO_INTS getSTATUS() & (~IECON)
+#define YES_INTS getSTATUS() | IECON | IMON
 
 #define GETEXECCODE    0x0000007C
 #define LOCALTIMERINT  0x00000200
@@ -183,9 +183,9 @@
 #define TRANSMITCHAR 2
 #define FLASHREAD  2
 #define FLASHWRITE 3
-#define DEVICE_TYPES     6 
-#define DEVICE_INSTANCES 8 
+#define DEV_UNITS   8 
 #define DEVREGSIZE	    16
+#define DEVICE_TYPES     6 
 #define OFFSET 3 
 
 /* Dev Semaphores*/

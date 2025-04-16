@@ -8,7 +8,7 @@
 #include "../h/types.h"
 #include "../h/const.h"
 
-extern int devSema4_support[DEVICE_TYPES * DEVICE_INSTANCES];
+extern int devSema4_support[DEVICE_TYPES * DEV_UNITS];
 
 
 void returnControlSup(support_t *support, int exc_code);

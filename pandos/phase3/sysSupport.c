@@ -27,7 +27,7 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Support level device semaphores*/
-int devSema4_support[DEVICE_TYPES * DEVICE_INSTANCES]; 
+int devSema4_support[DEVICE_TYPES * DEV_UNITS]; 
 
 
 
@@ -68,7 +68,7 @@ void get_nuked(support_t *support_struct)
     /*If the process is currently holding mutex of devices -> release all those locks*/
     int i;
     for (i = 0; i < DEVICE_TYPES; i++) {
-        int index = i * DEVICE_INSTANCES + dev_num;
+        int index = i * DEV_UNITS + dev_num;
         if (devSema4_support[index] == 0){
             SYSCALL(SYS4, (memaddr)&devSema4_support[index],0,0);
         }
@@ -77,10 +77,10 @@ void get_nuked(support_t *support_struct)
     /*When u-proc terminates, mark all frames it occupy as free (no longer in use)*/
     for (i = 0; i < MAXPAGES; i++) {
         if(support_struct->sup_privatePgTbl[i].entryLO & VALIDON){
-            setSTATUS(INTSOFF);
+            setSTATUS(NO_INTS);
             support_struct->sup_privatePgTbl[i].entryLO &= ~VALIDON; /*invalidate the page*/
             update_tlb_handler(&(support_struct->sup_privatePgTbl[i])); /*update TLB to maintain consistency with page tables*/
-            setSTATUS(INTSON);
+            setSTATUS(YES_INTS);
         }
     }
     SYSCALL(SYS4, (memaddr) &masterSema4, 0, 0);
@@ -170,11 +170,11 @@ void writeToPrinter(char *virtualAddr, int len, support_t *support_struct) {
     int i;
     for (i = 0; i < len; i++) { /*Iterate over each character in the string to be printed*/
         if(printerDev->d_status == READY) {
-            setSTATUS(INTSOFF); /*disable interrupts*/
+            setSTATUS(NO_INTS); /*disable interrupts*/
             printerDev->d_data0 = ((int) *(virtualAddr + i)); /*Set data0 to the character to be transmitted to printer*/
             printerDev->d_command = PRINTCHR; /*Set command field to 2 to transmit the character in data0 to printer*/
             SYSCALL(WAITIO, PRNTINT, pid, 0); /*block the process until I/O completes*/
-            setSTATUS(INTSON); /*enable interrupts*/
+            setSTATUS(YES_INTS); /*enable interrupts*/
             char_printed_count++; /*increment transmitted character count*/
         }
         else { /*If printer device is BUSY*/
@@ -233,7 +233,7 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     semIndex = baseTerminalIndex + DEVPERINT; /*Transmission device semaphores are 8 bits behind reception for terminal devices*/
 
     /*Calculate the offset for the terminal device row relative to disk*/
-    unsigned int terminalOffset = (TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE);
+    unsigned int terminalOffset = (TERMINT - DISKINT) * (DEV_UNITS * DEVREGSIZE);
 
     /*Calculate the offset for the specific device within that row*/
     unsigned int instanceOffset = term_id * DEVREGSIZE;
@@ -251,12 +251,12 @@ void writeToTerminal(char *virtualAddr, int len, support_t *support_struct) {
     for (i = 0; i < len; i ++) {
         memaddr transmitterStatus = (terminalDevice->d_data0 & TERMINAL_STATUS_MASK);
         if (transmitterStatus == TERMINAL_STATUS_READY) {
-            setSTATUS(INTSOFF); /*disable interrupts*/
+            setSTATUS(NO_INTS); /*disable interrupts*/
             char transmitChar = *(virtualAddr + i); 
             terminalDevice->t_transm_command = TERMINAL_COMMAND_TRANSMITCHAR | (transmitChar << TERMINAL_CHAR_SHIFT); /*Set data1 (t_transm_command) to the character to issue transmission*/
             status = SYSCALL(SYS5, TERMINT, term_id, 0); /*block the process until I/O completes*/
             transmittedChars++;
-            setSTATUS(INTSON); /*enable interrupts*/
+            setSTATUS(YES_INTS); /*enable interrupts*/
         } else {
             transmittedChars = -(status); /*return negative of device's status value in v0*/
             break;
@@ -311,7 +311,7 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
     semIndex = ((TERMINT - OFFSET) * DEVPERINT) + term_id;
     
     /*Calculate the offset for the terminal device row relative to disk*/
-    unsigned int terminalOffset = (TERMINT - DISKINT) * (DEVICE_INSTANCES * DEVREGSIZE);
+    unsigned int terminalOffset = (TERMINT - DISKINT) * (DEV_UNITS * DEVREGSIZE);
 
     /*Calculate the offset for the specific device instance within that row*/
     unsigned int instanceOffset = term_id * DEVREGSIZE;
@@ -331,12 +331,12 @@ void readTerminal(char *virtualAddr, support_t *support_struct){
 
     /*iterate through string until we reach end of character*/
     while(((terminalDevice->d_status & TERMSTATUSMASK) == READY) && (currChar != EOS)) {
-        setSTATUS(INTSOFF); /*disable interrupts*/
+        setSTATUS(NO_INTS); /*disable interrupts*/
         terminalDevice->d_command = TRANSMITCHAR; /*issue transmit command*/
         readStatus = SYSCALL(WAITIO, TERMINT, term_id, TRUE); /*block current proc until IO completes*/
-        setSTATUS(INTSON); /*enable interrupts*/
+        setSTATUS(YES_INTS); /*enable interrupts*/
         if((readStatus & TERMSTATUSMASK) == OKCHARTRANS) { /*if terminal status is OK, */
-            currChar = (readStatus >> DEVICE_INSTANCES);
+            currChar = (readStatus >> DEV_UNITS);
             if(currChar != '\n') {
                 *virtualAddr = currChar; /*copy character to currChar*/
                 virtualAddr++; /*move pointer to next char*/

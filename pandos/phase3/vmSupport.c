@@ -2,8 +2,9 @@
  * @file vmSupport.c  
  *  
  * @brief  
- * This module implements the TLB exception handler (the Pager) for virtual memory management and  
- * provides functions for reading from and writing to U-proc flash devices.
+ * This module implements the TLB exception handler (the Pager), TLB refill handler alongside other
+ * functions that help with initializing swap pool, device semaphores, swap pool semaphores, and 
+ * writing/reading to/from flash devices.
  * 
  *  
  * @note  
@@ -34,8 +35,8 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Data structures and Variables Declaration*/
-swap_pool_t swap_pool[SWAP_POOL_CAP];    /*swap pool table*/
 int semaphore_swapPool;              /*swap pool sempahore*/
+swap_pool_t swap_pool[SWAP_POOL_CAP];    /*swap pool table*/
 
 /**************************************************************************************************
  * @brief Initializes the Swap Pool Table, Swap Pool Semaphore and Device Semaphores
@@ -47,18 +48,18 @@ int semaphore_swapPool;              /*swap pool sempahore*/
  * pandOS - section 4.11.2
  **************************************************************************************************/
 void initSwapStructs(){
+    /*Initialize swap pool semaphore*/
+    semaphore_swapPool = SWAP_SEMAPHORE_INIT; /*initialize swap pool semaphore to 1*/
+
     /*Initialize the swap pool table*/
     int i;
     for (i=0; i < SWAP_POOL_CAP; i++){
         swap_pool[i].asid = FREE; /*init swap pool frames as unoccupied (-1)*/
     }
 
-    /*Initialize swap pool semaphore*/
-    semaphore_swapPool = SWAP_SEMAPHORE_INIT; /*initialize swap pool semaphore to 1*/
-
     /*Initialize associated semaphores*/
     int j;
-    for (j=0; j < DEVICE_TYPES * DEVICE_INSTANCES; j++){
+    for (j=0; j < DEVICE_TYPES * DEV_UNITS; j++){
         devSema4_support[j] = SUPP_SEMA4_INIT; /*initialize device semaphores to 1*/
     }
 }
@@ -99,46 +100,16 @@ int find_frame_swapPool(){
 
 /**************************************************************************************************
  * @brief
- * This function ensures TLB cache consistency (with uprocs' page tables) after page tables are updated.
- * 
- * @details
- * This function is called after the OS updates a page table entry. It performs the following steps:
- *   1. Loads the new page table entry’s EntryHi into CP0, so that the TLB can find the 
- *      corresponding entry.
- *   2. Calls TLBP() to probe the TLB for a matching entry using the updated EntryHi.
- *   3. If a matching entry is found (valid INDEX.P bit), the function:
- *         - Loads the new page's physical frame number into entryLO & entryHI
- *         - Writes the updated entry back into the TLB using TLBWI().
- * 
- * @param: ptEntry - updated page table entry
- * @return: None
- * 
- * @ref 
- * POPS 6.4, 7.1 and PandOS 4.5.2.
- **************************************************************************************************/
-void update_tlb_handler(pte_entry_t *ptEntry) {
-    setENTRYHI(ptEntry->entryHI); /* Load the new page's virtual page number (VPN) and ASID into EntryHi*/
-    TLBP(); /*probe the TLB to searches for a matching entry using the current EntryHi*/
-
-    /*In Index CP0 control register, check INDEX.P bit (bit 31 of INDEX). We perform bitwise AND with 0x8000000 to isolate bit 31*/
-    if ((P_BIT_MASK & getINDEX()) == 0){ /*If P bit == 0 -> found a matching entry. Else P bit == 1 if not found*/
-        setENTRYLO(ptEntry->entryLO); /*set content of entryLO to write to Index.TLB-INDEX*/
-        TLBWI(); /* Write content of entryHI and entryLO CP0 registers into Index.TLB-INDEX -> This updates the cached entry to match the page table*/
-    }
-}
-
-/**************************************************************************************************
- * @brief
  *  Performs a flash device read or write operation
  *
  * @details
  *  This function interacts with a flash device, either reading a block into a memory
  *  frame or writing a block from a memory frame to the flash device. It:
  *    1. Retrieves the current process’s support structure.
- *    2. Computes the address of the flash device registers.
+ *    2. Computes the address of the flash device register.
  *    3. Locks the flash device semaphore
- *    4. Constructs a command code based on the operation type (read or write).
- *    5. Writes the memory frame address into the flash device’s data register.
+ *    4. Writes the memory frame address (to be read from or wrriten to) into the flash device’s data register
+ *    5. Constructs a command code based on the operation type (read or write).
  *    6. Disables interrupts, sends the command to the flash device, and waits for I/O completion.
  *    7. Re-enables interrupts and unlocks the flash device semaphore.
  *    8. Checks the device status and, if an error occurred, invokes the program trap handler.
@@ -168,11 +139,13 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
 
     /*Calculate address of specific flash device register block*/
     int devIdx = (FLASHINT-DISKINT) * DEVPERINT + deviceNum;
+    SYSCALL(SYS3, (memaddr)&devSema4_support[(DEV_UNITS) + deviceNum], 0, 0); /*Perform SYS3 to lock flash device semaphore*/
+    
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
     f_device = &busRegArea->devreg[devIdx];
 
-    /*Perform SYS3 to lock flash device semaphore*/
-    SYSCALL(SYS3, (memaddr)&devSema4_support[(DEVICE_INSTANCES) + deviceNum], 0, 0);
+    /*Write the flash device’s DATA0 field with the starting physical address of the 4kb block to be read (or written)*/
+    f_device->d_data0 = frame_dest;
 
     /*Build command code*/
     if (op_type == FLASHWRITE){ /*If it's a write operation*/
@@ -182,21 +155,49 @@ void flash_read_write(int deviceNum, int block_num, int op_type, int frame_dest)
         command = (block_num << BLOCK_SHIFT) | FLASHREAD;
     }
 
-    /*Write the flash device’s DATA0 field with the starting physical address of the 4kb block to be read (or written)*/
-    f_device->d_data0 = frame_dest;
-
-    setSTATUS(INTSOFF); /*Disable interrupts*/
+    setSTATUS(NO_INTS); /*Disable interrupts*/
     f_device->d_command = command;  /*write the flash device's COMMAND field*/
     device_status = SYSCALL(SYS5,FLASHINT,deviceNum,0); /*immediately issue SYS5 (wait for IO) to block the current process*/
-    setSTATUS(INTSON); /*enable interrupts*/
+    setSTATUS(YES_INTS); /*enable interrupts*/
     
     /*Perform SYS4 to unlock flash device semaphore*/
-    SYSCALL(SYS4, (memaddr)&devSema4_support[(DEVICE_INSTANCES) + deviceNum], 0, 0);
+    SYSCALL(SYS4, (memaddr)&devSema4_support[(DEV_UNITS) + deviceNum], 0, 0);
     /*If operation failed (check device status) -> program trap handler*/
     if (device_status != READY){
         syslvl_prgmTrap_handler(currSuppStruct);
     }
 }
+
+/**************************************************************************************************
+ * @brief
+ * This function ensures TLB cache consistency (with uprocs' page tables) after page tables are updated.
+ * 
+ * @details
+ * This function is called after the OS updates a page table entry. It performs the following steps:
+ *   1. Loads the new page table entry’s EntryHi into CP0, so that the TLB can find the 
+ *      corresponding entry.
+ *   2. Calls TLBP() to probe the TLB for a matching entry using the updated EntryHi.
+ *   3. If a matching entry is found (valid INDEX.P bit), the function:
+ *         - Loads the new page's physical frame number into entryLO
+ *         - Writes the updated entry back into the TLB using TLBWI()
+ * 
+ * @param: ptEntry - updated page table entry
+ * @return: None
+ * 
+ * @ref 
+ * POPS 6.4, 7.1 and PandOS 4.5.2.
+ **************************************************************************************************/
+void update_tlb_handler(pte_entry_t *ptEntry) {
+    setENTRYHI(ptEntry->entryHI); /* Load the page of interest's virtual page number (VPN) and ASID into EntryHi*/
+    TLBP(); /*probe the TLB to searches for a matching entry using the current EntryHi*/
+
+    /*In Index CP0 control register, check INDEX.P bit (bit 31 of INDEX). We perform bitwise AND with 0x8000000 to isolate bit 31*/
+    if ((P_BIT_MASK & getINDEX()) == 0){ /*If P bit == 0 -> found a matching entry. Else P bit == 1 if not found*/
+        setENTRYLO(ptEntry->entryLO); /*set content of entryLO to write to Index.TLB-INDEX*/
+        TLBWI(); /* Write content of entryHI and entryLO CP0 registers into Index.TLB-INDEX -> This updates the cached entry to match the page table*/
+    }
+}
+
 
 /**************************************************************************************************
  * @brief Handles TLB-refill exceptions
@@ -265,6 +266,9 @@ void uTLB_RefillHandler() {
  *       13.Release mutual exclusion over the Swap Pool Table (SYS4 - V operation)
  *       14.Retry the instruction that caused the page fault using LDST
  * 
+ * @param: None
+ * @return: None
+ * 
  * @note
  * To update tlb there are 2 approaches
  *      1. Probe the TLB (TLBP) to see if the newly updated TLB entry is indeed cached in the TLB. 
@@ -312,16 +316,16 @@ void tlb_exception_handler() {
         /*Step 7 + 8: If the frame is occupied -> need to evict it (invalidate the page occupying this frame)*/
         if (swap_pool[free_frame_num].asid != FREE){
             /*Updating TLB and Swap Pool must be atomic -> DISABLE INTERRUPTS - pandOS [section 4.5.3]*/
-            setSTATUS(INTSOFF);
+            setSTATUS(NO_INTS);
 
             /*Step 1: Mark old page currently occupying the frame number as invalid*/
-            swap_pool[free_frame_num].ownerEntry->entryLO &= VALIDBITOFF; /*go to page table entry of owner process and set valid bit to off*/
+            swap_pool[free_frame_num].ownerEntry->entryLO &= VALIDOFF; /*go to page table entry of owner process and set valid bit to off*/
 
             /*Step 2: Update the TLB*/
             update_tlb_handler(swap_pool[free_frame_num].ownerEntry);
 
             /*ENABLE INTERRUPTS*/
-            setSTATUS(INTSON);
+            setSTATUS(YES_INTS);
 
             unsigned int occp_pageNum = swap_pool[free_frame_num].pg_number; /*get the page number of the page occupying the frame at swap_pool[frame_number]*/
             occp_pageNum = occp_pageNum % 32; /*mod to map page to range 0-31*/    
@@ -344,7 +348,7 @@ void tlb_exception_handler() {
 
         /*Step 10: Update the Swap Pool Table to reflect the new contents (atomic operations)*/
         /*First, we disable Interrupts by getting current status and clearing the IEc (global interrupt) bit*/
-        setSTATUS(INTSOFF);
+        setSTATUS(NO_INTS);
 
         /*Update swap pool table with new entry*/
         swap_pool[free_frame_num].asid = asid; /*set asid of the u-proc that now owns this frame*/
@@ -360,7 +364,7 @@ void tlb_exception_handler() {
         /*TLBCLR();*/ /*old approach - erase ALL the entries in the TLB*/
 
         /*Re-enable interrupts*/
-        setSTATUS(INTSON);
+        setSTATUS(YES_INTS);
 
         /*Step 13: Perform SYS4 to release mutex on swap pool table*/
         SYSCALL(SYS4,(int)&semaphore_swapPool,0,0);

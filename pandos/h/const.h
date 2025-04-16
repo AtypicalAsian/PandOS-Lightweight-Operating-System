@@ -12,7 +12,7 @@
 #define MAXPAGES      32
 #define MAXUPROCS 8
 #define MAX_FREE_POOL 9
-#define POOLSIZE (MAXUPROCS * 2)
+#define SWAP_POOL_CAP (MAXUPROCS * 2)
 #define STACKSIZE 499
 
 
@@ -41,6 +41,7 @@
 #define MASTER_SEMA4_START 0
 #define SWAP_SEMAPHORE_INIT 1
 #define SUPP_SEMA4_INIT 1
+
 
 /* device register addresses */
 #define DEVICEREGSTART  0x10000054
@@ -159,8 +160,8 @@
 #define DIRTYON  0x00000400
 #define VALIDON  0x00000200
 
-#define INTSOFF getSTATUS() & (~IECON)
-#define INTSON getSTATUS() | IECON | IMON
+#define NO_INTS getSTATUS() & (~IECON)
+#define YES_INTS getSTATUS() | IECON | IMON
 
 #define GETEXECCODE    0x0000007C
 #define LOCALTIMERINT  0x00000200
@@ -182,9 +183,9 @@
 #define TRANSMITCHAR 2
 #define FLASHREAD  2
 #define FLASHWRITE 3
-#define DEVICE_TYPES     6 
-#define DEVICE_INSTANCES 8 
+#define DEV_UNITS   8 
 #define DEVREGSIZE	    16
+#define DEVICE_TYPES     6 
 #define OFFSET 3 
 
 /* Dev Semaphores*/
@@ -202,7 +203,7 @@
 
 /* Phase 3 Constants*/
 #define FLASHADDRSHIFT 8
-#define MISSINGPAGESHIFT 0xFFFFF000
+#define VPN_MASK 0xFFFFF000
 #define FRAMEADDRSHIFT 0x20020000
 #define VALIDOFF 0xFFFFFDFF
 #define EOS	 '\n'
@@ -231,14 +232,14 @@
 
 #define TERMINAL_STATUS_RECEIVED 5
 
+#define P_BIT_MASK 0x80000000
+#define BLOCK_SHIFT 8
 
-#define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
+
 #define EXCSTATE ((state_t *) BIOSDATAPAGE)
-#define TIME_TO_TICKS(T) (T) * (*((cpu_t *)TIMESCALEADDR)) /*convert time value into hardware ticks*/
 #define LDIT(T)	((* ((cpu_t *) INTERVALTMR)) = (T) * (* ((cpu_t *) TIMESCALEADDR))) 
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
 #define IP(C) ((C & 0x0000FF00) >> 8)
-#define EXCCODE(C) ((C & 0x0000007C) >> 2)
 
 
 

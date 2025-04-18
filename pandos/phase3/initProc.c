@@ -1,4 +1,4 @@
-/**************************************************************************************************  
+/********************************************************************************************************************  
  * @file initProc.c  
  *  
  * 
@@ -18,7 +18,7 @@
  * @authors  
  * Nicolas & Tran  
  * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
- **************************************************************************************************/
+ ********************************************************************************************************************/
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../h/asl.h"
@@ -116,9 +116,8 @@ void initSuppPool() {
 }
 
 
-/**************************************************************************************************
- * @brief Initialize a u-proc's support structure and process
- *        state, and then calling SYS1 to create and launch the process.
+/*************************************************************************************************************************************************************
+ * @brief Initialize a u-proc's support structure and process state, and then calling SYS1 to create and launch the process.
  *
  * @details
  * 1. Allocates a support structure from the free pool
@@ -138,7 +137,7 @@ void initSuppPool() {
  * 
  * @ref
  * pandOS - section 4.9.1
- **************************************************************************************************/
+ ***************************************************************************************************************************************************************/
 void summon_process(int process_id, state_t *base_state){
     support_t *suppStruct = allocate(); /*allocate a support struct from the free pool*/
     if (suppStruct == NULL){

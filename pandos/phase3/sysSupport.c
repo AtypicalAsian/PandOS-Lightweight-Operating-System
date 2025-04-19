@@ -394,7 +394,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     /*----------------------------------------------------------*/
 
     /* Validate syscall number */
-    if (syscall_num_requested < SYS9 || syscall_num_requested > SYS13) { /*Will have to change for future phases*/
+    if (syscall_num_requested < SYS9 || syscall_num_requested > SYS17) { /*Will have to change for future phases*/
         /* Invalid syscall number, treat as Program Trap */
         syslvl_prgmTrap_handler(currProc_support_struct);
         return;

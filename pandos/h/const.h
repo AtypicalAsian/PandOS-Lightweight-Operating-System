@@ -143,6 +143,10 @@
 #define SYS11 11
 #define SYS12 12
 #define SYS13 13
+#define SYS14 14
+#define SYS15 15
+#define SYS16 16
+#define SYS17 17
 
 
 #define TLBS              3

@@ -85,7 +85,6 @@ void disk_put (int *logicalAddr, int diskNo, int sectNo, support_t *support_stru
         return;
     }
 
-    disk->d_command = DISK_ACK;
     setSTATUS(YES_INTS);
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = DISKREADY;
 }
@@ -143,7 +142,6 @@ void disk_get (int *logicalAddr, int diskNo, int sectNo, support_t *support_stru
         return;
     }
 
-    disk->d_command = DISK_ACK;
     setSTATUS(YES_INTS);
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = DISKREADY;
 }

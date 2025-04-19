@@ -1,15 +1,19 @@
-#ifndef CONSTS
-#define CONSTS
-
+#ifndef CONST
+#define CONST
 /**************************************************************************** 
  *
  * This header file contains utility constants & macro definitions.
  * 
  ****************************************************************************/
-
 /* Hardware & software constants */
 #define PAGESIZE		  4096			/* page size in bytes	*/
 #define WORDLEN			  4				  /* word size in bytes	*/
+#define MAXPROC 20 
+#define MAXPAGES      32
+#define MAXUPROCS 8
+#define MAX_FREE_POOL 9
+#define SWAP_POOL_CAP (MAXUPROCS * 2)
+#define STACKSIZE 499
 
 
 /* timer, timescale, TOD-LO and other bus regs */
@@ -18,17 +22,50 @@
 #define TODLOADDR		  0x1000001C
 #define INTERVALTMR		0x10000020	
 #define TIMESCALEADDR	0x10000024
-
+#define TIMER_RESET_CONST 0xFFFFFFFF
 
 /* utility constants */
 #define	TRUE			    1
 #define	FALSE			    0
 #define HIDDEN			  static
-#define EOS				    '\0'
-
 #define NULL 			    ((void *)0xFFFFFFFF)
+#define RESET			    0
+#define ACK				    1
+#define READY			    1
+#define ON         1
+#define OK         0
+#define FREE     -1
+#define INITPROCCNT 0
+#define INITSBLOCKCNT 0
+#define GETEXCPCODE 0x0000007C
+#define MASTER_SEMA4_START 0
+#define SWAP_SEMAPHORE_INIT 1
+#define SUPP_SEMA4_INIT 1
+
+
+/* device register addresses */
+#define DEVICEREGSTART  0x10000054
+
+/* Memory related constants */
+#define KSEG1        0x20000000
+#define KUSEG        0x80000000
+#define ENDKUSEG    KUSEG + MAXPAGES
+#define BIOSDATAPAGE 0x0FFFF000
+#define PASSUPVECTOR 0x0FFFF900
+#define UPROCSTARTADDR 0x800000B0
+#define USERSTACKTOP   0xC0000000
+#define STACKSTART    0x20001000
+#define PT_START 0x80000000
+#define UPROCSTACKPG 0xBFFFF000
+#define TOPSTKPAGE 0x20001000
+#define PAGE31_ADDR 0xBFFFF000
+#define PAGE_TABLE_MAX 31
+
+
 
 /* device interrupts */
+#define TIMERINT          1
+#define INTERVALTMR_LINE  2   
 #define DISKINT			  3
 #define FLASHINT 		  4
 #define NETWINT 		  5
@@ -50,7 +87,6 @@
 #define	DEV6			6				/* constant representing device 6 */
 #define	DEV7			7				/* constant representing device 7 */
 
-
 /*Cause Register Mask to Isolate the correct corresponding to which line the interupt was generated from*/
 #define	LINE1MASK		0x00000200		/* constant for setting all bits to 0 in the Cause register except for bit 9 -> line 1 interrupts*/
 #define	LINE2MASK		0x00000400		/* constant for setting all bits to 0 in the Cause register except for bit 10 -> line 2 interrupts */
@@ -70,6 +106,7 @@
 #define	LINE6			6				/* constant representing line 6 */
 #define	LINE7			7				/* constant representing line 7 */
 
+<<<<<<< HEAD
 /* Constant that represents when the first four bits in a terminal device's device register's status field are turned on */
 #define	TERM_DEV_STATUSFIELD_ON		0x0F
 
@@ -103,49 +140,139 @@
 #define PRINTER_LINE_NUM    6
 #define PRINTER_READY       1
 #define PRINTER_BUSY        3
+=======
+/* Interupts constants */
+#define GETIP   0x0000FE00
+#define IPSHIFT 8
+#define TRANS_CHAR 5
+#define RECVD_CHAR 5
+#define TERMSTATUSMASK 0x000000FF
+>>>>>>> fafd3b43fb303831ee72b8e7787e119e265fbed2
 
 
-/* Terminal Device Codes */
-#define TERMINAL_LINE_NUM   7
+/* syscall */
+#define CREATEPROCESS 1
+#define TERMINATEPROCESS   2
+#define PASSEREN      3
+#define VERHOGEN      4
+#define WAITIO        5
+#define GETTIME       6
+#define CLOCKWAIT     7
+#define GETSUPPORTPTR 8
+#define TERMINATE     9
+#define GET_TOD       10
+#define WRITEPRINTER  11
+#define WRITETERMINAL 12
+#define READTERMINAL  13
+
+
+#define SYS1 1
+#define SYS2 2
+#define SYS3 3
+#define SYS4 4
+#define SYS5 5
+#define SYS6 6
+#define SYS7 7
+#define SYS8 8
+#define SYS9 9
+#define SYS10 10
+#define SYS11 11
+#define SYS12 12
+#define SYS13 13
+
+
+#define TLBS              3
+/* Exceptions related constants */
+#define PGFAULTEXCEPT 0
+#define GENERALEXCEPT 1
+
+/* Status setting constants */
+#define ALLOFF      0x00000000
+#define USERPON     0x00000008
+#define IEPON       0x00000004
+#define IECON       0x00000001
+#define IMON        0x0000FF00
+#define TEBITON     0x08000000
+#define DIRTYON  0x00000400
+#define VALIDON  0x00000200
+
+#define NO_INTS getSTATUS() & (~IECON)
+#define YES_INTS getSTATUS() | IECON | IMON
+
+#define GETEXECCODE    0x0000007C
+#define LOCALTIMERINT  0x00000200
+#define TIMERINTERRUPT 0x00000400
+#define DISKINTERRUPT  0x00000800
+#define FLASHINTERRUPT 0x00001000
+#define NETWINTERRUPT  0x00002000
+#define PRINTINTERRUPT 0x00004000
+#define TERMINTERRUPT  0x00008000
+#define CAUSESHIFT     2
+
+#define SHIFT_VPN      12
+#define SHIFT_ASID     6
+#define IP_MASK     0x0000FF00     
+
+
+/* Term and Dev Ops*/
+#define OKCHARTRANS  5
+#define TRANSMITCHAR 2
+#define FLASHREAD  2
+#define FLASHWRITE 3
+#define DEV_UNITS   8 
+#define DEVREGSIZE	    16
+#define DEVICE_TYPES     6 
+#define OFFSET 3 
+
+/* Dev Semaphores*/
+#define FLASHSEM 1
+#define PRINTSEM 3
+#define TERMSEM 4
+#define TERMWRSEM 5
+
+/* Time constants*/
+#define TIMESLICE  5000     
+#define SECOND     1000000
+#define INITTIMER  100000
+#define INTIMER  100000UL     
+#define PLT_HIGHEST_VAL   0xFFFFFFFFUL
+
+/* Phase 3 Constants*/
+#define FLASHADDRSHIFT 8
+#define VPN_MASK 0xFFFFF000
+#define FRAMEADDRSHIFT 0x20020000
+#define VALIDOFF 0xFFFFFDFF
+#define EOS	 '\n'
+#define PRINTCHR 2
+#define TERMTRANSHIFT 8
+#define EXCODE_NUM 20
+
+#define TEXT_START    0x800000B0
+#define SP_START      0xC0000000
+
+#define MAX_SUPPORTS 9
+#define POOLBASEADDR 0x20020000
+
+#define VALIDBITOFF     0xFFFFFDFF
+#define V_BIT_SET       0x00000200      /*Bit 9*/
+#define D_BIT_SET       0x00000400      /*Bit 10*/
+
 
 #define TERMINAL_STATUS_NOT_INSTALLED   0
 #define TERMINAL_STATUS_READY   1
 #define TERMINAL_STATUS_TRANSMITTED 5
 
 #define TERMINAL_COMMAND_TRANSMITCHAR   2
-
 #define TERMINAL_CHAR_SHIFT 8
 #define TERMINAL_STATUS_MASK    0xFF
 
 #define TERMINAL_STATUS_RECEIVED 5
 
-/* Memory related constants */
-#define KSEG0           0x00000000
-#define KSEG1           0x20000000
-#define KSEG2           0x40000000
-#define KUSEG           0x80000000
-#define RAMSTART        0x20000000
-#define BIOSDATAPAGE    0x0FFFF000
-#define	PASSUPVECTOR	  0x0FFFF900
-#define DEV_STARTING_REG  0x10000054 /*device register starting address - [figure 5.2 pops section 5.2]*/
-#define FRAME_SHIFT 0x20020000 /*starting address of the swap pool*/
-
-/* Exceptions related constants */
-#define	PGFAULTEXCEPT	  0
-#define GENERALEXCEPT	  1
-
-#define VPNSHIFT      12
-#define VPNMASK         0xFFFFF000
-#define POOLBASEADDR      0x20020000 /*Base address of the swap pool (used to calc frame address)*/
-#define ENTRYLO_PFN_MASK  0x3FFFF000
-
-#define HIGH_ORDER_3BYTES_SHIFT 8
-#define READFLASH 2
-#define WRITEFLASH 3
-
-#define MAX_PAGES 32 /*max number of pages of a process*/
+#define P_BIT_MASK 0x80000000
+#define BLOCK_SHIFT 8
 
 
+<<<<<<< HEAD
 /*Macro to get the index of the deviceSema4s array*/
 /*Shift each line's devices into 8-slot region. If it's a terminal device (line_no 7), have to see whether it's transimission or receive*/
 /*Otherwise, all other lines just use device 0-7*/
@@ -292,9 +419,14 @@
 #define TERMINAL_STATUS_MASK    0xFF
 
 /* Macro to load the Interval Timer */
+=======
+#define EXCSTATE ((state_t *) BIOSDATAPAGE)
+>>>>>>> fafd3b43fb303831ee72b8e7787e119e265fbed2
 #define LDIT(T)	((* ((cpu_t *) INTERVALTMR)) = (T) * (* ((cpu_t *) TIMESCALEADDR))) 
-
-/* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
+#define IP(C) ((C & 0x0000FF00) >> 8)
+
+
 
 #endif
+

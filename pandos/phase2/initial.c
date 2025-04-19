@@ -37,36 +37,58 @@
  * @authors Nicolas & Tran
  * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
 ************************************************************************************************/
-
-#include "../h/asl.h"
 #include "../h/types.h"
 #include "../h/const.h"
+
+#include "../h/asl.h"
 #include "../h/pcb.h"
+
+#include "../h/initial.h"
 #include "../h/scheduler.h"
 #include "../h/exceptions.h"
-#include "../h/interrupts.h"
 
 #include "/usr/include/umps3/umps/libumps.h"
 
-/**************** METHOD DECLARATIONS***************************/ 
+/**************** METHOD DECLARATIONS***************************/
 extern void test(); /*Function to help debug the Nucleus, defined in the test file for this module*/
-extern void uTLB_RefillHandler(); /*this function is a placeholder function not implemented in Phase 2 and whose code is provided. This function implementation will be replaced when the support level is implemented*/
+extern void uTLB_RefillHandler(); /*support level TLB refill event handler*/
 
 
-/*************GLOBAL VARIABLES DECLARATIONS*********************/ 
+/*************GLOBAL VARIABLES DECLARATIONS*********************/
 int procCnt; /*integer indicating the number of started, but not yet terminated processes.*/
 int softBlockCnt; /*Integer representing the number of started, but not terminated processes that in are the “blocked” state due to an I/O or timer request.*/
 pcb_PTR ReadyQueue; /*Tail pointer to a queue of pcbs that are in the “ready” state.*/
 pcb_PTR currProc; /*Pointer to the pcb that is in the “running” state, i.e. the current executing process.*/
-cpu_t start_TOD; /*the value on the time of day clock that the Current Process begins executing at*/
-cpu_t curr_TOD; /*current time on the time of day clock*/
-cpu_t at_interrupt_TOD; /*time on time of day clock when interrupt was generated*/
-int deviceSemaphores[MAXDEVICECNT]; /* semaphore integer array that represents each external (sub) device, plus one semd for the Pseudo-clock */
-state_PTR savedExceptState; /* a pointer to the saved exception state */
-
-
+int deviceSemaphores[DEVICE_TYPES * DEV_UNITS]; /* semaphore integer array that represents each external (sub) device, plus one semd for the Pseudo-clock */
+int semIntTimer; /* semaphore used by the interval timer (pseudo-clock) for timer-related blocking operations */
 
 /***********************HELPER METHODS***************************************/
+
+/****************************************************************************
+ * debug_fxn()
+ * 
+ * 
+ * @brief 
+ * Helper function to debug the program as we set breakpoints during execution.
+ * 
+ * 
+ * @note
+ * The values for the four parameters to this debug fxn can be accessed in
+ * registers a0,a1,a2,a3
+ * 
+ * 
+ * @param i - can be line number or a unique identifier
+ * @param p1 - first var to be configured
+ * @param p2 - second var to be configured
+ * @param p3 - third var to be configured
+ * @return None
+ * 
+
+ *****************************************************************************/
+void debug_fxn(int i, int p1, int p2, int p3){
+    return;
+}
+
 
 /****************************************************************************
  * populate_passUpVec()
@@ -103,9 +125,9 @@ state_PTR savedExceptState; /* a pointer to the saved exception state */
 void populate_passUpVec(){
     passupvector_t *proc0_passup_vec;                                       /*Pointer to Processor 0 Pass-Up Vector */
     proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer*/
-    proc0_passup_vec->tlb_refll_handler = (memaddr) uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
-    proc0_passup_vec->tlb_refll_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
-    proc0_passup_vec->execption_handler = (memaddr) gen_exception_handler;  /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
+    proc0_passup_vec->tlb_refill_handler = (memaddr) &uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
+    proc0_passup_vec->tlb_refill_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
+    proc0_passup_vec->exception_handler = (memaddr) &gen_exception_handler;  /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
     proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
 }
 
@@ -141,92 +163,21 @@ void populate_passUpVec(){
 
  *****************************************************************************/
 void init_proc_state(pcb_PTR firstProc){
+	unsigned int ramBase;  /* Variable to store the base address of RAM */
+	unsigned int ramSize; /* Variable to store the total size of RAM */
+	ramBase = *((int *)RAMBASEADDR); /* Read the RAM base address */
+	ramSize = *((int *)RAMBASESIZE); /* Read the RAM size */
     memaddr topRAM;                         /* the address of the last RAM frame */
-    devregarea_t *dra;                      /* device register area that used to determine RAM size */
-    dra = (devregarea_t *) RAMBASEADDR;     /*Set the base address of the device register area */
-    topRAM = dra->rambase + dra->ramsize;   /*Calculate the top of RAM by adding the base address and total RAM size*/
+	topRAM = ramBase + ramSize; /* Calculate top of RAM by adding the base address and the total RAM size */
 
     /*Initialize the process state*/
     firstProc->p_s.s_sp = topRAM;           /*Stack pointer set to top of RAM*/
     firstProc->p_s.s_pc = (memaddr) test;   /*Set PC to test()*/ 
     firstProc->p_s.s_t9 = (memaddr) test;   /*Set t9 register to test(). For technical reasons, whenever one assigns a value to the PC one must also assign the same value to the general purpose register t9.*/
-    firstProc->p_s.s_status = STATUS_ALL_OFF | STATUS_IE_ENABLE | STATUS_PLT_ON | STATUS_INT_ON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
+    firstProc->p_s.s_status = IEPON | TEBITON | IMON; /*configure initial process state to run with interrupts, local timer enabled, kernel-mode on*/
 }
-
-
-/****************************************************************************
- * update_accumulated_CPUtime(cpu_t start_time, cpu_t end_time, pcb_PTR curr_process)
- * 
- * 
- * @brief 
- * This function updates the total accumulated CPU time for the given process 
- * by computing the time spent in execution during its most recent run.
- *  
- *
- * @protocol 
- * This function is called whenever a process transitions from the "running" 
- * state to either "ready" (preempted) or "blocked" (waiting for I/O).
- * It computes the CPU time used during the latest execution period and 
- * adds it to the process's total execution time.
- * The function ensures that the PCB field `p_time` correctly reflects the 
- * total CPU time consumed by the process so far.
- * 
- * 
- * @param start_time - The Time of Day (TOD) clock value at which the process 
- *                     started executing.
- * @param end_time   - The TOD clock value when the process was interrupted 
- *                     or stopped running.
- * @param curr_process - Pointer to the Process Control Block (PCB) of the 
- *                       process whose CPU time is being updated.
- * 
- * 
- * @return None
- * 
- * 
- * @note 
- * The difference (end_time - start_time) represents the time the process 
- * was actively using the CPU during this execution slice.
- * This function must be called before switching to another process to 
- * ensure accurate CPU accounting.
- * The stored CPU time in p_time is cumulative and persists until the 
- * process terminates.
-
- *****************************************************************************/
-void update_accumulated_CPUtime(cpu_t start_time, cpu_t end_time, pcb_PTR curr_process){
-    curr_process->p_time = curr_process->p_time + (end_time - start_time);
-}
-
-
-
-/****************************************************************************
- * debug_fxn()
- * 
- * 
- * @brief 
- * Helper function to debug the program as we set breakpoints during execution.
- * 
- * 
- * @note
- * The values for the four parameters to this debug fxn can be accessed in
- * registers a0,a1,a2,a3
- * 
- * 
- * @param i - can be line number or a unique identifier
- * @param p1 - first var to be configured
- * @param p2 - second var to be configured
- * @param p3 - third var to be configured
- * @return None
- * 
-
- *****************************************************************************/
-void debug_fxn(int i, int p1, int p2, int p3){
-    return;
-}
-
 
 /***********************MAIN METHOD***************************************/
-
-
 /****************************************************************************
  * main()
  * 
@@ -264,15 +215,11 @@ void debug_fxn(int i, int p1, int p2, int p3){
  * @return None  
 
  *****************************************************************************/
- int main(){
-    /*Declare variables*/
+int main() {
+	/*Declare variables*/
     pcb_PTR first_proc; /* a pointer to the first process in the ready queue to be created so that the scheduler can begin execution */
 
-    /*Initialize device semaphores*/
-    int i;
-    for (i = 0; i < MAXDEVICECNT; i++) {
-        deviceSemaphores[i] = INITDEVICESEM;
-    }
+	/*Initialize device semaphores (array declared as extern so values are zero-initialized)*/
 
     /*Initialize variables*/
     ReadyQueue = mkEmptyProcQ();  /*Initialize the Ready Queue*/
@@ -280,35 +227,28 @@ void debug_fxn(int i, int p1, int p2, int p3){
     procCnt = INITPROCCNT;  /*No active processes yet*/
     softBlockCnt = INITSBLOCKCNT;  /*No soft-blocked processes*/
 
+	/*Initialize Level 2 data structures*/
+	initPcbs(); /*Set up the Process Control Block (PCB) free list (pool of avaible pcbs)*/
+	initASL(); /*Set up the Active Semaphore List (ASL)*/
 
-    /*Initialize Level 2 data structures*/
-    initPcbs(); /*Set up the Process Control Block (PCB) free list (pool of avaible pcbs)*/
-    initASL(); /*Set up the Active Semaphore List (ASL)*/
-
-    /*Initialize passUp vector fields*/
+	/*Initialize passUp vector fields*/
     populate_passUpVec();
 
-    /*Load the system-wide Interval Timer with 100 milliseconds*/
-    LDIT(INITTIMER);  /*Set interval timer to 100ms*/
+	/*Load the system-wide Interval Timer with 100 milliseconds*/
+	LDIT(INITTIMER); /*Set interval timer to 100ms*/
 
-    /*Create and Launch the First Process*/
-    first_proc = allocPcb();    /*allocate a PCB from the PCB free list for the first process*/
-    
-    /*If there are avaible pcbs to be allocated*/
-    if (first_proc != NULL){
-        /*Initialize the process state for first process*/
-        init_proc_state(first_proc);
+	/*Create and Launch the First Process*/
+	first_proc = allocPcb(); /*allocate a PCB from the PCB free list for the first process*/
 
-        /*Add process to Ready Queue & update process count */
-        insertProcQ(&ReadyQueue, first_proc);       /*insert first process into ready queue*/
-        procCnt++;                                  /*increase the total process count to 1*/
+	if (first_proc != NULL){
+		procCnt++; /*increment process count*/
+		init_proc_state(first_proc); /* Initialize the process state for the new process (stack, PC, t9, status) */
+		insertProcQ(&ReadyQueue, first_proc); /* Insert the new process into the ready queue */
+		switchProcess();  /* Invoke the scheduler */
+		return 1;
+	}
+	/*If no PCB is available, the system calls PANIC() to halt execution*/
+	PANIC();
+	return (0);
+}
 
-        /*Start execution with the scheduler*/  
-        switchProcess();  
-        return (0);  
-    }
-
-    /*If no PCB is available, the system calls PANIC() to halt execution*/
-    PANIC();
-    return (0);
- }

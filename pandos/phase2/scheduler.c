@@ -25,16 +25,20 @@
  * @authors Nicolas & Tran
  * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
  ************************************************************************************************/
-#include "../h/asl.h"
 #include "../h/types.h"
 #include "../h/const.h"
+
 #include "../h/pcb.h"
+#include "../h/asl.h"
+
 #include "../h/scheduler.h"
-#include "../h/interrupts.h"
 #include "../h/initial.h"
+#include "../h/exceptions.h"
+#include "../h/interrupts.h"
 
 #include "/usr/include/umps3/umps/libumps.h"
 
+volatile cpu_t quantum;
 
 /***********************HELPER METHODS***************************************/
 
@@ -76,37 +80,7 @@ void copyState(state_PTR src, state_PTR dst){
 
 }
 
-
-/**************************************************************************** 
- * swContext()
- *
- * @brief 
- * Switches execution to the specified process by updating the current process 
- * pointer, recording its start time, and loading its processor state.
- *
- * @details
- * This function is responsible for switching execution context to a new process. 
- * It updates currProc to point to the given process, records the time at which
- * the process starts running using the Time of Day (TOD) clock, and restores 
- * the process state by loading the saved processor state stored in the process 
- * control block (p_s). This effectively transfers control to the specified 
- * process.
- *
- * @param curr_process  Pointer to the PCB of the process to switch to.
- *
- * @return None (execution control is transferred to the new process).
- *****************************************************************************/
-
-void swContext(pcb_PTR curr_proccess){
-    currProc = curr_proccess;        /* Update the global pointer to track the currently running process */
-    STCK(start_TOD);                 /* Store the current Time of Day (TOD) clock value into start_TOD */
-    LDST(&(curr_proccess->p_s));     /* Load the processor state of the new current process */
-}
-
-
-
 /***************************SCHEDULER*************************************/
-
 
 /**************************************************************************** 
  * switchProcess()
@@ -151,12 +125,13 @@ void swContext(pcb_PTR curr_proccess){
  *****************************************************************************/
 
 void switchProcess() {
-    currProc = removeProcQ(&ReadyQueue); /* Remove a process from the ReadyQueue and assign it as the current process */
+	currProc = removeProcQ(&ReadyQueue); /* Remove a process from the ReadyQueue and assign it as the current process */
 
     /* If the ReadyQueue is not empty, schedule the next process */
     if (currProc != NULL){
-        setTIMER(SCHED_TIME_SLICE);     /* Set Process Local Timer (PLT) to 5ms for time-sharing */
-        swContext(currProc);            /* Perform context switch to the selected process */
+        setTIMER(TIMESLICE);     /* Set Process Local Timer (PLT) to 5ms for time-sharing */
+        STCK(quantum); /*record current quantum*/
+		LDST(&(currProc->p_s)); /*perform context switch to load state of the new process -> effectively handing control over to new proc*/
     }
 
     /* If there are no active processes left in the system, halt execution */
@@ -165,14 +140,16 @@ void switchProcess() {
     }
 
     /* If no ready processes exist but there are blocked processes, enter a wait state */
-    if ((procCnt > INITPROCCNT) && (softBlockCnt > INITSBLOCKCNT)){
-        setSTATUS(STATUS_ALL_OFF |  STATUS_INT_ON | STATUS_IECON); /* Enable interrupts before waiting */
-        setTIMER(LARGETIME); /* Set a large timer value to avoid premature wake-up */
-        WAIT(); /* Enter wait state until an interrupt occurs (e.g., I/O completion) */
+    if ((procCnt > 0) && (softBlockCnt > 0)){
+		unsigned int curr_status = getSTATUS(); /*get current status*/
+		setTIMER(TIMER_RESET_CONST); /*set timer to max possible value of unsigned 32 bit int to prevent premature timer interrupt*/
+        setSTATUS((curr_status) | IMON | IECON); /* Enable interrupts before waiting */
+		WAIT(); /*issue wait*/
+        setSTATUS(curr_status); /*restore original processor state after WAIT() period*/
     }
 
     /* If the system reaches this point, it means no processes are ready or waiting on I/O */
     /* This indicates a deadlock situation, meaning all processes are blocked with no recovery */
     PANIC();  /* Trigger a system panic as no forward progress can be made */
 }
-    
+

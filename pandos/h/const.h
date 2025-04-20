@@ -245,7 +245,17 @@
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
 #define IP(C) ((C & 0x0000FF00) >> 8)
 
-
+/* Phase 4 Constants*/
+#define HEADADDRSHIFT 8
+#define CYLADDRSHIFT 16
+#define RESETACKSHIFT 24
+#define LOWERMASK 0xFF
+#define DISK_RESET 0
+#define DISK_ACK 1
+#define SEEKCYL 2
+#define READBLK 3
+#define WRITEBLK 4
+#define DISKREADY 1
 
 #endif
 

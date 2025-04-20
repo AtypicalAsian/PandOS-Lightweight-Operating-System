@@ -187,7 +187,8 @@ void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
  *  2. Check invalid memory region access
  *  3. Lock semaphore 
  *  4. Locate flash's DMA buffer in RAM
- *  5. Perform write to flash operation using starting address of dma buffer (4Kb)
+ *  5. Copy data from uproc address space to dma buffer
+ *  5. Perform write to target flash block using starting address of dma buffer (4Kb)
  *  6. Release semaphore
  *  7. Check status code to see if operation is successful -> write into v0 accordingly
  * 
@@ -208,6 +209,22 @@ void flash_put(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct
     return;
 }
 
+/**************************************************************************************************  
+ * Reads data from block in target flash device
+ * 
+ * Steps:
+ *  1. Extract syscall arguments: user virtual address, disk number, sector number (done in syscall handler)
+ *  2. Check invalid memory region access
+ *  3. Lock semaphore 
+ *  4. Locate flash's DMA buffer in RAM
+ *  5. Copy data from uproc address space to dma buffer
+ *  5. Perform write to target flash block using starting address of dma buffer (4Kb)
+ *  6. Release semaphore
+ *  7. Check status code to see if operation is successful -> write into v0 accordingly
+ * 
+ * @ref
+ * 5.3 pandos and 5.4 pops
+ **************************************************************************************************/
 void flash_get(){
     return;
 }

@@ -203,8 +203,13 @@ void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
  **************************************************************************************************/
 void flash_put(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct){
     /*logicalAddr = a1, flashNo = a2, blockNo = a3*/
-    memaddr *dmaBuffer;
-    int dev_status;
+
+    /*Local Variables*/
+    memaddr *dmaBuffer; /*pointer to appropriate dmaBuffer for the given flash device*/
+    int dev_status; /*stores flash device status*/
+    device_t *flash_dev; /*pointer to target flash device*/
+    unsigned int command; /*command to write to COMMAND field of flash device*/
+    unsigned int max_blockCnt; /*stores the target flash device's max block number*/
 
     /*Check invalid memory region access*/
     if ((int) logicalAddr < KUSEG){
@@ -227,13 +232,37 @@ void flash_put(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct
     }
 
     /*Perform write from DMA buffer to target flash block*/
+    /*needs flashNo, block, buffer, write op*/
+    int devIdx = (FLASHINT-DISKINT) * DEVPERINT + flashNo;
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    flash_dev = &busRegArea->devreg[devIdx]; /*get pointer to target flash device*/
 
+    max_blockCnt = flash_dev->d_data1; /*get max block number for this target flash device [0...maxBlock-1]*/
+
+    if (blockNo > max_blockCnt-1){ /*if requested block is outside the range of max_blockCnt -> terminate*/
+        SYSCALL(SYS9,0,0,0);
+    }
+
+    
+    flash_dev->d_data0 = dmaBuffer;/*Write the flash device’s DATA0 field with the starting physical address of the 4kb block to be written*/
+    command = (blockNo << BLOCK_SHIFT)| FLASHWRITE; /*build WRITE command to write to COMMAND field of device register*/
+
+    setSTATUS(NO_INTS); /*Disable interrupts*/
+    flash_dev->d_command = command;  /*write the flash device's COMMAND field*/
+    dev_status = SYSCALL(SYS5,FLASHINT,flashNo,0); /*immediately issue SYS5 (wait for IO) to block the current process*/
+    setSTATUS(YES_INTS); /*Enable interrupts*/
 
     /*Release flash device semaphore*/
     SYSCALL(SYS4,(memaddr) &devSema4_support[(DEV_UNITS) + flashNo],0,0);
 
     /*Check status code to write appropriate value into v0 register*/
+    
+    if (dev_status != READY){ /*If operation failed (check device status) -> program trap handler*/
+        suppStruct->sup_exceptState[GENERALEXCEPT].s_v0 = -(dev_status); /*return negative of device status in v0*/
+        syslvl_prgmTrap_handler(suppStruct); /*call support level program trap handler*/
+    }
 
+    suppStruct->sup_exceptState[GENERALEXCEPT].s_v0 = dev_status; /*write device status into v0*/
     
 }
 
@@ -255,8 +284,10 @@ void flash_put(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct
  **************************************************************************************************/
 void flash_get(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct){
     /*logicalAddr = a1, flashNo = a2, blockNo = a3*/
-    memaddr *dmaBuffer;
-    int dev_status;
+
+    /*Local Variables*/
+    memaddr *dmaBuffer; /*pointer to appropriate dmaBuffer for the given flash device*/
+    int dev_status; /*stores flash device status*/
 
     /*Check invalid memory region access*/
     if ((int) logicalAddr < KUSEG){

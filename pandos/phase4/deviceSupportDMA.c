@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-// #include "/usr/include/umps3/umps/libumps.h"
+#include "/usr/include/umps3/umps/libumps.h"
 
 
 /**************************************************************************************************  
@@ -47,7 +47,7 @@ void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
 
     /* Pointers */
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
-    device_t *disk = &busRegArea->devreg[diskNo];  // get pointer to device register
+    device_t *disk = &busRegArea->devreg[diskNo];  /*get pointer to device register */
 
     /* Read geometry info */
     int maxCyl = disk->d_data1 >> CYLADDRSHIFT;
@@ -57,7 +57,7 @@ void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
 
     /* Validation: sector bounds and address range */
     if (sectNo < 0 || sectNo >= totalSectors || (int)logicalAddr < KUSEG) {
-        SYSCALL(SYS9, 0, 0, 0);  // terminate process
+        SYSCALL(SYS9, 0, 0, 0);
         return;
     }
 
@@ -86,7 +86,7 @@ void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
     if (status != DISKREADY) {
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
         setSTATUS(YES_INTS);
-        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);  // release lock
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
         return;
     }
 
@@ -115,8 +115,66 @@ void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
 * 5.2 pandos and 5.3 pops
 */
 void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
-    
-    /* Find the disk device register with given diskNo */
+    /* Get pointer to device register area */
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
-    
+    device_t *disk = &busRegArea->devreg[diskNo];
+
+    /* Extract geometry from d_data1 */
+    int maxCyl  = disk->d_data1 >> CYLADDRSHIFT;
+    int maxHd   = (disk->d_data1 >> HEADADDRSHIFT) & LOWERMASK;
+    int maxSect = disk->d_data1 & LOWERMASK;
+    int totalSectors = maxCyl * maxHd * maxSect;
+
+    /* Validate address and bounds */
+    if (sectNo < 0 || sectNo >= totalSectors || (int)logicalAddr < KUSEG) {
+        SYSCALL(SYS9, 0, 0, 0);
+        return;
+    }
+
+    /* Convert flat sector number into (cylinder, head, sector) */
+    int cyl  = sectNo / (maxHd * maxSect);
+    int temp = sectNo % (maxHd * maxSect);
+    int hd   = temp / maxSect;
+    int sect = temp % maxSect;
+
+    /* Acquire disk semaphore (mutual exclusion) */
+    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
+
+    /* Use physical buffer assigned to this disk */
+    memaddr *dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+
+    /* Step 1: Seek to the correct cylinder */
+    setSTATUS(NO_INTS);
+    disk->d_command = (cyl << HEADADDRSHIFT) | SEEKCYL;
+    int status = SYSCALL(SYS5, DISKINT, diskNo, 0);
+    setSTATUS(YES_INTS);
+
+    if (status != DISKREADY) {
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
+        return;
+    }
+
+    /* Step 2: Set DMA buffer address and initiate READ */
+    setSTATUS(NO_INTS);
+    disk->d_data0 = (memaddr)dmaBuffer;
+    disk->d_command = (hd << RESETACKSHIFT) | (sect << CYLADDRSHIFT) | READBLK;
+    status = SYSCALL(SYS5, DISKINT, diskNo, 0);
+    setSTATUS(YES_INTS);
+
+    if (status != DISKREADY) {
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
+        return;
+    }
+
+    /* Step 3: Copy from DMA buffer to logical address in user memory */
+    memaddr *dst = (memaddr *)logicalAddr;
+    for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
+        dst[i] = dmaBuffer[i];
+    }
+
+    /* Step 4: Release semaphore and return status */
+    SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = DISKREADY;
 }

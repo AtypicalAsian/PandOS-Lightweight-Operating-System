@@ -432,15 +432,19 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
         
         case SYS14:
+            disk_put();
             break;
         
         case SYS15:
+            disk_get();
             break;
         
         case SYS16:
+            flash_put();
             break;
         
         case SYS17:
+            flash_get();
             break;
 
         default:

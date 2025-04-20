@@ -179,7 +179,32 @@ void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = DISKREADY;
 }
 
-void flash_put(){
+/**************************************************************************************************  
+ * Writes data from given memory address to specific flash device (flashNo)
+ * 
+ * Steps:
+ *  1. Extract syscall arguments: user virtual address, disk number, sector number (done in syscall handler)
+ *  2. Check invalid memory region access
+ *  3. Lock semaphore 
+ *  4. Locate flash's DMA buffer in RAM
+ *  5. Perform write to flash operation using starting address of dma buffer (4Kb)
+ *  6. Release semaphore
+ *  7. Check status code to see if operation is successful -> write into v0 accordingly
+ * 
+ * @ref
+ * 5.3 pandos and 5.4 pops
+ **************************************************************************************************/
+void flash_put(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct){
+    /*logicalAddr = a1, flashNo = a2, blockNo = a3*/
+    memaddr *dmaBuffer;
+    int dev_status;
+
+    /*Check invalid memory region access*/
+    if ((int) logicalAddr < KUSEG){
+        SYSCALL(SYS9,0,0,0);
+        return;
+    }
+    
     return;
 }
 

@@ -147,6 +147,7 @@
 #define SYS15 15
 #define SYS16 16
 #define SYS17 17
+#define SYS18 18
 
 
 #define TLBS              3

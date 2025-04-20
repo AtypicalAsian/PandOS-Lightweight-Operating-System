@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 
 /**************************************************************************************************  
@@ -73,8 +73,11 @@ void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
     /* Copy user memory to DMA buffer */
     memaddr *dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
     memaddr *src = (DISKSTART + (diskNo * PAGESIZE));
-    for (int i = 0; i < BLOCKS_4KB; i++) {
-        *dmaBuffer++ = *logicalAddr++;
+    int i;
+    for (i = 0; i < BLOCKS_4KB; i++) {
+        *dmaBuffer = *logicalAddr;
+        dmaBuffer++;
+        logicalAddr++;
     }
 
     /* Seek to the correct cylinder */
@@ -170,8 +173,11 @@ void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
 
     /* Step 3: Copy from DMA buffer to logical address in user memory */
     memaddr *dst = (memaddr *)logicalAddr;
-    for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
-        dst[i] = dmaBuffer[i];
+    int i;
+    for (i = 0; i < BLOCKS_4KB; i++) {
+        *dst = *dmaBuffer;
+        dst++;
+        dmaBuffer++;
     }
 
     /* Step 4: Release semaphore and return status */
@@ -205,8 +211,30 @@ void flash_put(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct
         SYSCALL(SYS9,0,0,0);
         return;
     }
+
+    /*Lock flash device semaphore*/
+    SYSCALL(SYS3, (memaddr) &devSema4_support[(DEV_UNITS) + flashNo], 0,0);
+
+    /*Locate flash's dma buffer in RAM*/
+    dmaBuffer = (memaddr *) (FLASHSTART + (PAGESIZE * flashNo));
+
+    /*Copy data from uproc address space to dma buffer (prepare for write operation)*/
+    int i;
+    for (i=0; i < BLOCKS_4KB; i++){
+        *dmaBuffer = *logicalAddr;
+        dmaBuffer++;
+        logicalAddr++;
+    }
+
+    /*Perform write from DMA buffer to target flash block*/
+
+
+    /*Release flash device semaphore*/
+    SYSCALL(SYS4,(memaddr) &devSema4_support[(DEV_UNITS) + flashNo],0,0);
+
+    /*Check status code to write appropriate value into v0 register*/
+
     
-    return;
 }
 
 /**************************************************************************************************  
@@ -217,14 +245,40 @@ void flash_put(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct
  *  2. Check invalid memory region access
  *  3. Lock semaphore 
  *  4. Locate flash's DMA buffer in RAM
- *  5. Copy data from uproc address space to dma buffer
- *  5. Perform write to target flash block using starting address of dma buffer (4Kb)
- *  6. Release semaphore
- *  7. Check status code to see if operation is successful -> write into v0 accordingly
+ *  5. Read from flash block to device DMA buffer
+ *  6. Copy data from DMA buffer into requesting uproc address space starting from provide start address
+ *  7. Release semaphore
+ *  8. Check status code to see if operation is successful -> write into v0 accordingly
  * 
  * @ref
  * 5.3 pandos and 5.4 pops
  **************************************************************************************************/
-void flash_get(){
-    return;
+void flash_get(int *logicalAddr, int flashNo, int blockNo, support_t *suppStruct){
+    /*logicalAddr = a1, flashNo = a2, blockNo = a3*/
+    memaddr *dmaBuffer;
+    int dev_status;
+
+    /*Check invalid memory region access*/
+    if ((int) logicalAddr < KUSEG){
+        SYSCALL(SYS9,0,0,0);
+        return;
+    }
+
+    /*Lock device semaphore*/
+    SYSCALL(SYS3,(memaddr)&devSema4_support[DEV_UNITS + flashNo],0,0);
+
+    /*Locate flash device's DMA buffer*/
+    dmaBuffer = (memaddr *) (FLASHSTART + (PAGESIZE * flashNo));
+
+    /*Perform read operation to read from target flash block to device DMA buffer*/
+
+    /*Copy data from DMA buffer into uproc address space*/
+
+
+    /*Release flash device semaphore*/
+    SYSCALL(SYS4,(memaddr)&devSema4_support[DEV_UNITS + flashNo],0,0);
+
+    /*Check device status code to write appropriate value into v0 register*/
+
+
 }

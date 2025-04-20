@@ -178,3 +178,11 @@ void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
     SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = DISKREADY;
 }
+
+void flash_put(){
+    return;
+}
+
+void flash_get(){
+    return;
+}

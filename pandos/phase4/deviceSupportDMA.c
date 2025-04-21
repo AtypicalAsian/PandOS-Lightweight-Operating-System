@@ -56,9 +56,8 @@ void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
     int totalSectors = maxCyl * maxHd * maxSect;
 
     /* Validation: sector bounds and address range */
-    if (sectNo < 0 || sectNo >= totalSectors || (int)logicalAddr < KUSEG) {
+    if ((sectNo < 0) || (sectNo > totalSectors) || ((int)logicalAddr < KUSEG)) {
         SYSCALL(SYS9, 0, 0, 0);
-        return;
     }
 
     /* Compute cylinder, head, sector from 1D index */
@@ -141,9 +140,8 @@ void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
     int totalSectors = maxCyl * maxHd * maxSect;
 
     /* Validate address and bounds */
-    if (sectNo < 0 || sectNo >= totalSectors || (int)logicalAddr < KUSEG) {
+    if ((sectNo < 0) || (sectNo > totalSectors) || ((int)logicalAddr < KUSEG)) {
         SYSCALL(SYS9, 0, 0, 0);
-        return;
     }
 
     /* Convert flat sector number into (cylinder, head, sector) */
@@ -184,17 +182,16 @@ void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
     }
 
     /* Step 3: Copy from DMA buffer to logical address in user memory */
-    memaddr *dst = (memaddr *)logicalAddr;
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
-        *dst = *dmaBuffer;
-        dst++;
+        *logicalAddr = *dmaBuffer;
+        logicalAddr++;
         dmaBuffer++;
     }
 
     /* Step 4: Release semaphore and return status */
     SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = DISKREADY;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
 }
 
 /**************************************************************************************************  

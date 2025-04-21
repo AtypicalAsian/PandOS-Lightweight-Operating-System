@@ -393,8 +393,8 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     int a1_val; /*value stored in a1*/
     int a2_val; /*value stored in a2*/
     int a3_val; /*value stored in a3*/
-    // char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
-    // int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
+    /*char* virtualAddr;*/    /*value stored in a1 - here it's the ptr to first char to be written/read*/
+    /* int length;*/     /*value stored in a2 - here it's the length of the string to be written/read*/
     /*----------------------------------------------------------*/
 
     /* Validate syscall number */
@@ -435,19 +435,19 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
         
         case SYS14:
-            disk_put(a1_val,a2_val,a3_val,currProc_support_struct);
+            disk_put((int *) a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS15:
-            disk_get(a1_val,a2_val,a3_val,currProc_support_struct);
+            disk_get((int *) a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS16:
-            flash_put(a1_val,a2_val,a3_val,currProc_support_struct);
+            flash_put((int *) a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS17:
-            flash_get(a1_val,a2_val,a3_val,currProc_support_struct);
+            flash_get((int *) a1_val,a2_val,a3_val,currProc_support_struct);
             break;
 
         default:

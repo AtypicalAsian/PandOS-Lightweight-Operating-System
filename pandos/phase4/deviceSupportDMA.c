@@ -51,7 +51,7 @@ void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
 
     /* Read geometry info */
     int maxCyl = disk->d_data1 >> CYLADDRSHIFT;
-    int maxHd  = (disk->d_data1 >> HEADADDRSHIFT) & LOWERMASK;
+    int maxHd  = (disk->d_data1 >> HEADADDRSHIFT) & HEADMASK;
     int maxSect = disk->d_data1 & LOWERMASK;
     int totalSectors = maxCyl * maxHd * maxSect;
 
@@ -83,27 +83,28 @@ void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struc
     setSTATUS(NO_INTS);
     disk->d_command = (cyl << HEADADDRSHIFT) | SEEKCYL;
     int status = SYSCALL(SYS5, DISKINT, diskNo, 0);
+    setSTATUS(YES_INTS);
 
     /*Device is not ready -> error write*/
     if (status != DISKREADY) {
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
-        setSTATUS(YES_INTS);
-        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
-        return;
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -(status);
+        /*setSTATUS(YES_INTS);*/
+        /*SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);*/
+        /*return;*/
     }
 
     /* Set up DMA transfer from buffer to disk */
     setSTATUS(NO_INTS);
     disk->d_data0 = (memaddr)dmaBuffer;
-    disk->d_command = (hd << RESETACKSHIFT) | (sect << CYLADDRSHIFT) | WRITEBLK;
+    disk->d_command = (hd << 16) | (sect << 8) | WRITEBLK;
     status = SYSCALL(SYS5, DISKINT, diskNo, 0);
     setSTATUS(YES_INTS);
 
     /* Return result */
-    if (status != DISKREADY) {
+    if (status != READY) {
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
     } else {
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = DISKREADY;
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
     }
 
     /* Release disk semaphore */

@@ -43,11 +43,11 @@ UDEV = umps3-mkdev
 # Device generation variables
 TERMINALS := $(addprefix term, $(addsuffix .umps, $(shell seq 0 7)))
 PRINTERS  := $(addprefix print, $(addsuffix .umps, $(shell seq 0 7)))
-DISKS     := $(addprefix disk, $(addsuffix .umps, $(shell seq 0 1)))
+# DISKS     := $(addprefix disk, $(addsuffix .umps, $(shell seq 0 1)))
 
 
 #main target
-all: kernel.core.umps $(TERMINALS) $(PRINTERS) $(DISKS)
+all: kernel.core.umps $(TERMINALS) $(PRINTERS) #$(DISKS)
 
 kernel.core.umps: kernel
 	$(EF) -k kernel
@@ -60,7 +60,7 @@ kernel: $(OBJS)
 
 # Rule to generate .umps devices (termX.umps, printX.umps)
 %.umps:
-	$(UDEV) -i -t $(basename $@) -f $@
+	$(UDEV) -d $@
 
 clean:
 	rm -f *.o *.umps kernel

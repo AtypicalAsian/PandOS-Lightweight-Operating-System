@@ -52,7 +52,7 @@ all: printerTest.umps strConcat.umps terminalReader.umps asciiArt.umps \
 	$(EF) -a $<
 
 %.umps: %.t.aout.umps
-	$(UDEV) -f $@ $<
+	$(UDEV) -f $@ $<	
 
 
 clean:

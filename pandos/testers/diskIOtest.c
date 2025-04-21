@@ -16,7 +16,9 @@ void main() {
 
 	print(WRITETERMINAL, "diskTest starts\n");
 	*buffer = 42;  /*buffer[0] = 'a'; */
+	print(WRITETERMINAL, "buffer init done!\n"); 		/*comment line 1*/
 	dstatus = SYSCALL(DISK_PUT, (int)buffer, 1, 3);
+	print(WRITETERMINAL, "disk_put started!\n");       /*comment line 2*/
 	
 	if (dstatus != READY)
 		print(WRITETERMINAL, "diskTest error: disk i/o result\n");

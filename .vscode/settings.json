@@ -10,6 +10,8 @@
     "initial.h": "c",
     "type_traits": "c",
     "vmsupport.h": "c",
-    "interrupts.h": "c"
+    "interrupts.h": "c",
+    "initproc.h": "c",
+    "devicesupportdma.h": "c"
   }
 }

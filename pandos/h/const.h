@@ -143,6 +143,11 @@
 #define SYS11 11
 #define SYS12 12
 #define SYS13 13
+#define SYS14 14
+#define SYS15 15
+#define SYS16 16
+#define SYS17 17
+#define SYS18 18
 
 
 #define TLBS              3
@@ -252,6 +257,11 @@
 #define READBLK 3
 #define WRITEBLK 4
 #define DISKREADY 1
+
+#define DISKSTART (FRAMEADDRSHIFT + (PAGESIZE * SWAP_POOL_CAP)) /*disk dma buffers placed after swap pool (for now)*/
+#define FLASHSTART (DISKSTART + (DEV_UNITS * PAGESIZE)) /*flash dma buffers after disk buffers*/
+
+#define BLOCKS_4KB PAGESIZE/WORDLEN
 
 #endif
 

@@ -25,7 +25,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 /*Support level device semaphores*/
 int devSema4_support[DEVICE_TYPES * DEV_UNITS]; 
@@ -390,8 +390,11 @@ void syslvl_prgmTrap_handler(support_t *suppStruct)
  **************************************************************************************************/
 void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
     /*--------------Declare local variables---------------------*/
-    char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
-    int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
+    int a1_val; /*value stored in a1*/
+    int a2_val; /*value stored in a2*/
+    int a3_val; /*value stored in a3*/
+    // char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
+    // int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
     /*----------------------------------------------------------*/
 
     /* Validate syscall number */
@@ -402,9 +405,9 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     }
 
     /*Step 2: Read values in registers a1-a3*/
-    virtualAddr = (char *) currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
-    length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
-    /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3 yet*/  
+    a1_val = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    a2_val = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+    a3_val = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
 
     /*Step 3: Increment PC+4 to execute next instruction on return*/
     currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
@@ -420,31 +423,31 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
 
         case SYS11:
-            write_to_printer(virtualAddr, length, currProc_support_struct);
+            write_to_printer((char *) a1_val, a2_val, currProc_support_struct);
             break;
 
         case SYS12:
-            write_to_terminal(virtualAddr, length, currProc_support_struct);  
+            write_to_terminal((char *) a1_val, a2_val, currProc_support_struct);  
             break;
 
         case SYS13:
-            read_from_terminal(virtualAddr, currProc_support_struct);
+            read_from_terminal((char *) a1_val, currProc_support_struct);
             break;
         
         case SYS14:
-            disk_put();
+            disk_put(a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS15:
-            disk_get();
+            disk_get(a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS16:
-            flash_put();
+            flash_put(a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS17:
-            flash_get();
+            flash_get(a1_val,a2_val,a3_val,currProc_support_struct);
             break;
 
         default:

@@ -134,71 +134,60 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  **************************************************************************************************/
 
  void disk_get(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
-    int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
-    int seekCylinder, platterNum, device_status;                   
-    memaddr *buffer;                                                    
-    devregarea_t *devReg;                         
-    unsigned int command;
+    /*Local Variables*/
+    memaddr *dmaBuffer; /*pointer to location of target buffer 4kb block in RAM*/
+    int maxCyl, maxSect, maxHd; /*disk device characteristics*/
+    int status; /*device status*/
 
-    devReg = (devregarea_t *) RAMBASEADDR;
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
 
-    diskPhysicalGeometry = devReg->devreg[diskNo].d_data1;
-    maxCylinder = (diskPhysicalGeometry >> 16);
-    maxPlatter = (diskPhysicalGeometry & 0x0000FF00) >> 8;
-    maxSector = (diskPhysicalGeometry & 0x000000FF);
-    maxCount = maxCylinder * maxPlatter * maxSector;
+    maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
+    maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
-    if (((int)logicalAddr < KUSEG) || (sectNo > maxCount)) {
-        get_nuked(NULL); 
+    /* Validate the sector address, where we perform WRITE operation into 
+     * if it's not outside of U's proc logical address 
+     */
+    if (sectNo < 0 || sectNo > (maxCyl * maxHd * maxSect) || (int) logicalAddr < KUSEG) {
+        get_nuked(NULL);
     }
 
-    seekCylinder = sectNo / (maxPlatter * maxSector);
-    sectNo = sectNo % (maxPlatter * maxSector);
-    platterNum = sectNo / maxSector;
-    sectNo = sectNo % maxSector;
+    int cyl = sectNo / (maxHd * maxSect); 
+    int temp = sectNo % (maxHd * maxSect);
+    int hd = temp / maxSect;
+    int sect = temp % maxSect;
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
+    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
 
-    buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
     setSTATUS(NO_INTS);
-
-    command = (seekCylinder << 8) | 2;
-    devReg->devreg[diskNo].d_command = command;
-    device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
-
+    busRegArea->devreg[diskNo].d_command = (cyl << HEADADDRSHIFT) | SEEKCYL; /*perform seek to correct sector*/
+    status = SYSCALL(SYS5, DISKINT, diskNo, 0);
     setSTATUS(YES_INTS);
 
-    if (device_status == READY) {
+    if (status == READY){
         setSTATUS(NO_INTS);
-
-        devReg->devreg[diskNo].d_data0 = originBuff;
-
-        command = (platterNum << 16) | (sectNo << 8) | 3;
-        devReg->devreg[diskNo].d_command = command;
-
-        device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
-
+        busRegArea->devreg[diskNo].d_data0 = originBuff;
+        busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 3;
+        status = SYSCALL(SYS5,DISKINT,diskNo,0);
         setSTATUS(YES_INTS);
-
-        if (device_status != READY) {
-            device_status = -device_status;
+        if (status != READY){
+            status = -(status);
         }
     } else {
-        device_status = -device_status;
+        status = -(status);
     }
 
-    if (device_status == READY) {
-        int i;
-        for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-            *logicalAddr++ = *buffer++; 
+    if (status == READY){
+        int j;
+        for (j=0;j<BLOCKS_4KB;j++){
+            *logicalAddr++ = *dmaBuffer++;
         }
     }
-
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
-
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+    SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
 }
 
 /**************************************************************************************************  

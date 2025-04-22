@@ -186,7 +186,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
     }
 
-    if (status = READY){
+    if (status == READY){
         int j;
         for (j=0;j<BLOCKS_4KB;j++){
             *logicalAddr = *dmaBuffer;

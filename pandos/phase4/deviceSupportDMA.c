@@ -106,13 +106,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         }
     }
     SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
-
-    // int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
-    // int seekCylinder, platterNum, device_status; 
-    // memaddr *buffer;                                                       
-    // devregarea_t *devReg;                         
-    // unsigned int command;                        
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;                 
 
 }
 

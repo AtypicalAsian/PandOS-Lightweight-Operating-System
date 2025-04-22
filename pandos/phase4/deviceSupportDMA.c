@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-// #include "/usr/include/umps3/umps/libumps.h"
+#include "/usr/include/umps3/umps/libumps.h"
 
 
 

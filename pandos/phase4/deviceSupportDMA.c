@@ -124,7 +124,8 @@ void disk_put(support_t *current_support) {
     buffer = (memaddr *)(DISKSTART + (diskNum * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNum * PAGESIZE));
 
-    for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
+    int i;
+    for (i = 0; i < PAGESIZE / WORDLEN; i++) {
         *buffer++ = *virtualAddr++;
     }
 
@@ -240,7 +241,8 @@ void disk_put(support_t *current_support) {
     }
 
     if (device_status == READY) {
-        for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
+        int i;
+        for (i = 0; i < PAGESIZE / WORDLEN; i++) {
             *virtualAddr++ = *buffer++; 
         }
     }

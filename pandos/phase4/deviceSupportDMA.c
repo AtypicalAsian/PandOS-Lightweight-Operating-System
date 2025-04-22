@@ -51,7 +51,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     memaddr *dmaBuffer; /*pointer to location of target buffer 4kb block in RAM*/
     int maxCyl, maxSect, maxHd; /*disk device characteristics*/
     int status; /*device status*/
-    unsigned int command;
 
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
 
@@ -73,7 +72,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
-    memaddr *originBuffAddr = (DISKSTART + (diskNo * PAGESIZE)); /*save this to later assign to data0 field to issue WRITE*/
 
     int i;
     for (i = 0; i < PAGESIZE / WORDLEN; i++) {
@@ -84,8 +82,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo)); /*re-assign to starting address of 4kb block to later use for WRITE operation*/
 
     setSTATUS(NO_INTS);
-    command = (cyl << HEADADDRSHIFT) | SEEKCYL;
-    busRegArea->devreg[diskNo].d_command = command;
+    busRegArea->devreg[diskNo].d_command = (cyl << HEADADDRSHIFT) | SEEKCYL;
     /* Issue I/O Request to suspend current U's proc until the disk WRITE/READ operation is done */
     status = SYSCALL(SYS5, DISKINT, diskNo, 0);
     setSTATUS(YES_INTS);
@@ -100,8 +97,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     else{
         setSTATUS(NO_INTS);
         busRegArea->devreg[diskNo].d_data0 = dmaBuffer;
-        command = (hd << 16) | (sectNo << 8) | 4;
-        busRegArea->devreg[diskNo].d_command = command;
+        busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 4;
 
         status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);

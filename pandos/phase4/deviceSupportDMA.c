@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 /**************************************************************************************************  
  * Writes data from given memory address to specific disk device (diskNo)
@@ -51,13 +51,12 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     memaddr *dmaBuffer; /*pointer to location of target buffer 4kb block in RAM*/
     int maxCyl, maxSect, maxHd; /*disk device characteristics*/
     int status; /*device status*/
-    unsigned int command; /*stores command to write into the disk*/
 
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
 
-    maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
     maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
+    maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
     /* Validate the sector address, where we perform WRITE operation into 
      * if it's not outside of U's proc logical address 
@@ -66,10 +65,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         get_nuked(NULL);
     }
 
-    int cyl = sectNo / (maxHd * maxSect);
+    int cyl = sectNo / (maxHd * maxSect); 
     int temp = sectNo % (maxHd * maxSect);
     int hd = temp / maxSect;
-    int sect = temp % maxSect;
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
@@ -80,8 +78,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
 
     setSTATUS(NO_INTS);
-    command = (cyl << HEADADDRSHIFT) | SEEKCYL;
-    busRegArea->devreg[diskNo].d_command = command;
+    busRegArea->devreg[diskNo].d_command = (cyl << HEADADDRSHIFT) | SEEKCYL;
     /* Issue I/O Request to suspend current U's proc until the disk WRITE/READ operation is done */
     status = SYSCALL(SYS5, DISKINT, diskNo, 0);
     setSTATUS(YES_INTS);
@@ -96,8 +93,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     else{
         setSTATUS(NO_INTS);
         busRegArea->devreg[diskNo].d_data0 = dmaBuffer;
-        command = (hd << 16) | (sect << 8) | 4;
-        busRegArea->devreg[diskNo].d_command = command;
+        busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 4;
 
         status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);

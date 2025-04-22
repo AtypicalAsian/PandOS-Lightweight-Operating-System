@@ -26,20 +26,20 @@
  * Writes data from given memory address to specific disk device (diskNo)
  * 
  * Steps:
- *  2. Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect
- *  3. Validate sector number to ensure it's within disk capacity (prevent invalid access)
- *  4. Convert the linear sector number into its 3D physical representation: cylinder, head, and sector.
- *  5. Lock target disk device semaphore
- *  6. Locate appropriate disk DMA buffer in RAM
- *  7. Copy 4KB from the uproc's logical address space into the disk's DMA buffer.
- *  8. Initiate a SEEK command by writing the appropriate value into the command register to move the disk head to the correct cylinder.
- *  9. Block current process on ASL while waiting for SEEK operation to complete
- * 10. If successful SEEK 
- *     11. Load device register data0 field with address of DMA buffer to write from
- *     12. Issue WRITE command
- * 11. Block current process on ASL while waiting for WRITE operation to complete
- * 12. Release the target disk device semaphore
- * 13. Store the final status of the operation (success or error code) into the v0 register of the exception state.
+ *  1. Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect
+ *  2. Validate sector number to ensure it's within disk capacity (prevent invalid access)
+ *  3. Convert the linear sector number into its 3D physical representation: cylinder, head, and sector.
+ *  4. Lock target disk device semaphore
+ *  5. Locate appropriate disk DMA buffer in RAM
+ *  6. Copy 4KB from the uproc's logical address space into the disk's DMA buffer.
+ *  7. Initiate a SEEK command by writing the appropriate value into the command register to move the disk head to the correct cylinder.
+ *  8. Block current process on ASL while waiting for SEEK operation to complete
+ *  9. If successful SEEK 
+ *     10. Load device register data0 field with address of DMA buffer to write from
+ *     11. Issue WRITE command
+ * 12. Block current process on ASL while waiting for WRITE operation to complete
+ * 13. Release the target disk device semaphore
+ * 14. Store the final status of the operation (success or error code) into the v0 register of the exception state.
  * 
  * 
  * @ref

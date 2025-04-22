@@ -52,9 +52,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     devReg = (devregarea_t *) RAMBASEADDR; 
 
-    /*virtualAddr = (memaddr *) support_struct->sup_exceptState[GENERALEXCEPT].s_a1;*/
-    /*diskNo = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;*/
-    /*sectNo = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/
 
     diskPhysicalGeometry = devReg->devreg[diskNo].d_data1;
 
@@ -131,58 +128,52 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  * 5.2 pandos and 5.3 pops
  **************************************************************************************************/
 
- void disk_get(support_t *current_support) {
+ void disk_get(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
     int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
-    int seekCylinder, platterNum, device_status; 
-    int diskNum, sectorNum;                       
-    memaddr *buffer;                              
-    memaddr *virtualAddr;                         
+    int seekCylinder, platterNum, device_status;                   
+    memaddr *buffer;                                                    
     devregarea_t *devReg;                         
     unsigned int command;
 
     devReg = (devregarea_t *) RAMBASEADDR;
 
-    virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
-    diskNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
-    sectorNum = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
-
-    diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
+    diskPhysicalGeometry = devReg->devreg[diskNo].d_data1;
     maxCylinder = (diskPhysicalGeometry >> 16);
     maxPlatter = (diskPhysicalGeometry & 0x0000FF00) >> 8;
     maxSector = (diskPhysicalGeometry & 0x000000FF);
     maxCount = maxCylinder * maxPlatter * maxSector;
 
-    if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
+    if (((int)logicalAddr < KUSEG) || (sectNo > maxCount)) {
         get_nuked(NULL); 
     }
 
-    seekCylinder = sectorNum / (maxPlatter * maxSector);
-    sectorNum = sectorNum % (maxPlatter * maxSector);
-    platterNum = sectorNum / maxSector;
-    sectorNum = sectorNum % maxSector;
+    seekCylinder = sectNo / (maxPlatter * maxSector);
+    sectNo = sectNo % (maxPlatter * maxSector);
+    platterNum = sectNo / maxSector;
+    sectNo = sectNo % maxSector;
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNum], 0, 0);
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
-    buffer = (memaddr *)(DISKSTART + (diskNum * PAGESIZE));
-    memaddr *originBuff = (DISKSTART + (diskNum * PAGESIZE));
+    buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
     setSTATUS(NO_INTS);
 
     command = (seekCylinder << 8) | 2;
-    devReg->devreg[diskNum].d_command = command;
-    device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+    devReg->devreg[diskNo].d_command = command;
+    device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
 
     setSTATUS(YES_INTS);
 
     if (device_status == READY) {
         setSTATUS(NO_INTS);
 
-        devReg->devreg[diskNum].d_data0 = originBuff;
+        devReg->devreg[diskNo].d_data0 = originBuff;
 
-        command = (platterNum << 16) | (sectorNum << 8) | 3;
-        devReg->devreg[diskNum].d_command = command;
+        command = (platterNum << 16) | (sectNo << 8) | 3;
+        devReg->devreg[diskNo].d_command = command;
 
-        device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+        device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
 
         setSTATUS(YES_INTS);
 
@@ -196,13 +187,13 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     if (device_status == READY) {
         int i;
         for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-            *virtualAddr++ = *buffer++; 
+            *logicalAddr++ = *buffer++; 
         }
     }
 
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
-    current_support->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
 }
 
 /**************************************************************************************************  
@@ -222,49 +213,44 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  * @ref
  * 5.3 pandos and 5.4 pops
  **************************************************************************************************/
-void flash_put(support_t *current_support) {
-    int flashNum, sector, device_status;
+void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
+    int device_status;
     memaddr *buffer;
-    memaddr *virtualAddr;
     device_t *flashDevice;
     unsigned int command, maxBlock;
 
-    virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
-    flashNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
-    sector = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
-
-    if ((int)virtualAddr < KUSEG) {
+    if ((int)logicalAddr < KUSEG) {
         get_nuked(NULL);
     }
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNum], 0, 0);
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
-    buffer = (memaddr *)(FLASHSTART + (flashNum * PAGESIZE));
+    buffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
     memaddr *originBuff = buffer;
 
     int i;
     for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-        *buffer++ = *virtualAddr++;
+        *buffer++ = *logicalAddr++;
     }
 
-    flashDevice = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNum * DEVREGSIZE));
+    flashDevice = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
     maxBlock = flashDevice->d_data1;
 
-    if (sector >= maxBlock) {
+    if (blockNo >= maxBlock) {
         get_nuked(NULL);
     }
 
-    command = FLASHWRITE | (sector << FLASHADDRSHIFT);
+    command = FLASHWRITE | (blockNo << FLASHADDRSHIFT);
     flashDevice->d_data0 = (memaddr)originBuff;
 
     setSTATUS(NO_INTS);
     flashDevice->d_command = command;
-    device_status = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
+    device_status = SYSCALL(WAITIO, FLASHINT, flashNo, 0);
     setSTATUS(YES_INTS);
 
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[DEV_UNITS + flashNum], 0, 0);
+    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
-    current_support->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
 }
 
 
@@ -286,51 +272,47 @@ void flash_put(support_t *current_support) {
  * @ref
  * 5.3 pandos and 5.4 pops
  **************************************************************************************************/
-void flash_get(support_t *current_support) {
-    int flashNum, sector, device_status;
+void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
+    int device_status;
     memaddr *buffer;
-    memaddr *virtualAddr;
     device_t *flashDevice;
     unsigned int command, maxBlock;
 
-    virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
-    flashNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
-    sector = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
 
-    if ((int)virtualAddr < KUSEG) {
+    if ((int)logicalAddr < KUSEG) {
         get_nuked(NULL);
     }
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNum], 0, 0);
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
-    buffer = (memaddr *)(FLASHSTART + (flashNum * PAGESIZE));
+    buffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
     memaddr *originBuff = buffer;
 
-    flashDevice = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNum * DEVREGSIZE));
+    flashDevice = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
     maxBlock = flashDevice->d_data1;
 
-    if (sector >= maxBlock) {
+    if (blockNo >= maxBlock) {
         get_nuked(NULL);
     }
 
-    command = FLASHREAD | (sector << FLASHADDRSHIFT);
+    command = FLASHREAD | (blockNo << FLASHADDRSHIFT);
     flashDevice->d_data0 = (memaddr)originBuff;
 
     setSTATUS(NO_INTS);
     flashDevice->d_command = command;
-    device_status = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
+    device_status = SYSCALL(WAITIO, FLASHINT, flashNo, 0);
     setSTATUS(YES_INTS);
 
     if (device_status == READY) {
         int i;
         for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-            *virtualAddr++ = *buffer++;
+            *logicalAddr++ = *buffer++;
         }
     }
 
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[DEV_UNITS + flashNum], 0, 0);
+    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
-    current_support->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
 }
 
 

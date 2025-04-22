@@ -52,18 +52,17 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     unsigned int command; /*stores command to write into the disk*/
 
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
-    device_t d_device = busRegArea->devreg[diskNo];
-    disk_data1_field = d_device.d_data1;
+    disk_data1_field = busRegArea->devreg[diskNo].d_data1;
 
-    maxCyl = d_device.d_data1 >> CYLADDRSHIFT;
-    maxHd = (d_device.d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
-    maxSect = d_device.d_data1 & LOWERMASK;
+    maxCyl = disk_data1_field >> CYLADDRSHIFT;
+    maxHd = (disk_data1_field & 0x0000FF00) >> HEADADDRSHIFT;
+    maxSect = disk_data1_field & LOWERMASK;
 
     /* Validate the sector address, where we perform WRITE operation into 
      * if it's not outside of U's proc logical address 
      */
     if (sectNo < 0 || sectNo >= (maxCyl * maxHd * maxSect)) {
-        SYSCALL(SYS9, 0, 0, 0);
+        get_nuked(NULL);
     }
 
     int cyl = sectNo / (maxHd * maxSect);
@@ -81,7 +80,8 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
 
     setSTATUS(NO_INTS);
-    d_device.d_command = (cyl << HEADADDRSHIFT) | SEEKCYL;
+    command = (cyl << HEADADDRSHIFT) | SEEKCYL;
+    busRegArea->devreg[diskNo].d_command = command;
     /* Issue I/O Request to suspend current U's proc until the disk WRITE/READ operation is done */
     status = SYSCALL(SYS5, DISKINT, diskNo, 0);
     setSTATUS(YES_INTS);
@@ -89,7 +89,8 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     /* If the operation ends with a status other than “Device Ready”
      * (1), the negative of the completion status is returned in v0*/
     if (status != READY) {
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
+        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -(status);
         return;
     }
     else{
@@ -104,10 +105,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         if (status != READY) {
             status = -status;
         }
+        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
     }
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;                 
-
 }
 
 

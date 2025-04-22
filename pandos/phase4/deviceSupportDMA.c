@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 /**************************************************************************************************  
  * Writes data from given memory address to specific disk device (diskNo)
@@ -46,17 +46,15 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     /*Local Variables*/
     memaddr *dmaBuffer; /*pointer to location of target buffer 4kb block in RAM*/
-    int disk_data1_field; /*data1 field (stores maxcyl,maxhead,maxsect)*/
     int maxCyl, maxSect, maxHd; /*disk device characteristics*/
     int status; /*device status*/
     unsigned int command; /*stores command to write into the disk*/
 
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
-    disk_data1_field = busRegArea->devreg[diskNo].d_data1;
 
-    maxCyl = disk_data1_field >> CYLADDRSHIFT;
-    maxHd = (disk_data1_field & 0x0000FF00) >> HEADADDRSHIFT;
-    maxSect = disk_data1_field & LOWERMASK;
+    maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
+    maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
 
     /* Validate the sector address, where we perform WRITE operation into 
      * if it's not outside of U's proc logical address 
@@ -72,7 +70,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
-    memaddr *originBuff = (DISKSTART + (PAGESIZE * diskNo));
+    /*memaddr *originBuff = (DISKSTART + (PAGESIZE * diskNo));*/
 
     int i;
     for (i = 0; i < PAGESIZE / WORDLEN; i++) {
@@ -95,7 +93,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
     else{
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = originBuff;
+        busRegArea->devreg[diskNo].d_data0 = dmaBuffer;
         command = (hd << 16) | (sectNo << 8) | 4;
         busRegArea->devreg[diskNo].d_command = command;
 

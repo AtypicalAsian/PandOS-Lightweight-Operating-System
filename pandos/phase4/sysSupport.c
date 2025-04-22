@@ -435,7 +435,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
         
         case SYS14:
-            disk_put(currProc_support_struct);
+            disk_put((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS15:

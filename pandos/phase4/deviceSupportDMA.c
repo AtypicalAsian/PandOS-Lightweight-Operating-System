@@ -73,6 +73,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
+    memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
     int i;
     for (i = 0; i < PAGESIZE / WORDLEN; i++) {
@@ -95,7 +96,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
     else{
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = dmaBuffer;
+        busRegArea->devreg[diskNo].d_data0 = originBuff;
         command = (hd << 16) | (sectNo << 8) | 4;
         busRegArea->devreg[diskNo].d_command = command;
 

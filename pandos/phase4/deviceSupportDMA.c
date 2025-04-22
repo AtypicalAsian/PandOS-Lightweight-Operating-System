@@ -26,17 +26,20 @@
  * Writes data from given memory address to specific disk device (diskNo)
  * 
  * Steps:
- *  1. Extract syscall arguments: user virtual address, disk number, sector number.
- *  2. Access DATA1 field to get maxcyl,maxhead,maxsect
- *  3. Find sectCnt (convert to 1D view of disk)
- *  4. Check invalid access
- *  5. Convert sector number to (cylinder, platter, sector) triplet.
- *  6. Lock semaphore 
- *  7. Locate disk's DMA buffer in RAM
- *  8. Copy 4KB data to write from uproc to DMA buffer we just found
- *  9. Perform the write op (seek correct cylinder, write from buffer to correct sector, etc..)
- *  10. Release semaphore
- *  11. Check status code to see if operation is successful -> write into v0 accordingly
+ *  2. Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect
+ *  3. Validate sector number to ensure it's within disk capacity (prevent invalid access)
+ *  4. Convert the linear sector number into its 3D physical representation: cylinder, head, and sector.
+ *  5. Lock target disk device semaphore
+ *  6. Locate appropriate disk DMA buffer in RAM
+ *  7. Copy 4KB from the uproc's logical address space into the disk's DMA buffer.
+ *  8. Initiate a SEEK command by writing the appropriate value into the command register to move the disk head to the correct cylinder.
+ *  9. Block current process on ASL while waiting for SEEK operation to complete
+ * 10. If successful SEEK 
+ *     11. Load device register data0 field with address of DMA buffer to write from
+ *     12. Issue WRITE command
+ * 11. Block current process on ASL while waiting for WRITE operation to complete
+ * 12. Release the target disk device semaphore
+ * 13. Store the final status of the operation (success or error code) into the v0 register of the exception state.
  * 
  * 
  * @ref
@@ -66,11 +69,10 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     int cyl = sectNo / (maxHd * maxSect);
     int temp = sectNo % (maxHd * maxSect);
     int hd = temp / maxSect;
-    int sect = temp % maxSect;
+    /*int sect = temp % maxSect;*/
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
-    /*memaddr *originBuff = (DISKSTART + (PAGESIZE * diskNo));*/
 
     int i;
     for (i = 0; i < PAGESIZE / WORDLEN; i++) {

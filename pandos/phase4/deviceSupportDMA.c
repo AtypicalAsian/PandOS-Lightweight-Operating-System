@@ -22,52 +22,6 @@
 #include "../h/deviceSupportDMA.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
-
-/*re-usable*/
-int diskOp(int diskNum, int track, int head, int sector, int buffer, int operation) {
-    unsigned int command;           
-    int device_status;               
-    devregarea_t *diskDevice;        
-
-    
-    diskDevice = (devregarea_t *) RAMBASEADDR; 
-
-    setSTATUS(NO_INTS);
-    
-   
-    command = (track << 8) | 2;
-    diskDevice->devreg[diskNum].d_command = command;  
-    
-
-    device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
-    setSTATUS(YES_INTS);  
-
-
-    if(device_status != READY) {
-        device_status = -(device_status);  
-    } else {
-
-        setSTATUS(NO_INTS);
-        diskDevice->devreg[diskNum].d_data0  = buffer;  
-        
-
-        command = (head << 16) | (sector << 8) | operation; 
-        diskDevice->devreg[diskNum].d_command = command;  
-        
-       
-        device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
-        setSTATUS(YES_INTS);  
-
-
-        if(device_status != READY) {
-            device_status = -(device_status);  
-        }
-    }
-
-    return device_status;  
-}
-
-
 /**************************************************************************************************  
  * Writes data from given memory address to specific disk device (diskNo)
  * 
@@ -270,28 +224,44 @@ void disk_put(support_t *current_support) {
  * 5.3 pandos and 5.4 pops
  **************************************************************************************************/
 void flash_put(support_t *current_support) {
-    int flashNum, sector, device_status; 
-    memaddr *buffer;                       
-    memaddr *virtualAddr;                  
+    int flashNum, sector, device_status;
+    memaddr *buffer;
+    memaddr *virtualAddr;
+    device_t *flashDevice;
+    unsigned int command, maxBlock;
 
     virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
     flashNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
     sector = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
 
-    if ((int) virtualAddr < KUSEG) {
-        get_nuked(NULL);  
+    if ((int)virtualAddr < KUSEG) {
+        get_nuked(NULL);
     }
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNum], 0, 0);
 
-    buffer = (memaddr *) FLASHSTART + (flashNum * PAGESIZE);
+    buffer = (memaddr *)(FLASHSTART + (flashNum * PAGESIZE));
+    memaddr *originBuff = buffer;
 
     int i;
     for (i = 0; i < PAGESIZE / WORDLEN; i++) {
         *buffer++ = *virtualAddr++;
     }
 
-    device_status = flashOp(flashNum, sector, (memaddr)buffer, FLASHWRITE);
+    flashDevice = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNum * DEVREGSIZE));
+    maxBlock = flashDevice->d_data1;
+
+    if (sector >= maxBlock) {
+        get_nuked(NULL);
+    }
+
+    command = FLASHWRITE | (sector << FLASHADDRSHIFT);
+    flashDevice->d_data0 = (memaddr)originBuff;
+
+    setSTATUS(NO_INTS);
+    flashDevice->d_command = command;
+    device_status = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
+    setSTATUS(YES_INTS);
 
     SYSCALL(VERHOGEN, (memaddr)&devSema4_support[DEV_UNITS + flashNum], 0, 0);
 
@@ -318,33 +288,44 @@ void flash_put(support_t *current_support) {
  * 5.3 pandos and 5.4 pops
  **************************************************************************************************/
 void flash_get(support_t *current_support) {
-    int flashNum, sector, device_status;  
-    memaddr *buffer;                       
-    memaddr *virtualAddr;                  
+    int flashNum, sector, device_status;
+    memaddr *buffer;
+    memaddr *virtualAddr;
+    device_t *flashDevice;
+    unsigned int command, maxBlock;
 
-    
     virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
     flashNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
     sector = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
 
-    
-    if ((int) virtualAddr < KUSEG) {
-        get_nuked(NULL);  
+    if ((int)virtualAddr < KUSEG) {
+        get_nuked(NULL);
     }
 
-   
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNum], 0, 0);
 
-   
-    buffer = (memaddr *) FLASHSTART + (flashNum * PAGESIZE);
+    buffer = (memaddr *)(FLASHSTART + (flashNum * PAGESIZE));
+    memaddr *originBuff = buffer;
 
-    
-    device_status = flashOp(flashNum, sector, (memaddr) buffer, FLASHREAD);
+    flashDevice = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNum * DEVREGSIZE));
+    maxBlock = flashDevice->d_data1;
+
+    if (sector >= maxBlock) {
+        get_nuked(NULL);
+    }
+
+    command = FLASHREAD | (sector << FLASHADDRSHIFT);
+    flashDevice->d_data0 = (memaddr)originBuff;
+
+    setSTATUS(NO_INTS);
+    flashDevice->d_command = command;
+    device_status = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
+    setSTATUS(YES_INTS);
 
     if (device_status == READY) {
         int i;
         for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-            *virtualAddr++ = *buffer++;  
+            *virtualAddr++ = *buffer++;
         }
     }
 
@@ -355,37 +336,4 @@ void flash_get(support_t *current_support) {
 
 
 
-
-int flashOp(int flashNum, int sector, int buffer, int operation) {
-    unsigned int command;   
-    device_t *flashDevice; 
-    unsigned int maxBlock; 
-
-    flashDevice = (device_t *) (DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNum * DEVREGSIZE));
-    maxBlock = flashDevice->d_data1; 
-
-    if (sector >= maxBlock) {
-        get_nuked(NULL); 
-    }
-
-    if (operation == FLASHREAD) {
-        command = FLASHREAD | (sector << FLASHADDRSHIFT);  
-    } else if (operation == FLASHWRITE) {
-        command = FLASHWRITE | (sector << FLASHADDRSHIFT);
-    } else {
-        return -1; 
-    }
-
-    flashDevice->d_data0 = buffer;
-
-
-    setSTATUS(NO_INTS);
-    flashDevice->d_command = command; 
-    
-    unsigned int deviceStatus = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
-    
-    setSTATUS(YES_INTS);
-
-    return deviceStatus;  
-}
 

@@ -262,7 +262,7 @@
 #define DISKSTART (FRAMEADDRSHIFT + (PAGESIZE * SWAP_POOL_CAP)) /*disk dma buffers placed after swap pool (for now)*/
 #define FLASHSTART (DISKSTART + (DEV_UNITS * PAGESIZE)) /*flash dma buffers after disk buffers*/
 
-#define BLOCKS_4KB PAGESIZE/WORDLEN
+#define BLOCKS_4KB 1024
 
 #endif
 

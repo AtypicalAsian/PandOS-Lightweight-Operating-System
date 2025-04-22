@@ -148,7 +148,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     /* Validate the sector address, where we perform WRITE operation into 
      * if it's not outside of U's proc logical address 
      */
-    if (sectNo < 0 || sectNo >= (maxCyl * maxHd * maxSect)) {
+    if (sectNo < 0 || sectNo >= (maxCyl * maxHd * maxSect) || logicalAddr < KUSEG) {
         get_nuked(NULL);
     }
 
@@ -182,8 +182,8 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         if (status != READY){
             status = -(status);
         }
-        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
+        /*SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);*/
+        /*support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;*/
     }
 
     if (status == READY){
@@ -194,6 +194,8 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
             dmaBuffer++;
         }
     }
+    SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
 }
 
 /**************************************************************************************************  

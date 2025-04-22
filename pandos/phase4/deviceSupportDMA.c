@@ -69,7 +69,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     int cyl = sectNo / (maxHd * maxSect);
     int temp = sectNo % (maxHd * maxSect);
     int hd = temp / maxSect;
-    /*int sect = temp % maxSect;*/
+    int sect = temp % maxSect;
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
@@ -96,7 +96,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     else{
         setSTATUS(NO_INTS);
         busRegArea->devreg[diskNo].d_data0 = dmaBuffer;
-        command = (hd << 16) | (sectNo << 8) | 4;
+        command = (hd << 16) | (sect << 8) | 4;
         busRegArea->devreg[diskNo].d_command = command;
 
         status = SYSCALL(WAITIO, DISKINT, diskNo, 0);

@@ -115,7 +115,7 @@ void disk_put(support_t *current_support) {
     maxCount = maxCylinder * maxPlatter * maxSector;
 
     if(((int) virtualAddr < KUSEG) || (sectorNum > maxCount)) {
-        terminate(NULL); 
+        get_nuked(NULL); 
     }
 
     seekCylinder = sectorNum / (maxPlatter * maxSector);
@@ -182,7 +182,7 @@ void disk_put(support_t *current_support) {
     maxCount = maxCylinder * maxPlatter * maxSector;
 
     if(((int) virtualAddr < KUSEG) || (sectorNum > maxCount)) {
-        terminate(NULL); 
+        get_nuked(NULL); 
     }
 
     seekCylinder = sectorNum / (maxPlatter * maxSector);
@@ -236,7 +236,7 @@ void flash_put(support_t *current_support) {
     sector = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
 
     if ((int) virtualAddr < KUSEG) {
-        terminate(NULL);  
+        get_nuked(NULL);  
     }
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNum], 0, 0);
@@ -286,7 +286,7 @@ void flash_get(support_t *current_support) {
 
     
     if ((int) virtualAddr < KUSEG) {
-        terminate(NULL);  
+        get_nuked(NULL);  
     }
 
    
@@ -322,7 +322,7 @@ int flashOp(int flashNum, int sector, int buffer, int operation) {
     maxBlock = flashDevice->d_data1; 
 
     if (sector >= maxBlock) {
-        terminate(NULL); 
+        get_nuked(NULL); 
     }
 
     if (operation == FLASHREAD) {

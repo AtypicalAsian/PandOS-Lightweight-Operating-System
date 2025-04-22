@@ -46,8 +46,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     /*logAddr,diskNo,sectNo,suppStruct*/
     int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
     int seekCylinder, platterNum, device_status; 
-    memaddr *buffer;                              
-    memaddr *virtualAddr;                         
+    memaddr *buffer;                                                       
     devregarea_t *devReg;                         
     unsigned int command;                        
 
@@ -64,7 +63,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     maxSector = (diskPhysicalGeometry & 0x000000FF);
     maxCount = maxCylinder * maxPlatter * maxSector;
 
-    if (((int)virtualAddr < KUSEG) || (sectNo > maxCount)) {
+    if (((int)logicalAddr < KUSEG) || (sectNo > maxCount)) {
         get_nuked(NULL); 
     }
 
@@ -80,7 +79,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     int i;
     for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-        *buffer++ = *virtualAddr++;
+        *buffer++ = *logicalAddr++;
     }
 
     /*Perform disk seek operation + read contents of disk sector*/

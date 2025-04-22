@@ -435,19 +435,19 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
         
         case SYS14:
-            disk_put((int *) a1_val,a2_val,a3_val,currProc_support_struct);
+            disk_put(currProc_support_struct);
             break;
         
         case SYS15:
-            disk_get((int *) a1_val,a2_val,a3_val,currProc_support_struct);
+            disk_get(currProc_support_struct);
             break;
         
         case SYS16:
-            flash_put((int *) a1_val,a2_val,a3_val,currProc_support_struct);
+            flash_put(currProc_support_struct);
             break;
         
         case SYS17:
-            flash_get((int *) a1_val,a2_val,a3_val,currProc_support_struct);
+            flash_get(currProc_support_struct);
             break;
 
         default:

@@ -175,7 +175,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
     else{
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = dmaBuffer;
+        busRegArea->devreg[diskNo].d_data0 = originBuff;
         busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 3;
         status = SYSCALL(SYS5,DISKINT,diskNo,0);
         setSTATUS(YES_INTS);

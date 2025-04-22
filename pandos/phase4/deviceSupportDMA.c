@@ -20,9 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
-
-
+// #include "/usr/include/umps3/umps/libumps.h"
 
 
 /*re-usable*/
@@ -94,18 +92,16 @@ void disk_put(support_t *current_support) {
     int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
     int seekCylinder, platterNum, device_status; 
     int diskNum, sectorNum;                       
-    memaddr *buffer;                             
+    memaddr *buffer;                              
     memaddr *virtualAddr;                         
-    devregarea_t *devReg;                      
-
+    devregarea_t *devReg;                         
+    unsigned int command;                        
 
     devReg = (devregarea_t *) RAMBASEADDR; 
-
 
     virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
     diskNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
     sectorNum = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
-
 
     diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
 
@@ -114,7 +110,7 @@ void disk_put(support_t *current_support) {
     maxSector = (diskPhysicalGeometry & 0x000000FF);
     maxCount = maxCylinder * maxPlatter * maxSector;
 
-    if(((int) virtualAddr < KUSEG) || (sectorNum > maxCount)) {
+    if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
         get_nuked(NULL); 
     }
 
@@ -124,16 +120,38 @@ void disk_put(support_t *current_support) {
     sectorNum = sectorNum % maxSector;
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNum], 0, 0);
-    
+
     buffer = (memaddr *)(DISKSTART + (diskNum * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNum * PAGESIZE));
-    
-    int i;
-    for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-        *buffer++ = *virtualAddr++;  
+
+    for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
+        *buffer++ = *virtualAddr++;
     }
 
-    device_status = diskOp(diskNum, seekCylinder, platterNum, sectorNum, originBuff, 4);
+    /*Perform disk seek operation + read contents of disk sector*/
+    setSTATUS(NO_INTS);
+    command = (seekCylinder << 8) | 2;
+    devReg->devreg[diskNum].d_command = command;
+    device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+
+    setSTATUS(YES_INTS);
+
+    if (device_status == READY) {
+        setSTATUS(NO_INTS);
+        devReg->devreg[diskNum].d_data0 = originBuff;
+
+        command = (platterNum << 16) | (sectorNum << 8) | 4;
+        devReg->devreg[diskNum].d_command = command;
+
+        device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+        setSTATUS(YES_INTS);
+
+        if (device_status != READY) {
+            device_status = -device_status;
+        }
+    } else {
+        device_status = -device_status;
+    }
 
     SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
 
@@ -163,25 +181,24 @@ void disk_put(support_t *current_support) {
     int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
     int seekCylinder, platterNum, device_status; 
     int diskNum, sectorNum;                       
-    memaddr *buffer;                            
-    memaddr *virtualAddr;                        
-    devregarea_t *devReg;                       
+    memaddr *buffer;                              
+    memaddr *virtualAddr;                         
+    devregarea_t *devReg;                         
+    unsigned int command;
 
-
-    devReg = (devregarea_t *) RAMBASEADDR; 
+    devReg = (devregarea_t *) RAMBASEADDR;
 
     virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
     diskNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
     sectorNum = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
-    
-    diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
 
+    diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
     maxCylinder = (diskPhysicalGeometry >> 16);
     maxPlatter = (diskPhysicalGeometry & 0x0000FF00) >> 8;
     maxSector = (diskPhysicalGeometry & 0x000000FF);
     maxCount = maxCylinder * maxPlatter * maxSector;
 
-    if(((int) virtualAddr < KUSEG) || (sectorNum > maxCount)) {
+    if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
         get_nuked(NULL); 
     }
 
@@ -195,11 +212,35 @@ void disk_put(support_t *current_support) {
     buffer = (memaddr *)(DISKSTART + (diskNum * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNum * PAGESIZE));
 
-    device_status = diskOp(diskNum, seekCylinder, platterNum, sectorNum, originBuff, 3);
+    setSTATUS(NO_INTS);
 
-    if(device_status == READY) {
-        int i;
-        for (i = 0; i < PAGESIZE / WORDLEN; i++) {
+    command = (seekCylinder << 8) | 2;
+    devReg->devreg[diskNum].d_command = command;
+    device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+
+    setSTATUS(YES_INTS);
+
+    if (device_status == READY) {
+        setSTATUS(NO_INTS);
+
+        devReg->devreg[diskNum].d_data0 = originBuff;
+
+        command = (platterNum << 16) | (sectorNum << 8) | 3;
+        devReg->devreg[diskNum].d_command = command;
+
+        device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+
+        setSTATUS(YES_INTS);
+
+        if (device_status != READY) {
+            device_status = -device_status;
+        }
+    } else {
+        device_status = -device_status;
+    }
+
+    if (device_status == READY) {
+        for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
             *virtualAddr++ = *buffer++; 
         }
     }

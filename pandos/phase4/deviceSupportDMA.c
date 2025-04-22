@@ -142,7 +142,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
 
     maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> HEADADDRSHIFT;
     maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
     /* Validate the sector address, where we perform WRITE operation into 

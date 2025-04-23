@@ -204,7 +204,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
 
-    current_support->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
 }
 
 /**************************************************************************************************  

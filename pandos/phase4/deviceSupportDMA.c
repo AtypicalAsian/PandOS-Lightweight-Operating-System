@@ -46,72 +46,73 @@
  * 5.2 pandos and 5.3 pops
  **************************************************************************************************/
 void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
+    int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
+    int seekCylinder, platterNum, device_status; 
+    int diskNum, sectorNum;                       
+    memaddr *buffer;                              
+    memaddr *virtualAddr;                         
+    devregarea_t *devReg;                         
+    unsigned int command;                        
 
-    /*Local Variables*/
-    memaddr *dmaBuffer; /*pointer to location of target buffer 4kb block in RAM*/
-    int maxCyl, maxSect, maxHd; /*disk device characteristics*/
-    int status; /*device status*/
+    devReg = (devregarea_t *) RAMBASEADDR; 
 
-    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
+    diskNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
+    sectorNum = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
 
-    maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;
-    maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
+    diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
 
-    /* Validate the sector address, where we perform WRITE operation into 
-     * if it's not outside of U's proc logical address 
-     */
-    if (sectNo < 0 || sectNo > (maxCyl * maxHd * maxSect)) {
-        get_nuked(NULL);
+    maxCylinder = (diskPhysicalGeometry >> 16);
+    maxPlatter = (diskPhysicalGeometry & 0x0000FF00) >> 8;
+    maxSector = (diskPhysicalGeometry & 0x000000FF);
+    maxCount = maxCylinder * maxPlatter * maxSector;
+
+    if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
+        get_nuked(NULL); 
     }
 
-    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
+    seekCylinder = sectorNum / (maxPlatter * maxSector);
+    sectorNum = sectorNum % (maxPlatter * maxSector);
+    platterNum = sectorNum / maxSector;
+    sectorNum = sectorNum % maxSector;
 
-    dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
-    memaddr *originBuff = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNum], 0, 0);
 
-    int cyl = sectNo / (maxHd * maxSect); 
-    int temp = sectNo % (maxHd * maxSect);
-    int hd = temp / maxSect;
+    buffer = (memaddr *)(DISKSTART + (diskNum * PAGESIZE));
+    memaddr *originBuff = (DISKSTART + (diskNum * PAGESIZE));
 
-    int i;
-    for (i = 0; i < BLOCKS_4KB; i++) {
-        *dmaBuffer = *logicalAddr;
-        dmaBuffer++;
-        logicalAddr++;
+    for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
+        *buffer++ = *virtualAddr++;
     }
-    dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo)); /*re-assign to starting address of 4kb block to later use for WRITE operation*/
 
     setSTATUS(NO_INTS);
-    busRegArea->devreg[diskNo].d_command = (cyl << HEADADDRSHIFT) | SEEK_CMD;
-    /* Issue I/O Request to suspend current U's proc until the disk WRITE/READ operation is done */
-    status = SYSCALL(SYS5, DISKINT, diskNo, 0);
+
+    command = (seekCylinder << 8) | 2;
+    devReg->devreg[diskNum].d_command = command;
+    device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+
     setSTATUS(YES_INTS);
 
-    /* If the operation ends with a status other than “Device Ready”
-     * (1), the negative of the completion status is returned in v0*/
-    if (status != READY) {
-        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -(status);
-        return;
-    }
-    else{
+    if (device_status == READY) {
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = (unsigned int) originBuff;
-        unsigned int headField, sectorField;
-        headField = hd << LEFTSHIFT16;
-        sectorField = sectNo << LEFTSHIFT8;
-        busRegArea->devreg[diskNo].d_command = headField | sectorField | WRITEBLK;
+        devReg->devreg[diskNum].d_data0 = originBuff;
 
-        status = SYSCALL(SYS5, DISKINT, diskNo, 0);
+        command = (platterNum << 16) | (sectorNum << 8) | 4;
+        devReg->devreg[diskNum].d_command = command;
+
+        device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
         setSTATUS(YES_INTS);
 
-        if (status != READY) {
-            status = -status;
+        if (device_status != READY) {
+            device_status = -device_status;
         }
-        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
+    } else {
+        device_status = -device_status;
     }
+
+    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+
+    current_support->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
 }
 
 

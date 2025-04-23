@@ -147,6 +147,7 @@
 #define SYS15 15
 #define SYS16 16
 #define SYS17 17
+#define SYS18 18
 
 
 #define TLBS              3
@@ -249,13 +250,22 @@
 #define HEADADDRSHIFT 8
 #define CYLADDRSHIFT 16
 #define RESETACKSHIFT 24
-#define LOWERMASK 0xFF
+#define LOWERMASK 0x000000FF
+#define HEADMASK 0x0000FF00
 #define DISK_RESET 0
 #define DISK_ACK 1
-#define SEEKCYL 2
+#define SEEK_CMD 2
 #define READBLK 3
 #define WRITEBLK 4
 #define DISKREADY 1
+
+#define DISKSTART (FRAMEADDRSHIFT + (PAGESIZE * SWAP_POOL_CAP)) /*disk dma buffers placed after swap pool (for now)*/
+#define FLASHSTART (DISKSTART + (DEV_UNITS * PAGESIZE)) /*flash dma buffers after disk buffers*/
+
+#define BLOCKS_4KB 1024
+#define HEADMASK 0x0000FF00
+#define LEFTSHIFT8 8
+#define LEFTSHIFT16 16
 
 #endif
 

@@ -390,21 +390,24 @@ void syslvl_prgmTrap_handler(support_t *suppStruct)
  **************************************************************************************************/
 void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_requested){
     /*--------------Declare local variables---------------------*/
-    char* virtualAddr;    /*value stored in a1 - here it's the ptr to first char to be written/read*/
-    int length;     /*value stored in a2 - here it's the length of the string to be written/read*/
+    int a1_val; /*value stored in a1*/
+    int a2_val; /*value stored in a2*/
+    int a3_val; /*value stored in a3*/
+    /*char* virtualAddr;*/    /*value stored in a1 - here it's the ptr to first char to be written/read*/
+    /* int length;*/     /*value stored in a2 - here it's the length of the string to be written/read*/
     /*----------------------------------------------------------*/
 
     /* Validate syscall number */
-    if (syscall_num_requested < SYS9 || syscall_num_requested > SYS17) { /*Will have to change for future phases*/
+    if (syscall_num_requested < SYS9 || syscall_num_requested > SYS18) { /*Will have to change for future phases*/
         /* Invalid syscall number, treat as Program Trap */
         syslvl_prgmTrap_handler(currProc_support_struct);
         return;
     }
 
     /*Step 2: Read values in registers a1-a3*/
-    virtualAddr = (char *) currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
-    length = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
-    /*param3 = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/ /*no need for value in a3 yet*/  
+    a1_val = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    a2_val = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+    a3_val = currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
 
     /*Step 3: Increment PC+4 to execute next instruction on return*/
     currProc_support_struct->sup_exceptState[GENERALEXCEPT].s_pc += WORDLEN;
@@ -420,31 +423,31 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
 
         case SYS11:
-            write_to_printer(virtualAddr, length, currProc_support_struct);
+            write_to_printer((char *) a1_val, a2_val, currProc_support_struct);
             break;
 
         case SYS12:
-            write_to_terminal(virtualAddr, length, currProc_support_struct);  
+            write_to_terminal((char *) a1_val, a2_val, currProc_support_struct);  
             break;
 
         case SYS13:
-            read_from_terminal(virtualAddr, currProc_support_struct);
+            read_from_terminal((char *) a1_val, currProc_support_struct);
             break;
         
         case SYS14:
-            disk_put();
+            disk_put((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS15:
-            disk_get();
+            disk_get((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS16:
-            flash_put();
+            flash_put((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         
         case SYS17:
-            flash_get();
+            flash_get((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
             break;
 
         default:

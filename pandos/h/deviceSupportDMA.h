@@ -10,10 +10,10 @@
 #include "../h/types.h"
 #include "../h/const.h"
 
-void disk_put(int *logicalAddr, int diskNo, int sectNo, support_t *support_struct); /*sys14*/
-void disk_get(int *logicalAddr, int diskNo, int sectNo, support_t *support_struct); /*sys15*/
-void flash_put(); /*sys16*/
-void flash_get(); /*sys17*/
+void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct); /*sys14 - disk WRITE*/
+void disk_get(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct); /*sys15 - disk READ*/
+void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct); /*sys16 - flash WRITE*/
+void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct); /*sys17 - flash READ*/
  
 
 

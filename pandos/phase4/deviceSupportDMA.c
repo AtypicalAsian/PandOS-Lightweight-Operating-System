@@ -55,7 +55,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
 
     maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> HEADADDRSHIFT;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;
     maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
     /* Validate the sector address, where we perform WRITE operation into 
@@ -82,7 +82,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo)); /*re-assign to starting address of 4kb block to later use for WRITE operation*/
 
     setSTATUS(NO_INTS);
-    busRegArea->devreg[diskNo].d_command = (cyl << HEADADDRSHIFT) | SEEKCYL;
+    busRegArea->devreg[diskNo].d_command = (cyl << HEADADDRSHIFT) | SEEK_CMD;
     /* Issue I/O Request to suspend current U's proc until the disk WRITE/READ operation is done */
     status = SYSCALL(SYS5, DISKINT, diskNo, 0);
     setSTATUS(YES_INTS);
@@ -97,7 +97,10 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     else{
         setSTATUS(NO_INTS);
         busRegArea->devreg[diskNo].d_data0 = (unsigned int) dmaBuffer;
-        busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 4;
+        unsigned int headField, sectorField;
+        headField = hd << LEFTSHIFT16;
+        sectorField = sectNo << LEFTSHIFT8;
+        busRegArea->devreg[diskNo].d_command = headField | sectorField | WRITEBLK;
 
         status = SYSCALL(SYS5, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
@@ -142,7 +145,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     /*Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect*/
     maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> HEADADDRSHIFT;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;
     maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
     /*Validate sector number to ensure it's within disk capacity (prevent invalid access)*/
@@ -165,7 +168,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     /*Perform seek to correct sector*/
     setSTATUS(NO_INTS);
-    busRegArea->devreg[diskNo].d_command = (cyl << 8) | 2; /*issue command to seek to correct sector*/
+    busRegArea->devreg[diskNo].d_command = (cyl << LEFTSHIFT8) | SEEK_CMD; /*issue command to seek to correct sector*/
     status = SYSCALL(SYS5, DISKINT, diskNo, 0); /*Block current process until seek completes*/
     setSTATUS(YES_INTS); 
 
@@ -178,7 +181,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     else{/*If successful SEEK -> then continue with READ operation*/
         setSTATUS(NO_INTS);
         busRegArea->devreg[diskNo].d_data0 = (unsigned int) dmaBuffer; /*set data0 to address of 4kb buffer to read from*/
-        busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 3; /*issue command to READ from target sector*/
+        busRegArea->devreg[diskNo].d_command = (hd << LEFTSHIFT16) | (sectNo << LEFTSHIFT8) | READBLK; /*issue command to READ from target sector*/
         status = SYSCALL(SYS5, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
 

@@ -254,7 +254,7 @@
 #define HEADMASK 0x0000FF00
 #define DISK_RESET 0
 #define DISK_ACK 1
-#define SEEKCYL 2
+#define SEEK_CMD 2
 #define READBLK 3
 #define WRITEBLK 4
 #define DISKREADY 1
@@ -263,6 +263,9 @@
 #define FLASHSTART (DISKSTART + (DEV_UNITS * PAGESIZE)) /*flash dma buffers after disk buffers*/
 
 #define BLOCKS_4KB 1024
+#define HEADMASK 0x0000FF00
+#define LEFTSHIFT8 8
+#define LEFTSHIFT16 16
 
 #endif
 

@@ -163,9 +163,10 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
+    /*copy data from buffer into uproc address*/
     int i;
     for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-        *buffer++ = *logicalAddr++;
+        *logicalAddr++ = *buffer++;
     }
 
 

@@ -68,6 +68,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
 
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
+    memaddr *originBuff = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
 
     int cyl = sectNo / (maxHd * maxSect); 
     int temp = sectNo % (maxHd * maxSect);
@@ -96,7 +97,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
     else{
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = (unsigned int) dmaBuffer;
+        busRegArea->devreg[diskNo].d_data0 = (unsigned int) originBuff;
         unsigned int headField, sectorField;
         headField = hd << LEFTSHIFT16;
         sectorField = sectNo << LEFTSHIFT8;

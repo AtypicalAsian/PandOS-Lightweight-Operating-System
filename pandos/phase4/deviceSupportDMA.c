@@ -65,14 +65,14 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         get_nuked(NULL);
     }
 
+    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
+
+    dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
+
     int cyl = sectNo / (maxHd * maxSect); 
     int temp = sectNo % (maxHd * maxSect);
     int hd = temp / maxSect;
     int sect = temp % maxSect;
-
-    dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
-
-    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
 
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
@@ -199,7 +199,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         int i;
         /*Copy contents of dma buffer to uproc's logical address space*/
         for (i = 0; i < BLOCKS_4KB; i++) {
-            *logicalAddr++ = *dmaBuffer++; 
+            *logicalAddr = *dmaBuffer;
+            logicalAddr++;
+            dmaBuffer++;
         }
     }
 }

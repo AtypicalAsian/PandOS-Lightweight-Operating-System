@@ -75,7 +75,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     /*Copy contents from uproc logical address 4kb block to dma buffer*/
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
-        *dmaBuffer++ = *logicalAddr++;
+        *dmaBuffer = *logicalAddr;
+        dmaBuffer++;
+        logicalAddr++;
     }
     dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE)); /*reset to issue correct starting address for WRITE*/
 
@@ -162,7 +164,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     sectNo = sectNo % (maxHead * maxSect);
     headNum = sectNo / maxSect;
     sectNo = sectNo % maxSect;
-
 
     setSTATUS(NO_INTS);
 

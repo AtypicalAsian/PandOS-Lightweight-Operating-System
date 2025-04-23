@@ -148,9 +148,12 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     busRegArea = (devregarea_t *) RAMBASEADDR;
 
     /*diskPhysicalGeometry = busRegArea->devreg[diskNo].d_data1;*/
-    maxCyl = (busRegArea->devreg[diskNo].d_data1 >> 16);
-    maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> 8;
-    maxSect = (busRegArea->devreg[diskNo].d_data1 & 0x000000FF);
+    
+    /*maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> 8;*/
+
+    maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
+    maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
     if (((int)logicalAddr < KUSEG) || (sectNo > (maxCyl * maxSect * maxHd))) {
         get_nuked(NULL); 
@@ -169,7 +172,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     setSTATUS(NO_INTS);
 
     command = (cyl << 8) | 2;
-    busRegArea->devreg[diskNo].d_command = command;
+    busRegArea->devreg[diskNo].d_command = (cyl << 8) | 2;
     status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
 
     setSTATUS(YES_INTS);
@@ -180,7 +183,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         busRegArea->devreg[diskNo].d_data0 = originBuff;
 
         command = (hd << 16) | (sectNo << 8) | 3;
-        busRegArea->devreg[diskNo].d_command = command;
+        busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 3;
 
         status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
 
@@ -195,7 +198,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     if (status == READY) {
         int i;
-        for (i = 0; i < PAGESIZE / WORDLEN; i++) {
+        for (i = 0; i < BLOCKS_4KB; i++) {
             *logicalAddr++ = *buffer++; 
         }
     }

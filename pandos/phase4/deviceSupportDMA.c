@@ -75,7 +75,8 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
-    for (int i = 0; i < BLOCKS_4KB; i++) {
+    int i;
+    for (i = 0; i < BLOCKS_4KB; i++) {
         *buffer++ = *logicalAddr++;
     }
 

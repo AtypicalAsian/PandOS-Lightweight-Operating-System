@@ -181,7 +181,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
         devReg->devreg[diskNum].d_data0 = originBuff;
 
-        command = (platterNum << 16) | (sectorNum << 8) | 3; // 3 = read
+        command = (platterNum << 16) | (sectorNum << 8) | 3;
         devReg->devreg[diskNum].d_command = command;
 
         device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);

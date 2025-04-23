@@ -46,7 +46,7 @@
  * 5.2 pandos and 5.3 pops
  **************************************************************************************************/
 void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
-    int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
+    int maxPlatter, maxSector, maxCylinder; 
     int seekCylinder, platterNum, device_status; 
     int diskNum, sectorNum;                       
     memaddr *buffer;                              
@@ -59,14 +59,11 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
     sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
 
-    diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
+    maxCylinder = (devReg->devreg[diskNum].d_data1; >> CYLADDRSHIFT);
+    maxPlatter = (devReg->devreg[diskNum].d_data1; & HEADMASK) >> HEADADDRSHIFT;
+    maxSector = (devReg->devreg[diskNum].d_data1; & LOWERMASK);
 
-    maxCylinder = (diskPhysicalGeometry >> CYLADDRSHIFT);
-    maxPlatter = (diskPhysicalGeometry & HEADMASK) >> HEADADDRSHIFT;
-    maxSector = (diskPhysicalGeometry & LOWERMASK);
-    maxCount = maxCylinder * maxPlatter * maxSector;
-
-    if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
+    if (((int)virtualAddr < KUSEG) || (sectorNum > (maxCylinder * maxPlatter * maxSector))) {
         get_nuked(NULL); 
     }
 
@@ -138,7 +135,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  **************************************************************************************************/
 
  void disk_get(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
-    int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
+    int maxPlatter, maxSector, maxCylinder; 
     int seekCylinder, platterNum, device_status; 
     int diskNum, sectorNum;                       
     memaddr *buffer;                              
@@ -151,13 +148,11 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
     sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
 
-    diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
-    maxCylinder = (diskPhysicalGeometry >> CYLADDRSHIFT);
-    maxPlatter = (diskPhysicalGeometry & HEADMASK) >> HEADADDRSHIFT;
-    maxSector = (diskPhysicalGeometry & LOWERMASK);
-    maxCount = maxCylinder * maxPlatter * maxSector;
+    maxCylinder = (devReg->devreg[diskNum].d_data1; >> CYLADDRSHIFT);
+    maxPlatter = (devReg->devreg[diskNum].d_data1; & HEADMASK) >> HEADADDRSHIFT;
+    maxSector = (devReg->devreg[diskNum].d_data1; & LOWERMASK);
 
-    if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
+    if (((int)virtualAddr < KUSEG) || (sectorNum > (maxCylinder * maxPlatter * maxSector))) {
         get_nuked(NULL); 
     }
 

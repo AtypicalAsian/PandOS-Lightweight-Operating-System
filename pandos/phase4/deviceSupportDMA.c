@@ -135,77 +135,67 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  **************************************************************************************************/
 
  void disk_get(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
-    /*Local Variables*/
-    memaddr *dmaBuffer; /*pointer to location of target buffer 4kb block in RAM*/
-    int maxCyl, maxSect, maxHd; /*disk device characteristics*/
-    int status; /*device status*/
-    devregarea_t *busRegArea;                                
+    int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
+    int seekCylinder, platterNum, device_status; 
+    memaddr *buffer;                                                       
+    devregarea_t *devReg;                         
+    unsigned int command;       
+    
+    devReg = (devregarea_t *) RAMBASEADDR;
+    diskPhysicalGeometry = devReg->devreg[diskNo].d_data1;
 
-    busRegArea = (devregarea_t *) RAMBASEADDR;
+    maxCylinder = (diskPhysicalGeometry >> 16);
+    maxPlatter = (diskPhysicalGeometry & 0x0000FF00) >> 8;
+    maxSector = (diskPhysicalGeometry & 0x000000FF);
+    maxCount = maxCylinder * maxPlatter * maxSector;
 
-    /*Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect*/
-    maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;
-    maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
-
-    /*Validate sector number to ensure it's within disk capacity (prevent invalid access)*/
-    if ((sectNo < 0) || ((int)logicalAddr < KUSEG) || (sectNo > (maxCyl * maxSect * maxHd))) {
+    if (((int)logicalAddr < KUSEG) || (sectNo > maxCount)) {
         get_nuked(NULL); 
     }
 
-    /*Lock target disk device semaphore*/
-    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
+    seekCylinder = sectNo / (maxPlatter * maxSector);
+    sectNo = sectNo % (maxPlatter * maxSector);
+    platterNum = sectNo / maxSector;
+    sectNo = sectNo % maxSector;
 
-    /*Locate appropriate disk DMA buffer in RAM*/
-    dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
-    /*Convert the linear sector number into its 3D physical representation: cylinder, head, and sector*/
-    int cyl = sectNo / (maxHd * maxSect);
-    sectNo = sectNo % (maxHd * maxSect);
-    int hd = sectNo / maxSect;
-    sectNo = sectNo % maxSect;
+    buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
-
-    /*Perform seek to correct sector*/
-    setSTATUS(NO_INTS);
-    busRegArea->devreg[diskNo].d_command = (cyl << LEFTSHIFT8) | SEEK_CMD; /*issue command to seek to correct sector*/
-    status = SYSCALL(SYS5, DISKINT, diskNo, 0); /*Block current process until seek completes*/
-    setSTATUS(YES_INTS); 
-
-
-    if (status != READY){ /*If SEEK unsuccessful -> write -status into v0 and unlock semaphore*/
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -(status);
-        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
-        return;
+    int i;
+    for (i = 0; i < PAGESIZE / WORDLEN; i++) {
+        *logicalAddr++ = *buffer++;
     }
-    else{/*If successful SEEK -> then continue with READ operation*/
+
+    /*Perform disk seek operation + read contents of disk sector*/
+    setSTATUS(NO_INTS);
+    command = (seekCylinder << 8) | 2;
+    devReg->devreg[diskNo].d_command = command;
+    device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
+
+    setSTATUS(YES_INTS);
+
+    if (device_status == READY) {
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = (unsigned int) dmaBuffer; /*set data0 to address of 4kb buffer to read from*/
-        busRegArea->devreg[diskNo].d_command = (hd << LEFTSHIFT16) | (sectNo << LEFTSHIFT8) | READBLK; /*issue command to READ from target sector*/
-        status = SYSCALL(SYS5, DISKINT, diskNo, 0);
+        devReg->devreg[diskNo].d_data0 = originBuff;
+
+        command = (platterNum << 16) | (sectNo << 8) | 4;
+        devReg->devreg[diskNo].d_command = command;
+
+        device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
 
-        if (status != READY){ /*Write result of disk READ into v0 register*/
-            support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
+        if (device_status != READY) {
+            device_status = -device_status;
         }
-        else{
-            support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
-        }
-        
-        /*Unlock target disk device semaphore*/
-        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
+    } else {
+        device_status = -device_status;
     }
 
-    /*If READ was successful*/
-    if (status == READY) {
-        int i;
-        /*Copy contents of dma buffer to uproc's logical address space*/
-        for (i = 0; i < BLOCKS_4KB; i++) {
-            *logicalAddr = *dmaBuffer;
-            logicalAddr++;
-            dmaBuffer++;
-        }
-    }
+    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
 }
 
 /**************************************************************************************************  

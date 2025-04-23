@@ -144,9 +144,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     devReg = (devregarea_t *) RAMBASEADDR;
 
-    virtualAddr = (memaddr *) current_support->sup_exceptState[GENERALEXCEPT].s_a1;
-    diskNum = current_support->sup_exceptState[GENERALEXCEPT].s_a2;
-    sectorNum = current_support->sup_exceptState[GENERALEXCEPT].s_a3;
+    virtualAddr = (memaddr *) support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
+    diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+    sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
 
     diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
     maxCylinder = (diskPhysicalGeometry >> 16);

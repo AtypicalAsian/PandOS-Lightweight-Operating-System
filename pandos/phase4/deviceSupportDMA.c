@@ -172,23 +172,23 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     status = SYSCALL(SYS5, DISKINT, diskNo, 0); /*Block current process until seek completes*/
 
     setSTATUS(YES_INTS); 
-
-    if (status == READY) { /*If seek was successful -> then we perform READ operation*/
+    if (status != READY){
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -(status);
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
+    }
+    else{/*If successful SEEK -> then continue with READ operation*/
         setSTATUS(NO_INTS);
-
         busRegArea->devreg[diskNo].d_data0 = originBuff; /*set data0 to address of 4kb buffer to read from*/
         busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 3; /*issue command to READ from target sector*/
-
         status = SYSCALL(SYS5, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
-
-        if (status != READY) {
-            status = -status;
-        }
-    } else {
-        status = -status;
+        
+        /*Unlock target disk device semaphore*/
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
     }
 
+    /*If READ was successful*/
     if (status == READY) {
         int i;
         /*Copy contents of dma buffer to uproc's logical address space*/
@@ -196,11 +196,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
             *logicalAddr++ = *dmaBuffer++; 
         }
     }
-
-    /*Unlock target disk device semaphore*/
-    SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
-
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
 }
 
 /**************************************************************************************************  

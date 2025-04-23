@@ -72,7 +72,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     int cyl = sectNo / (maxHd * maxSect); 
     int temp = sectNo % (maxHd * maxSect);
     int hd = temp / maxSect;
-    int sect = temp % maxSect;
 
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
@@ -97,7 +96,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
     else{
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = dmaBuffer;
+        busRegArea->devreg[diskNo].d_data0 = (unsigned int) dmaBuffer;
         busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 4;
 
         status = SYSCALL(SYS5, DISKINT, diskNo, 0);
@@ -178,7 +177,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
     else{/*If successful SEEK -> then continue with READ operation*/
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = dmaBuffer; /*set data0 to address of 4kb buffer to read from*/
+        busRegArea->devreg[diskNo].d_data0 = (unsigned int) dmaBuffer; /*set data0 to address of 4kb buffer to read from*/
         busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 3; /*issue command to READ from target sector*/
         status = SYSCALL(SYS5, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);

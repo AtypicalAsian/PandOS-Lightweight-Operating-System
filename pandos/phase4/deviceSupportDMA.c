@@ -208,7 +208,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
             dmaBuffer++;
         }
 
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = READY;
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
         SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0); /*release disk device semaphore*/
     }
 }

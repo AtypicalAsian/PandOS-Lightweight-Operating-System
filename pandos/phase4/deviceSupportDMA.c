@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 /**************************************************************************************************  
  * Writes data from given memory address to specific disk device (diskNo)
@@ -146,7 +146,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     busRegArea = (devregarea_t *) RAMBASEADDR;
 
     maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> HEADADDRSHIFT;
     maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
     if (((int)logicalAddr < KUSEG) || (sectNo > (maxCyl * maxSect * maxHd))) {

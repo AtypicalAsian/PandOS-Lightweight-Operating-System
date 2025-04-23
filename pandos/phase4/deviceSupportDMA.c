@@ -182,10 +182,16 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         busRegArea->devreg[diskNo].d_command = (hd << 16) | (sectNo << 8) | 3; /*issue command to READ from target sector*/
         status = SYSCALL(SYS5, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
+
+        if (status != READY){ /*Write result of disk READ into v0 register*/
+            support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
+        }
+        else{
+            support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
+        }
         
         /*Unlock target disk device semaphore*/
         SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
     }
 
     /*If READ was successful*/

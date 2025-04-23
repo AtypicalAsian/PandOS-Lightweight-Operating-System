@@ -90,7 +90,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     setSTATUS(NO_INTS);
 
     command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
-    devReg->devreg[diskNum].d_command = command;
+    devReg->devreg[diskNum].d_command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
     device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
 
     setSTATUS(YES_INTS);
@@ -100,7 +100,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         devReg->devreg[diskNum].d_data0 = originBuff;
 
         command = (platterNum << LEFTSHIFT16) | (sectorNum << LEFTSHIFT8) | WRITEBLK;
-        devReg->devreg[diskNum].d_command = command;
+        unsigned int headField = platterNum << LEFTSHIFT16;
+        unsigned int sectorField = sectorNum << LEFTSHIFT8;
+        devReg->devreg[diskNum].d_command = headField | sectorField | WRITEBLK;
 
         device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
         setSTATUS(YES_INTS);
@@ -203,7 +205,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     if (device_status == READY) {
         int i;
-        for (i = 0; i < PAGESIZE / WORDLEN; i++) {
+        for (i = 0; i < BLOCKS_4KB; i++) {
             *virtualAddr++ = *buffer++; 
         }
     }

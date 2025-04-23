@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 /**************************************************************************************************  
  * Writes data from given memory address to specific disk device (diskNo)
@@ -137,69 +137,69 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  void disk_get(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
     int maxPlatter, maxSector, maxCylinder; 
     int seekCylinder, platterNum, device_status; 
-    int diskNum, sectorNum;                       
+    /*int diskNum, sectorNum;*/                       
     memaddr *buffer;                              
-    memaddr *virtualAddr;                         
+    /*memaddr *virtualAddr;*/                         
     devregarea_t *devReg;                         
 
     devReg = (devregarea_t *) RAMBASEADDR;
 
-    virtualAddr = (memaddr *) support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
-    diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
-    sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
+    /*virtualAddr = (memaddr *) support_struct->sup_exceptState[GENERALEXCEPT].s_a1;*/
+    /*diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;*/
+    /*sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/
 
-    maxCylinder = (devReg->devreg[diskNum].d_data1 >> CYLADDRSHIFT);
-    maxPlatter = (devReg->devreg[diskNum].d_data1 & HEADMASK) >> HEADADDRSHIFT;
-    maxSector = (devReg->devreg[diskNum].d_data1 & LOWERMASK);
+    maxCylinder = (devReg->devreg[diskNo].d_data1 >> CYLADDRSHIFT);
+    maxPlatter = (devReg->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;
+    maxSector = (devReg->devreg[diskNo].d_data1 & LOWERMASK);
 
-    if (((int)virtualAddr < KUSEG) || (sectorNum > (maxCylinder * maxPlatter * maxSector))) {
+    if (((int)logicalAddr < KUSEG) || (sectNo > (maxCylinder * maxPlatter * maxSector))) {
         get_nuked(NULL); 
     }
 
-    seekCylinder = sectorNum / (maxPlatter * maxSector);
-    sectorNum = sectorNum % (maxPlatter * maxSector);
-    platterNum = sectorNum / maxSector;
-    sectorNum = sectorNum % maxSector;
+    seekCylinder = sectNo / (maxPlatter * maxSector);
+    sectNo = sectNo % (maxPlatter * maxSector);
+    platterNum = sectNo / maxSector;
+    sectNo = sectNo % maxSector;
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNum], 0, 0);
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
-    buffer = (memaddr *)(DISKSTART + (diskNum * PAGESIZE));
-    memaddr *originBuff = (DISKSTART + (diskNum * PAGESIZE));
+    buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
     setSTATUS(NO_INTS);
 
-    devReg->devreg[diskNum].d_command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
-    device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+    devReg->devreg[diskNo].d_command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
+    device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
 
     setSTATUS(YES_INTS);
 
     if (device_status != READY) {
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -device_status;
-        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
         return;
     } else {
         setSTATUS(NO_INTS);
-        devReg->devreg[diskNum].d_data0 = originBuff;
+        devReg->devreg[diskNo].d_data0 = originBuff;
     
         unsigned int headField = platterNum << LEFTSHIFT16;
-        unsigned int sectorField = sectorNum << LEFTSHIFT8;
-        devReg->devreg[diskNum].d_command = headField | sectorField | READBLK;
+        unsigned int sectorField = sectNo << LEFTSHIFT8;
+        devReg->devreg[diskNo].d_command = headField | sectorField | READBLK;
     
-        device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+        device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
     
         if (device_status != READY) {
             support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -device_status;
-            SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+            SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
             return;
         }
         int i;
         for (i = 0; i < BLOCKS_4KB; i++) {
-            *virtualAddr++ = *buffer++;
+            *logicalAddr++ = *buffer++;
         }
     
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = READY;
-        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
     }
 }
 

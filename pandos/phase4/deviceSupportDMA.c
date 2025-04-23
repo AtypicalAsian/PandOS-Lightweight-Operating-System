@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 /**************************************************************************************************  
  * Writes data from given memory address to specific disk device (diskNo)
@@ -136,55 +136,55 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  void disk_get(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
     int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount; 
     int seekCylinder, platterNum, device_status; 
-    int diskNum, sectorNum;                       
+    /*int diskNum, sectorNum;*/                       
     memaddr *buffer;                              
-    memaddr *virtualAddr;                         
+    /*memaddr *virtualAddr;*/                         
     devregarea_t *devReg;                         
     unsigned int command;
 
     devReg = (devregarea_t *) RAMBASEADDR;
 
-    virtualAddr = (memaddr *) support_struct->sup_exceptState[GENERALEXCEPT].s_a1;
-    diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
-    sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
+    /*virtualAddr = (memaddr *) support_struct->sup_exceptState[GENERALEXCEPT].s_a1;*/
+    /*diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;*/
+    /*sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/
 
-    diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
+    diskPhysicalGeometry = devReg->devreg[diskNo].d_data1;
     maxCylinder = (diskPhysicalGeometry >> 16);
     maxPlatter = (diskPhysicalGeometry & 0x0000FF00) >> 8;
     maxSector = (diskPhysicalGeometry & 0x000000FF);
     maxCount = maxCylinder * maxPlatter * maxSector;
 
-    if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
+    if (((int)logicalAddr < KUSEG) || (sectNo > maxCount)) {
         get_nuked(NULL); 
     }
 
-    seekCylinder = sectorNum / (maxPlatter * maxSector);
-    sectorNum = sectorNum % (maxPlatter * maxSector);
-    platterNum = sectorNum / maxSector;
-    sectorNum = sectorNum % maxSector;
+    seekCylinder = sectNo / (maxPlatter * maxSector);
+    sectNo = sectNo % (maxPlatter * maxSector);
+    platterNum = sectNo / maxSector;
+    sectNo = sectNo % maxSector;
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNum], 0, 0);
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
-    buffer = (memaddr *)(DISKSTART + (diskNum * PAGESIZE));
-    memaddr *originBuff = (DISKSTART + (diskNum * PAGESIZE));
+    buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
     setSTATUS(NO_INTS);
 
     command = (seekCylinder << 8) | 2;
-    devReg->devreg[diskNum].d_command = command;
-    device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+    devReg->devreg[diskNo].d_command = command;
+    device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
 
     setSTATUS(YES_INTS);
 
     if (device_status == READY) {
         setSTATUS(NO_INTS);
 
-        devReg->devreg[diskNum].d_data0 = originBuff;
+        devReg->devreg[diskNo].d_data0 = originBuff;
 
-        command = (platterNum << 16) | (sectorNum << 8) | 3;
-        devReg->devreg[diskNum].d_command = command;
+        command = (platterNum << 16) | (sectNo << 8) | 3;
+        devReg->devreg[diskNo].d_command = command;
 
-        device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
+        device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
 
         setSTATUS(YES_INTS);
 
@@ -198,11 +198,11 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     if (device_status == READY) {
         int i;
         for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-            *virtualAddr++ = *buffer++; 
+            *logicalAddr++ = *buffer++; 
         }
     }
 
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
 }

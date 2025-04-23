@@ -29,8 +29,8 @@
  *  1. Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect
  *  2. Validate sector number to ensure it's within disk capacity (prevent invalid access)
  *  3. Convert the linear sector number into its 3D physical representation: cylinder, head, and sector.
- *  4. Lock target disk device semaphore
- *  5. Locate appropriate disk DMA buffer in RAM
+ *  4. Locate appropriate disk DMA buffer in RAM
+ *  5. Lock target disk device semaphore
  *  6. Copy 4KB from the uproc's logical address space into the disk's DMA buffer.
  *  7. Initiate a SEEK command by writing the appropriate value into the command register to move the disk head to the correct cylinder.
  *  8. Block current process on ASL while waiting for SEEK operation to complete
@@ -70,8 +70,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     int hd = temp / maxSect;
     int sect = temp % maxSect;
 
-    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
     dmaBuffer = (memaddr *)(DISKSTART + (PAGESIZE * diskNo));
+
+    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
 
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
@@ -118,15 +119,13 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  *  1. Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect
  *  2. Validate sector number to ensure it's within disk capacity (prevent invalid access)
  *  3. Convert the linear sector number into its 3D physical representation: cylinder, head, and sector.
- *  4. Lock target disk device semaphore
- *  5. Locate appropriate disk DMA buffer in RAM
+ *  4. Locate appropriate disk DMA buffer in RAM
+ *  5. Lock target disk device semaphore
  *  6. Perform seek to correct sector
  *  7. Perform read to transfer data from disk sector to device DMA buffer
  *  8. Copy data from DMA buffer into requesting uproc address space starting from provided start address
  *  9. Release the target disk device semaphore
  * 10. Store the final status of the operation (success or error code) into the v0 register of the exception state.
- * 
- * 
  * 
  * 
  * @ref
@@ -159,12 +158,12 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     int hd = sectNo / maxSect;
     sectNo = sectNo % maxSect;
 
-    /*Lock target disk device semaphore*/
-    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
-
     /*Locate appropriate disk DMA buffer in RAM*/
     dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
+
+    /*Lock target disk device semaphore*/
+    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
 
     /*Perform seek to correct sector*/
     setSTATUS(NO_INTS);

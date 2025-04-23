@@ -14,11 +14,11 @@ void main() {
     int fstatus;
     int *buffer;
 
-    buffer = (int *)(SEG2 + (20 * PAGESIZE)); // User space buffer
+    buffer = (int *)(SEG2 + (20 * PAGESIZE));
 
     print(WRITETERMINAL, "flashTest starts\n");
 
-    // Write 123 to FLASH block 5
+    /*Write 123 to FLASH block 5*/
     *buffer = 123;
     fstatus = SYSCALL(FLASH_PUT, (int)buffer, FLASH_UNIT, FLASH_TEST_BLOCK_1);
     if (fstatus != READY)
@@ -26,25 +26,24 @@ void main() {
     else
         print(WRITETERMINAL, "flashTest ok: flash write result\n");
 
-    // Overwrite buffer with 999 and write to FLASH block 10
+    /*Overwrite buffer with 999 and write to FLASH block 10*/
     *buffer = 999;
     fstatus = SYSCALL(FLASH_PUT, (int)buffer, FLASH_UNIT, FLASH_TEST_BLOCK_2);
 
-    // Read back from FLASH block 5
+    /*Read back from FLASH block 5*/
     fstatus = SYSCALL(FLASH_GET, (int)buffer, FLASH_UNIT, FLASH_TEST_BLOCK_1);
     if (*buffer != 123)
         print(WRITETERMINAL, "flashTest error: bad first flash block readback\n");
     else
         print(WRITETERMINAL, "flashTest ok: first flash block readback\n");
 
-    // Read back from FLASH block 10
+    /*Read back from FLASH block 10*/
     fstatus = SYSCALL(FLASH_GET, (int)buffer, FLASH_UNIT, FLASH_TEST_BLOCK_2);
     if (*buffer != 999)
         print(WRITETERMINAL, "flashTest error: bad second flash block readback\n");
     else
         print(WRITETERMINAL, "flashTest ok: second flash block readback\n");
 
-    // Capacity test: attempt to exceed flash capacity
     i = 0;
     fstatus = SYSCALL(FLASH_GET, (int)buffer, FLASH_UNIT, i);
     while ((fstatus == READY) && (i < MILLION)) {
@@ -59,11 +58,9 @@ void main() {
 
     print(WRITETERMINAL, "flashTest: completed\n");
 
-    // Try reading into protected RAM
     SYSCALL(FLASH_GET, SEG1, FLASH_UNIT, FLASH_TEST_BLOCK_1);
     print(WRITETERMINAL, "flashTest error: just read into segment 1\n");
 
-    // Trigger traps for completeness
     i = i / 0;
     print(WRITETERMINAL, "flashTest error: divide by 0 did not terminate\n");
 

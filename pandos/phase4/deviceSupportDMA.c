@@ -64,7 +64,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     if ( (sectNo < 0) || ((int)logicalAddr < KUSEG) || (sectNo > (maxCyl * maxHead * maxSect))) {
         get_nuked(NULL); 
     }
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
+    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
     dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
 
     cylNum = sectNo / (maxHead * maxSect);
@@ -85,13 +85,13 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     setSTATUS(NO_INTS);
 
     busRegArea->devreg[diskNo].d_command = (cylNum << LEFTSHIFT8) | SEEK_CMD;
-    status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
+    status = SYSCALL(SYS5, DISKINT, diskNo, 0);
 
     setSTATUS(YES_INTS);
 
     if (status != READY){
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
-        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
         return;
     } else{
         setSTATUS(NO_INTS);
@@ -101,7 +101,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         unsigned int sectorField = sectNo << LEFTSHIFT8;
         busRegArea->devreg[diskNo].d_command = headField | sectorField | WRITEBLK;
 
-        status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
+        status = SYSCALL(SYS5, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
 
         if (status == READY) {
@@ -110,7 +110,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         else{
             support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
         }
-        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
     }
 }
 
@@ -155,7 +155,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         get_nuked(NULL); 
     }
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
+    SYSCALL(SYS3, (memaddr)&devSema4_support[diskNo], 0, 0);
 
     dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
@@ -168,13 +168,13 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     setSTATUS(NO_INTS);
 
     busRegArea->devreg[diskNo].d_command = (cylNum << LEFTSHIFT8) | SEEK_CMD;
-    status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
+    status = SYSCALL(SYS5, DISKINT, diskNo, 0);
 
     setSTATUS(YES_INTS);
 
     if (status != READY) {
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
-        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
         return;
     } else {
         setSTATUS(NO_INTS);
@@ -184,21 +184,23 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         unsigned int sectorField = sectNo << LEFTSHIFT8;
         busRegArea->devreg[diskNo].d_command = headField | sectorField | READBLK;
     
-        status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
+        status = SYSCALL(SYS5, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
     
         if (status != READY) {
             support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
-            SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+            SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
             return;
         }
         int i;
         for (i = 0; i < BLOCKS_4KB; i++) {
-            *logicalAddr++ = *dmaBuffer++;
+            *logicalAddr = *dmaBuffer;
+            logicalAddr++;
+            dmaBuffer++;
         }
     
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = READY;
-        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+        SYSCALL(SYS4, (memaddr)&devSema4_support[diskNo], 0, 0);
     }
 }
 

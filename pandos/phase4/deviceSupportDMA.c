@@ -61,7 +61,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     /* Validate the sector address, where we perform WRITE operation into 
      * if it's not outside of U's proc logical address 
      */
-    if (sectNo < 0 || sectNo >= (maxCyl * maxHd * maxSect)) {
+    if (sectNo < 0 || sectNo > (maxCyl * maxHd * maxSect)) {
         get_nuked(NULL);
     }
 

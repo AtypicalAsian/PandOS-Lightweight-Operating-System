@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 /**************************************************************************************************  
  * Writes data from given memory address to specific disk device (diskNo)
@@ -46,63 +46,67 @@
  * 5.2 pandos and 5.3 pops
  **************************************************************************************************/
 void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
-    int maxPlatter, maxSector, maxCylinder; 
-    int seekCylinder, platterNum, device_status; 
-    memaddr *buffer;                              
-    devregarea_t *devReg;                                               
+    /*Local Variables*/
+    memaddr *dmaBuffer;
+    devregarea_t *busRegArea;
+    int maxCyl;
+    int maxHead;
+    int maxSect;
+    int headNum,cylNum;
+    int status;                                        
 
-    devReg = (devregarea_t *) RAMBASEADDR; 
+    busRegArea = (devregarea_t *) RAMBASEADDR; 
 
-    maxCylinder = (devReg->devreg[diskNo].d_data1 >> CYLADDRSHIFT);
-    maxPlatter = (devReg->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;
-    maxSector = (devReg->devreg[diskNo].d_data1 & LOWERMASK);
+    maxCyl = (busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT);
+    maxHead = (busRegArea->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;
+    maxSect = (busRegArea->devreg[diskNo].d_data1 & LOWERMASK);
 
-    if (((int)logicalAddr < KUSEG) || (sectNo > (maxCylinder * maxPlatter * maxSector))) {
+    if (((int)logicalAddr < KUSEG) || (sectNo > (maxCyl * maxHead * maxSect))) {
         get_nuked(NULL); 
     }
 
-    seekCylinder = sectNo / (maxPlatter * maxSector);
-    sectNo = sectNo % (maxPlatter * maxSector);
-    platterNum = sectNo / maxSector;
-    sectNo = sectNo % maxSector;
+    cylNum = sectNo / (maxHead * maxSect);
+    sectNo = sectNo % (maxHead * maxSect);
+    headNum = sectNo / maxSect;
+    sectNo = sectNo % maxSect;
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
-    buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
-        *buffer++ = *logicalAddr++;
+        *dmaBuffer++ = *logicalAddr++;
     }
 
 
     setSTATUS(NO_INTS);
 
-    devReg->devreg[diskNo].d_command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
-    device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
+    busRegArea->devreg[diskNo].d_command = (cylNum << LEFTSHIFT8) | SEEK_CMD;
+    status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
 
     setSTATUS(YES_INTS);
 
-    if (device_status != READY){
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -device_status;
+    if (status != READY){
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
         SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
         return;
     } else{
         setSTATUS(NO_INTS);
-        devReg->devreg[diskNo].d_data0 = originBuff;
+        busRegArea->devreg[diskNo].d_data0 = originBuff;
 
-        unsigned int headField = platterNum << LEFTSHIFT16;
+        unsigned int headField = headNum << LEFTSHIFT16;
         unsigned int sectorField = sectNo << LEFTSHIFT8;
-        devReg->devreg[diskNo].d_command = headField | sectorField | WRITEBLK;
+        busRegArea->devreg[diskNo].d_command = headField | sectorField | WRITEBLK;
 
-        device_status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
+        status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
 
-        if (device_status != READY) {
-            device_status = -device_status;
+        if (status != READY) {
+            status = -status;
         }
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
         SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
     }
 }

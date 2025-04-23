@@ -73,7 +73,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
     dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
-    memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
+    /*memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));*/
 
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
@@ -136,16 +136,10 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  void disk_get(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_struct) {
     int maxPlatter, maxSector, maxCylinder; 
     int seekCylinder, platterNum, device_status; 
-    /*int diskNum, sectorNum;*/                       
     memaddr *buffer;                              
-    /*memaddr *virtualAddr;*/                         
     devregarea_t *devReg;                         
 
     devReg = (devregarea_t *) RAMBASEADDR;
-
-    /*virtualAddr = (memaddr *) support_struct->sup_exceptState[GENERALEXCEPT].s_a1;*/
-    /*diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;*/
-    /*sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;*/
 
     maxCylinder = (devReg->devreg[diskNo].d_data1 >> CYLADDRSHIFT);
     maxPlatter = (devReg->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;

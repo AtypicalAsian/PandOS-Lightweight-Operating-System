@@ -114,10 +114,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
         SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
     }
-
-    /*SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);*/
-
-    /*support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;*/
 }
 
 
@@ -182,35 +178,34 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     setSTATUS(YES_INTS);
 
-    if (device_status == READY) {
+    if (device_status != READY) {
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -device_status;
+        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+        return;
+    } else {
         setSTATUS(NO_INTS);
         devReg->devreg[diskNum].d_data0 = originBuff;
-
+    
         unsigned int headField = platterNum << LEFTSHIFT16;
-        unsigned int sectField = sectorNum << LEFTSHIFT8;
-        devReg->devreg[diskNum].d_command = headField | sectField | READBLK;
-
+        unsigned int sectorField = sectorNum << LEFTSHIFT8;
+        devReg->devreg[diskNum].d_command = headField | sectorField | READBLK;
+    
         device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
-
         setSTATUS(YES_INTS);
-
+    
         if (device_status != READY) {
-            device_status = -device_status;
+            support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -device_status;
+            SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+            return;
         }
-    } else {
-        device_status = -device_status;
-    }
-
-    if (device_status == READY) {
         int i;
         for (i = 0; i < BLOCKS_4KB; i++) {
-            *virtualAddr++ = *buffer++; 
+            *virtualAddr++ = *buffer++;
         }
+    
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = READY;
+        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
     }
-
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
-
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
 }
 
 /**************************************************************************************************  

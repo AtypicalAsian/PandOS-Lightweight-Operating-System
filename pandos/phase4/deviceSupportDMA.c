@@ -231,43 +231,40 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  * 5.3 pandos and 5.4 pops
  **************************************************************************************************/
 void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
-    int device_status;
-    memaddr *buffer;
-    device_t *flashDevice;
-    unsigned int command, maxBlock;
+    /*Local Variables*/
+    memaddr *dmaBuffer;                 /* Pointer to disk's DMA buffer in RAM */
+    device_t *f_device;                 /* Pointer to target flash device*/
+    int status;                         /* Flash device operation status code */    
+    unsigned int maxBlock;              /* Maximum blocks of the disk */
 
-    if ((int)logicalAddr < KUSEG) {
+    if ((int)logicalAddr < KUSEG || blockNo >= maxBlock) {
         get_nuked(NULL);
     }
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
+    SYSCALL(SYS3, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
-    buffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
-    memaddr *originBuff = buffer;
+    dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
+    memaddr *originBuff = dmaBuffer;
 
     int i;
-    for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-        *buffer++ = *logicalAddr++;
+    for (i = 0; i < BLOCKS_4KB; i++) {
+        *dmaBuffer++ = *logicalAddr++;
     }
 
-    flashDevice = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
-    maxBlock = flashDevice->d_data1;
+    f_device = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
+    maxBlock = f_device->d_data1;
 
-    if (blockNo >= maxBlock) {
-        get_nuked(NULL);
-    }
 
-    command = FLASHWRITE | (blockNo << FLASHADDRSHIFT);
-    flashDevice->d_data0 = (memaddr)originBuff;
+    f_device->d_data0 = (memaddr)originBuff;
 
     setSTATUS(NO_INTS);
-    flashDevice->d_command = command;
-    device_status = SYSCALL(WAITIO, FLASHINT, flashNo, 0);
+    f_device->d_command = FLASHWRITE | (blockNo << FLASHADDRSHIFT);
+    status = SYSCALL(SYS5, FLASHINT, flashNo, 0);
     setSTATUS(YES_INTS);
 
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
+    SYSCALL(SYS4, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
 }
 
 
@@ -290,46 +287,48 @@ void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
  * 5.3 pandos and 5.4 pops
  **************************************************************************************************/
 void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
-    int device_status;
-    memaddr *buffer;
-    device_t *flashDevice;
-    unsigned int command, maxBlock;
+    /*Local Variables*/
+    memaddr *dmaBuffer;
+    device_t *f_device;
+    int status;
+    unsigned int maxBlock;
+    unsigned int command;
 
 
     if ((int)logicalAddr < KUSEG) {
         get_nuked(NULL);
     }
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
+    SYSCALL(SYS3, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
-    buffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
-    memaddr *originBuff = buffer;
+    dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
+    memaddr *originBuff = dmaBuffer;
 
-    flashDevice = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
-    maxBlock = flashDevice->d_data1;
+    f_device = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
+    maxBlock = f_device->d_data1;
 
     if (blockNo >= maxBlock) {
         get_nuked(NULL);
     }
 
     command = FLASHREAD | (blockNo << FLASHADDRSHIFT);
-    flashDevice->d_data0 = (memaddr)originBuff;
+    f_device->d_data0 = (memaddr)originBuff;
 
     setSTATUS(NO_INTS);
-    flashDevice->d_command = command;
-    device_status = SYSCALL(WAITIO, FLASHINT, flashNo, 0);
+    f_device->d_command = command;
+    status = SYSCALL(SYS5, FLASHINT, flashNo, 0);
     setSTATUS(YES_INTS);
 
-    if (device_status == READY) {
+    if (status == READY) {
         int i;
-        for (i = 0; i < PAGESIZE / WORDLEN; i++) {
-            *logicalAddr++ = *buffer++;
+        for (i = 0; i < BLOCKS_4KB; i++) {
+            *logicalAddr++ = *dmaBuffer++;
         }
     }
 
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
+    SYSCALL(SYS4, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
 }
 
 

@@ -20,7 +20,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
-// #include "/usr/include/umps3/umps/libumps.h"
+#include "/usr/include/umps3/umps/libumps.h"
 
 /**************************************************************************************************  
  * Writes data from given memory address to specific disk device (diskNo)
@@ -75,7 +75,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
-    for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
+    for (int i = 0; i < BLOCKS_4KB; i++) {
         *buffer++ = *logicalAddr++;
     }
 
@@ -160,7 +160,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
     int i;
-    for (i = 0; i < PAGESIZE / WORDLEN; i++) {
+    for (i = 0; i < BLOCKS_4KB; i++) {
         *logicalAddr++ = *buffer++;
     }
 

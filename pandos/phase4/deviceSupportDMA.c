@@ -79,6 +79,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     for (i = 0; i < BLOCKS_4KB; i++) {
         *dmaBuffer++ = *logicalAddr++;
     }
+    dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE)); /*reset to issue correct starting address for WRITE*/
 
 
     setSTATUS(NO_INTS);
@@ -94,7 +95,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         return;
     } else{
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = originBuff;
+        busRegArea->devreg[diskNo].d_data0 = dmaBuffer;
 
         unsigned int headField = headNum << LEFTSHIFT16;
         unsigned int sectorField = sectNo << LEFTSHIFT8;

@@ -55,7 +55,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
 
     maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> HEADADDRSHIFT;
     maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
     /* Validate the sector address, where we perform WRITE operation into 
@@ -139,17 +139,13 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     int maxCyl, maxSect, maxHd; /*disk device characteristics*/
     int status; /*device status*/
     unsigned int command;
-
-    /*int maxPlatter, maxSector, maxCylinder, diskPhysicalGeometry, maxCount;*/ 
-    /*int seekCylinder, platterNum, device_status;*/                    
-    memaddr *buffer;                                                     
+                  
+    /*memaddr *buffer;*/                                                     
     devregarea_t *busRegArea;                         
 
     busRegArea = (devregarea_t *) RAMBASEADDR;
 
     /*diskPhysicalGeometry = busRegArea->devreg[diskNo].d_data1;*/
-    
-    /*maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> 8;*/
 
     maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
     maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> HEADADDRSHIFT;
@@ -166,7 +162,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
 
-    buffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
     memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
 
     setSTATUS(NO_INTS);
@@ -199,7 +195,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     if (status == READY) {
         int i;
         for (i = 0; i < BLOCKS_4KB; i++) {
-            *logicalAddr++ = *buffer++; 
+            *logicalAddr++ = *dmaBuffer++; 
         }
     }
 

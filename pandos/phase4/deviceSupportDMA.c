@@ -196,7 +196,8 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     }
 
     if (device_status == READY) {
-        for (int i = 0; i < PAGESIZE / WORDLEN; i++) {
+        int i;
+        for (i = 0; i < PAGESIZE / WORDLEN; i++) {
             *virtualAddr++ = *buffer++; 
         }
     }

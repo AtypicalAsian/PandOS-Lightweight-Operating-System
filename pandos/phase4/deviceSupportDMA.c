@@ -72,9 +72,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     headNum = sectNo / maxSect;
     sectNo = sectNo % maxSect;
 
-    /*SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);*/
-    /*memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));*/
-
+    /*Copy contents from uproc logical address 4kb block to dma buffer*/
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
         *dmaBuffer++ = *logicalAddr++;
@@ -104,11 +102,14 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         status = SYSCALL(WAITIO, DISKINT, diskNo, 0);
         setSTATUS(YES_INTS);
 
-        if (status != READY) {
-            status = -status;
+        if (status == READY) {
+            support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
+            SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
         }
-        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
-        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+        else{
+            support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -status;
+            SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNo], 0, 0);
+        }
     }
 }
 

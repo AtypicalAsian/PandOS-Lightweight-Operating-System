@@ -64,15 +64,15 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     if ( (sectNo < 0) || ((int)logicalAddr < KUSEG) || (sectNo > (maxCyl * maxHead * maxSect))) {
         get_nuked(NULL); 
     }
+    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
+    dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
 
     cylNum = sectNo / (maxHead * maxSect);
     sectNo = sectNo % (maxHead * maxSect);
     headNum = sectNo / maxSect;
     sectNo = sectNo % maxSect;
 
-    SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);
-
-    dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
+    /*SYSCALL(PASSEREN, (memaddr)&devSema4_support[diskNo], 0, 0);*/
     /*memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));*/
 
     int i;
@@ -145,7 +145,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     maxPlatter = (devReg->devreg[diskNo].d_data1 & HEADMASK) >> HEADADDRSHIFT;
     maxSector = (devReg->devreg[diskNo].d_data1 & LOWERMASK);
 
-    if (((int)logicalAddr < KUSEG) || (sectNo > (maxCylinder * maxPlatter * maxSector))) {
+    if ( (sectNo < 0) || ((int)logicalAddr < KUSEG) || (sectNo > (maxCylinder * maxPlatter * maxSector))) {
         get_nuked(NULL); 
     }
 

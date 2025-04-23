@@ -13,7 +13,7 @@ void main() {
 
     buffer = (int *)(SEG2 + (20 * PAGESIZE));  
 
-    print(WRITETERMINAL, "Basic flashTest starts\n");
+    print(WRITETERMINAL, "flashTest starts\n");
 
     /* Write value 123 to FLASH block 5 */
     *buffer = 123;
@@ -35,7 +35,7 @@ void main() {
         print(WRITETERMINAL, "flashTest ok: flash read correct value\n");
     }
 
-    print(WRITETERMINAL, "Basic flashTest completed\n");
+    print(WRITETERMINAL, "flashTest completed\n");
 
     SYSCALL(TERMINATE, 0, 0, 0);
 }

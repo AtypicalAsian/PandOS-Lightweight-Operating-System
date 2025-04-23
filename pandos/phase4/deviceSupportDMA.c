@@ -51,8 +51,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     int diskNum, sectorNum;                       
     memaddr *buffer;                              
     memaddr *virtualAddr;                         
-    devregarea_t *devReg;                         
-    /*unsigned int command;*/                        
+    devregarea_t *devReg;                                               
 
     devReg = (devregarea_t *) RAMBASEADDR; 
 
@@ -89,17 +88,19 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     setSTATUS(NO_INTS);
 
-    /*command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;*/
     devReg->devreg[diskNum].d_command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
     device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
 
     setSTATUS(YES_INTS);
 
-    if (device_status == READY) {
+    if (device_status != READY){
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = -device_status;
+        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+        return;
+    } else{
         setSTATUS(NO_INTS);
         devReg->devreg[diskNum].d_data0 = originBuff;
 
-        /*command = (platterNum << LEFTSHIFT16) | (sectorNum << LEFTSHIFT8) | WRITEBLK;*/
         unsigned int headField = platterNum << LEFTSHIFT16;
         unsigned int sectorField = sectorNum << LEFTSHIFT8;
         devReg->devreg[diskNum].d_command = headField | sectorField | WRITEBLK;
@@ -110,13 +111,13 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         if (device_status != READY) {
             device_status = -device_status;
         }
-    } else {
-        device_status = -device_status;
+        support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+        SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
     }
 
-    SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);
+    /*SYSCALL(VERHOGEN, (memaddr)&devSema4_support[diskNum], 0, 0);*/
 
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;
+    /*support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = device_status;*/
 }
 
 
@@ -147,7 +148,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     memaddr *buffer;                              
     memaddr *virtualAddr;                         
     devregarea_t *devReg;                         
-    /*unsigned int command;*/
 
     devReg = (devregarea_t *) RAMBASEADDR;
 
@@ -177,7 +177,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     setSTATUS(NO_INTS);
 
-    /*command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;*/
     devReg->devreg[diskNum].d_command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
     device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
 
@@ -187,7 +186,6 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         setSTATUS(NO_INTS);
         devReg->devreg[diskNum].d_data0 = originBuff;
 
-        /*command = (platterNum << LEFTSHIFT16) | (sectorNum << LEFTSHIFT8) | READBLK;*/
         unsigned int headField = platterNum << LEFTSHIFT16;
         unsigned int sectField = sectorNum << LEFTSHIFT8;
         devReg->devreg[diskNum].d_command = headField | sectField | READBLK;

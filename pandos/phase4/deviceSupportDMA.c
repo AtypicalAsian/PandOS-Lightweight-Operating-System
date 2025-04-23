@@ -62,9 +62,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
 
-    maxCylinder = (diskPhysicalGeometry >> 16);
-    maxPlatter = (diskPhysicalGeometry & 0x0000FF00) >> 8;
-    maxSector = (diskPhysicalGeometry & 0x000000FF);
+    maxCylinder = (diskPhysicalGeometry >> CYLADDRSHIFT);
+    maxPlatter = (diskPhysicalGeometry & HEADMASK) >> HEADADDRSHIFT;
+    maxSector = (diskPhysicalGeometry & LOWERMASK);
     maxCount = maxCylinder * maxPlatter * maxSector;
 
     if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
@@ -82,14 +82,14 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     memaddr *originBuff = (DISKSTART + (diskNum * PAGESIZE));
 
     int i;
-    for (i = 0; i < PAGESIZE / WORDLEN; i++) {
+    for (i = 0; i < BLOCKS_4KB; i++) {
         *buffer++ = *virtualAddr++;
     }
 
 
     setSTATUS(NO_INTS);
 
-    command = (seekCylinder << 8) | 2;
+    command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
     devReg->devreg[diskNum].d_command = command;
     device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
 
@@ -99,7 +99,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         setSTATUS(NO_INTS);
         devReg->devreg[diskNum].d_data0 = originBuff;
 
-        command = (platterNum << 16) | (sectorNum << 8) | 4;
+        command = (platterNum << LEFTSHIFT16) | (sectorNum << LEFTSHIFT8) | WRITEBLK;
         devReg->devreg[diskNum].d_command = command;
 
         device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
@@ -154,9 +154,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
 
     diskPhysicalGeometry = devReg->devreg[diskNum].d_data1;
-    maxCylinder = (diskPhysicalGeometry >> 16);
-    maxPlatter = (diskPhysicalGeometry & 0x0000FF00) >> 8;
-    maxSector = (diskPhysicalGeometry & 0x000000FF);
+    maxCylinder = (diskPhysicalGeometry >> CYLADDRSHIFT);
+    maxPlatter = (diskPhysicalGeometry & HEADMASK) >> HEADADDRSHIFT;
+    maxSector = (diskPhysicalGeometry & LOWERMASK);
     maxCount = maxCylinder * maxPlatter * maxSector;
 
     if (((int)virtualAddr < KUSEG) || (sectorNum > maxCount)) {
@@ -175,7 +175,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     setSTATUS(NO_INTS);
 
-    command = (seekCylinder << 8) | 2;
+    command = (seekCylinder << LEFTSHIFT8) | SEEK_CMD;
     devReg->devreg[diskNum].d_command = command;
     device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);
 
@@ -185,7 +185,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         setSTATUS(NO_INTS);
         devReg->devreg[diskNum].d_data0 = originBuff;
 
-        command = (platterNum << 16) | (sectorNum << 8) | 3;
+        command = (platterNum << LEFTSHIFT16) | (sectorNum << LEFTSHIFT8) | READBLK;
         devReg->devreg[diskNum].d_command = command;
 
         device_status = SYSCALL(WAITIO, DISKINT, diskNum, 0);

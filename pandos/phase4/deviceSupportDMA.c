@@ -152,7 +152,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     /*maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> 8;*/
 
     maxSect = busRegArea->devreg[diskNo].d_data1 & LOWERMASK;
-    maxHd = (busRegArea->devreg[diskNo].d_data1 >> HEADADDRSHIFT) & 0x0000FF00;
+    maxHd = (busRegArea->devreg[diskNo].d_data1 & 0x0000FF00) >> HEADADDRSHIFT;
     maxCyl = busRegArea->devreg[diskNo].d_data1 >> CYLADDRSHIFT;
 
     if (((int)logicalAddr < KUSEG) || (sectNo > (maxCyl * maxSect * maxHd))) {

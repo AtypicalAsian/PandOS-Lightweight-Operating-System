@@ -59,9 +59,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
     sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
 
-    maxCylinder = (devReg->devreg[diskNum].d_data1; >> CYLADDRSHIFT);
-    maxPlatter = (devReg->devreg[diskNum].d_data1; & HEADMASK) >> HEADADDRSHIFT;
-    maxSector = (devReg->devreg[diskNum].d_data1; & LOWERMASK);
+    maxCylinder = (devReg->devreg[diskNum].d_data1 >> CYLADDRSHIFT);
+    maxPlatter = (devReg->devreg[diskNum].d_data1 & HEADMASK) >> HEADADDRSHIFT;
+    maxSector = (devReg->devreg[diskNum].d_data1 & LOWERMASK);
 
     if (((int)virtualAddr < KUSEG) || (sectorNum > (maxCylinder * maxPlatter * maxSector))) {
         get_nuked(NULL); 
@@ -148,9 +148,9 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
     diskNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
     sectorNum = support_struct->sup_exceptState[GENERALEXCEPT].s_a3;
 
-    maxCylinder = (devReg->devreg[diskNum].d_data1; >> CYLADDRSHIFT);
-    maxPlatter = (devReg->devreg[diskNum].d_data1; & HEADMASK) >> HEADADDRSHIFT;
-    maxSector = (devReg->devreg[diskNum].d_data1; & LOWERMASK);
+    maxCylinder = (devReg->devreg[diskNum].d_data1 >> CYLADDRSHIFT);
+    maxPlatter = (devReg->devreg[diskNum].d_data1 & HEADMASK) >> HEADADDRSHIFT;
+    maxSector = (devReg->devreg[diskNum].d_data1 & LOWERMASK);
 
     if (((int)virtualAddr < KUSEG) || (sectorNum > (maxCylinder * maxPlatter * maxSector))) {
         get_nuked(NULL); 

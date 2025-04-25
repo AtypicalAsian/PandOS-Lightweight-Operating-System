@@ -258,7 +258,11 @@ void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
         logicalAddr++;
     }
 
-    f_device = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
+    /*Calculate address of specific flash device register block*/
+    int devIdx = (FLASHINT-DISKINT) * DEVPERINT + flashNo; /*method 1*/
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    f_device = &busRegArea->devreg[devIdx];
+    /*f_device = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));*/ /*method 2*/
     maxBlock = f_device->d_data1;
 
     /*Check invalid block number request*/
@@ -315,7 +319,12 @@ void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
     dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
     memaddr *originBuff = dmaBuffer;
 
-    f_device = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
+    /*Calculate address of specific flash device register block*/
+    int devIdx = (FLASHINT-DISKINT) * DEVPERINT + flashNo; /*method 1*/
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    f_device = &busRegArea->devreg[devIdx];
+
+    /*f_device = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));*/ /*method 2*/
     maxBlock = f_device->d_data1;
 
     /*Check invalid block number request*/

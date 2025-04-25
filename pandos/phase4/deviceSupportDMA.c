@@ -360,7 +360,14 @@ void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
 }
 
 
-/*separate helper (pandos 5.5.2)*/
+/**************************************************************************************************  
+ * flashOperation Helper
+ * 
+ * 
+ * 
+ * @ref
+ * 5.3, 5.5.2 pandos and 5.4 pops
+ **************************************************************************************************/
 int flashOperation(memaddr *logicalAddr, int flashNo, int blockNo, int operation, support_t *support_struct) {
     memaddr *dmaBuffer;
     device_t *f_device;

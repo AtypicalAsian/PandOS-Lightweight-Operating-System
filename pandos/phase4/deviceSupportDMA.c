@@ -1,8 +1,18 @@
 /**************************************************************************************************  
  * @file deviceSupportDMA.c  
  * 
- * @ref
+ * This module provides support for block I/O operations, functionalities core to syscalls 14-17,
+ * using DMA-capable devices, specifically disk and flash storage. It implements read and write 
+ * operations for 4KB blocks of data between user process address space and device-specific 
+ * DMA buffers, while handling mutual exclusion through semaphores. 
  * 
+ * Core functionalities include:
+ *  - Disk read/write (disk_get, disk_put)
+ *  - Flash read/write using block addressing (flash_get, flash_put)
+ * 
+ * @ref
+ * PandOS - Chapter 5
+ * Pops - 5.3 & 5.4
  * 
  * @authors  
  * Nicolas & Tran  
@@ -39,6 +49,10 @@
  *  7. If operation succeeded, return status in v0; otherwise return negative status code.
  *  8. Release device semaphore
  * 
+ *  @param logicalAddr Pointer to 4KB data in uproc logical address to be written to disk.
+ *  @param diskNo      Disk device number to write to
+ *  @param sectNo      Linear sector number on disk where data will be written
+ *  @param support_struct Pointer to the calling process's support structure
  * 
  * @ref
  * 5.2 pandos and 5.3 pops
@@ -135,7 +149,10 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
  *  9. Return status in v0
  * 10. Release target disk device semaphore
  * 
- * 
+ *  @param logicalAddr Pointer to 4KB data in uproc logical address space where disk data will be stored
+ *  @param diskNo      Disk device number to read from
+ *  @param sectNo      Linear sector number on disk to read from
+ *  @param support_struct Pointer to the calling process's support structure
  * 
  * @ref
  * 5.2 pandos and 5.3 pops
@@ -216,7 +233,10 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 /**************************************************************************************************  
  * Writes a 4KB block of data from the given user logical address to a specific block on a flash device
  * via DMA buffer
- * @params:
+ * @param logicalAddr Pointer to 4KB data in uproc logical address space to be written to flash
+ * @param flashNo     Flash device number to write to
+ * @param blockNo     Flash block number to write to
+ * @param support_struct Pointer to the calling process's support structure
  * 
  * @ref
  * 5.3 pandos and 5.4 pops
@@ -228,7 +248,11 @@ void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
 
 /**************************************************************************************************  
  * Reads data from 4kb block in target flash device into uproc's logical address space via DMA buffer
- * @params:
+ * 
+ *  @param logicalAddr Pointer to 4KB buffer in uproc logical address space where flash data will be stored
+ *  @param flashNo     Flash device number to read from
+ *  @param blockNo     Flash block number to read from
+ *  @param support_struct Pointer to the calling process's support structure
  * 
  * @ref
  * 5.3 pandos and 5.4 pops

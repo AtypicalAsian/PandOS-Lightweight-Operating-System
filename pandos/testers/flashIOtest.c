@@ -6,6 +6,20 @@
 #define BLOCK1         8    /*Valid flash block*/
 #define BLOCK2         10   /*Another valid flash block*/
 
+char *strcpy(char *dest, const char *src) {
+    char *orig = dest;
+    while ((*dest++ = *src++) != '\0'); /* Copy until null terminator */
+    return orig;
+}
+
+int strcmp(const char *s1, const char *s2) {
+    while (*s1 && (*s1 == *s2)) {
+        s1++;
+        s2++;
+    }
+    return (unsigned char)(*s1) - (unsigned char)(*s2);
+}
+
 void main() {
     /* Ref: 
      * pandOS chapter 5

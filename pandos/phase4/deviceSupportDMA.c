@@ -201,7 +201,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         }
         /*If READ op successful*/
         int i;
-        /*cCpy 4kb data from dma buffer to uproc's logical address space*/
+        /*Copy 4kb data from dma buffer to uproc's logical address space*/
         for (i = 0; i < BLOCKS_4KB; i++) {
             *logicalAddr = *dmaBuffer;
             logicalAddr++;
@@ -214,17 +214,21 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 }
 
 /**************************************************************************************************  
- * Writes data from given memory address to specific flash device (flashNo)
+ * Writes a 4KB block of data from the given user logical address to a specific block on a flash device.
  * 
  * Steps:
- *  1. Extract syscall arguments: user virtual address, disk number, sector number (done in syscall handler)
- *  2. Check invalid memory region access
- *  3. Lock semaphore 
- *  4. Locate flash's DMA buffer in RAM
- *  5. Copy data from uproc address space to dma buffer
- *  5. Perform write to target flash block using starting address of dma buffer (4Kb)
- *  6. Release semaphore
- *  7. Check status code to see if operation is successful -> write into v0 accordingly
+ *  1. Validate uproc logical address access (make sure to be within KUSEG)
+ *  2. Lock semaphore for target flash device
+ *  3. Locate appropriate DMA buffer in RAM
+ *  4. Copy 4kb data from uproc logical address space into flash device's DMA buffer
+ *  5. Determine target flash device register
+ *  6. Retrieve max number of valid blocks supported by the target device
+ *  7. Validate requested block number to make sure it's within valid flash block range
+ *  8. Set flash device's DATA0 register to DMA buffer starting address
+ *  9. Issue WRITE command with target flash block number
+ * 10. Block uproc until WRITE completes 
+ * 11. Store status of the operation (success or failure) into v0 of the exception state  
+ * 12. Release semaphore for the target flash device
  * 
  * 
  * @ref
@@ -236,101 +240,204 @@ void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
     device_t *f_device;                 /* Pointer to target flash device*/
     int status;                         /* Flash device operation status code */    
     unsigned int maxBlock;              /* Maximum blocks of the disk */
+    
 
-    if ((int)logicalAddr < KUSEG || blockNo >= maxBlock) {
+    /*Check for invalid memory access*/
+    if ((int)logicalAddr < KUSEG) {
         get_nuked(NULL);
     }
 
+    /*Lock target flash device semaphore*/
     SYSCALL(SYS3, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
+    /*Calculate the base address of the flash's DMA buffer*/
     dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
     memaddr *originBuff = dmaBuffer;
 
+    /*Copy 4KB data from user process memory to flash DMA buffer*/
     int i;
     for (i = 0; i < BLOCKS_4KB; i++) {
-        *dmaBuffer++ = *logicalAddr++;
+        *dmaBuffer = *logicalAddr;
+        dmaBuffer++;
+        logicalAddr++;
     }
 
-    f_device = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
-    maxBlock = f_device->d_data1;
+    /*Calculate address of specific flash device register block*/
+    int devIdx = (FLASHINT-DISKINT) * DEVPERINT + flashNo; /*method 1*/
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    f_device = &busRegArea->devreg[devIdx];
+    maxBlock = f_device->d_data1; /*Retrieve max number of valid blocks supported by the target device*/
 
+    /*Validate requested block number to make sure it's within valid flash block range*/
+    if (blockNo >= maxBlock){
+        get_nuked(NULL);
+    }
 
-    f_device->d_data0 = (memaddr)originBuff;
+    f_device->d_data0 = (memaddr)originBuff; /*Set flash device's DATA0 register to DMA buffer starting address*/
 
     setSTATUS(NO_INTS);
-    f_device->d_command = FLASHWRITE | (blockNo << FLASHADDRSHIFT);
-    status = SYSCALL(SYS5, FLASHINT, flashNo, 0);
+    f_device->d_command = FLASHWRITE | (blockNo << FLASHADDRSHIFT); /*issue flash write command*/
+    status = SYSCALL(SYS5, FLASHINT, flashNo, 0); /*block uproc on ASL until flash WRITE op completes*/
     setSTATUS(YES_INTS);
 
-    SYSCALL(SYS4, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
-
-    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status; /*Store status of the operation into v0*/
+    SYSCALL(SYS4, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0); /*Unlock target flash device semaphore*/
 }
-
-
 
 
 /**************************************************************************************************  
  * Reads data from block in target flash device
  * 
  * Steps:
- *  1. Extract syscall arguments: user virtual address, disk number, sector number (done in syscall handler)
- *  2. Check invalid memory region access
- *  3. Lock semaphore 
- *  4. Locate flash's DMA buffer in RAM
- *  5. Read from flash block to device DMA buffer
- *  6. Copy data from DMA buffer into requesting uproc address space starting from provide start address
- *  7. Release semaphore
- *  8. Check status code to see if operation is successful -> write into v0 accordingly
+ *  1. Validate uproc logical address access (make sure to be within KUSEG)
+ *  2. Lock semaphore for target flash device
+ *  3. Locate appropriate DMA buffer in RAM
+ *  4. Determine the target flash device's register
+ *  5. Extract max number of valid blocks supported by the flash device
+ *  6. Validate the requested block number to ensure it is within valid flash block range
+ *  7. Set the flash device's DATA0 register to the DMA buffer address (destination for the read)
+ *  8. Issue the READ command with the target block number
+ *  9. Block uproc until READ completes 
+ * 10. If the operation was successful, copy 4KB of data from the flash's DMA buffer to uproc logical address space.
+ * 11. Store the status of the operation (success or failure) into v0 of the exception state.
+ * 12. Release the semaphore for the target flash device
+ * 
  * 
  * @ref
  * 5.3 pandos and 5.4 pops
  **************************************************************************************************/
 void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
     /*Local Variables*/
-    memaddr *dmaBuffer;
-    device_t *f_device;
-    int status;
-    unsigned int maxBlock;
-    unsigned int command;
+    memaddr *dmaBuffer;                 /* Pointer to disk's DMA buffer in RAM */
+    device_t *f_device;                 /* Pointer to target flash device*/
+    int status;                         /* Flash device operation status code */    
+    unsigned int maxBlock;              /* Maximum blocks of the disk */
 
-
+    /*Check for invalid memory access*/
     if ((int)logicalAddr < KUSEG) {
         get_nuked(NULL);
     }
 
+    /*Lock target flash device semaphore*/
     SYSCALL(SYS3, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
 
+    /*Calculate the base address of the flash's DMA buffer*/
     dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
-    memaddr *originBuff = dmaBuffer;
+    /*memaddr *originBuff = dmaBuffer;*/
 
-    f_device = (device_t *)(DEVICEREGSTART + ((FLASHINT - DISKINT) * (DEV_UNITS * DEVREGSIZE)) + (flashNo * DEVREGSIZE));
-    maxBlock = f_device->d_data1;
+    /*Calculate address of specific flash device register block*/
+    int devIdx = (FLASHINT-DISKINT) * DEVPERINT + flashNo; /*method 1*/
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    f_device = &busRegArea->devreg[devIdx];
 
+    maxBlock = f_device->d_data1; /*Extract max number of valid blocks supported by the flash device*/
+
+    /*Check invalid block number request*/
     if (blockNo >= maxBlock) {
         get_nuked(NULL);
     }
 
-    command = FLASHREAD | (blockNo << FLASHADDRSHIFT);
-    f_device->d_data0 = (memaddr)originBuff;
+    f_device->d_data0 = (memaddr)dmaBuffer; /*Set the flash device's DATA0 register to the DMA buffer address*/
 
     setSTATUS(NO_INTS);
-    f_device->d_command = command;
-    status = SYSCALL(SYS5, FLASHINT, flashNo, 0);
+    f_device->d_command = FLASHREAD | (blockNo << FLASHADDRSHIFT); /*issue flash READ command*/
+    status = SYSCALL(SYS5, FLASHINT, flashNo, 0); /*block uproc on ASL until flash READ op completes*/
     setSTATUS(YES_INTS);
 
+    /*if READ op successful*/
     if (status == READY) {
+        int i;
+        /*Copy 4KB data from DMA buffer to uproc logical address space*/
+        for (i = 0; i < BLOCKS_4KB; i++) {
+            *logicalAddr = *dmaBuffer;
+            logicalAddr++;
+            dmaBuffer++;
+        }
+    }
+
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;  /*Store status of the operation into v0*/
+    SYSCALL(SYS4, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0); /*Unlock flash device semaphore*/
+}
+
+
+/**************************************************************************************************  
+ * flashOperation Helper
+ * 
+ * 
+ * 
+ * @ref
+ * 5.3, 5.5.2 pandos and 5.4 pops
+ **************************************************************************************************/
+int flashOperation(memaddr *logicalAddr, int flashNo, int blockNo, int operation, support_t *support_struct) {
+    memaddr *dmaBuffer;
+    device_t *f_device;
+    int status;
+    unsigned int maxBlock;
+
+    /* Step 1: Validate user memory access */
+    if ((int)logicalAddr < KUSEG) {
+        get_nuked(NULL);
+    }
+
+    /* Step 2: Lock target flash device semaphore */
+    SYSCALL(SYS3, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
+
+    /* Step 3: Calculate the base address of the flash's DMA buffer */
+    dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
+
+    /* Step 4: Access flash device register */
+    int devIdx = (FLASHINT - DISKINT) * DEVPERINT + flashNo;
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    f_device = &busRegArea->devreg[devIdx];
+    maxBlock = f_device->d_data1;
+
+    /* Step 5: Validate block number */
+    if (blockNo >= maxBlock) {
+        get_nuked(NULL);
+    }
+
+    /* Step 6: Set data0 to DMA buffer */
+    f_device->d_data0 = (memaddr)dmaBuffer;
+
+    /* Step 7: If writing, copy data from logicalAddr to DMA buffer */
+    if (operation == FLASHWRITE) {
+        int i;
+        for (i = 0; i < BLOCKS_4KB; i++) {
+            *dmaBuffer++ = *logicalAddr++;
+        }
+        dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE)); /* Reset for device use */
+        f_device->d_data0 = (memaddr)dmaBuffer;
+    }
+
+    /* Step 8: Issue flash command (READ or WRITE) */
+    setSTATUS(NO_INTS);
+    f_device->d_command = operation | (blockNo << FLASHADDRSHIFT);
+    status = SYSCALL(SYS5, FLASHINT, flashNo, 0); /* Wait for operation to complete */
+    setSTATUS(YES_INTS);
+
+    /* Step 9: If reading and status is READY, copy data from DMA buffer to logicalAddr */
+    if ((operation == FLASHREAD) && (status == READY)) {
         int i;
         for (i = 0; i < BLOCKS_4KB; i++) {
             *logicalAddr++ = *dmaBuffer++;
         }
     }
 
-    SYSCALL(SYS4, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
-
+    /* Step 10: Store status in v0 */
     support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
+
+    /* Step 11: Unlock flash device semaphore */
+    SYSCALL(SYS4, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
+    return status;
 }
 
+/*flash_get*/
+/*void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
+    flashOperation(logicalAddr, flashNo, blockNo, FLASHREAD, support_struct);
+}*/
 
-
+/*flash_put*/
+/*void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
+    flashOperation(logicalAddr, flashNo, blockNo, FLASHWRITE, support_struct);
+}*/
 

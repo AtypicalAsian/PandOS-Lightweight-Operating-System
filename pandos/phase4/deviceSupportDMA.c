@@ -360,5 +360,77 @@ void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
 }
 
 
+/*separate helper (pandos 5.5.2)*/
+int flashOperation(memaddr *logicalAddr, int flashNo, int blockNo, int operation, support_t *support_struct) {
+    memaddr *dmaBuffer;
+    device_t *f_device;
+    int status;
+    unsigned int maxBlock;
 
+    /* Step 1: Validate user memory access */
+    if ((int)logicalAddr < KUSEG) {
+        get_nuked(NULL);
+    }
+
+    /* Step 2: Lock target flash device semaphore */
+    SYSCALL(SYS3, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
+
+    /* Step 3: Calculate the base address of the flash's DMA buffer */
+    dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE));
+
+    /* Step 4: Access flash device register */
+    int devIdx = (FLASHINT - DISKINT) * DEVPERINT + flashNo;
+    devregarea_t *busRegArea = (devregarea_t *) RAMBASEADDR;
+    f_device = &busRegArea->devreg[devIdx];
+    maxBlock = f_device->d_data1;
+
+    /* Step 5: Validate block number */
+    if (blockNo >= maxBlock) {
+        get_nuked(NULL);
+    }
+
+    /* Step 6: Set data0 to DMA buffer */
+    f_device->d_data0 = (memaddr)dmaBuffer;
+
+    /* Step 7: If writing, copy data from logicalAddr to DMA buffer */
+    if (operation == FLASHWRITE) {
+        int i;
+        for (i = 0; i < BLOCKS_4KB; i++) {
+            *dmaBuffer++ = *logicalAddr++;
+        }
+        dmaBuffer = (memaddr *)(FLASHSTART + (flashNo * PAGESIZE)); /* Reset for device use */
+        f_device->d_data0 = (memaddr)dmaBuffer;
+    }
+
+    /* Step 8: Issue flash command (READ or WRITE) */
+    setSTATUS(NO_INTS);
+    f_device->d_command = operation | (blockNo << FLASHADDRSHIFT);
+    status = SYSCALL(SYS5, FLASHINT, flashNo, 0); /* Wait for operation to complete */
+    setSTATUS(YES_INTS);
+
+    /* Step 9: If reading and status is READY, copy data from DMA buffer to logicalAddr */
+    if ((operation == FLASHREAD) && (status == READY)) {
+        int i;
+        for (i = 0; i < BLOCKS_4KB; i++) {
+            *logicalAddr++ = *dmaBuffer++;
+        }
+    }
+
+    /* Step 10: Store status in v0 */
+    support_struct->sup_exceptState[GENERALEXCEPT].s_v0 = status;
+
+    /* Step 11: Unlock flash device semaphore */
+    SYSCALL(SYS4, (memaddr)&devSema4_support[DEV_UNITS + flashNo], 0, 0);
+    return status;
+}
+
+/*flash_get*/
+/*void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
+    flashOperation(logicalAddr, flashNo, blockNo, FLASHREAD, support_struct);
+}*/
+
+/*flash_put*/
+/*void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *support_struct) {
+    flashOperation(logicalAddr, flashNo, blockNo, FLASHWRITE, support_struct);
+}*/
 

@@ -113,7 +113,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         return;
     } else{ /*If seek successful*/
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = dmaBuffer; /*Put starting address of DMA buffer into register v0*/
+        busRegArea->devreg[diskNo].d_data0 = (unsigned int) dmaBuffer; /*Put starting address of DMA buffer into register v0*/
         unsigned int headField = headNum << LEFTSHIFT16;
         unsigned int sectorField = sectNo << LEFTSHIFT8;
         busRegArea->devreg[diskNo].d_command = headField | sectorField | WRITEBLK; /*Issue WRITE command */
@@ -185,7 +185,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
     /*Calculate the base address of the disk's DMA buffer for this disk unit*/
     dmaBuffer = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
-    memaddr *originBuff = (DISKSTART + (diskNo * PAGESIZE));
+    memaddr *originBuff = (memaddr *)(DISKSTART + (diskNo * PAGESIZE));
 
     /* Convert linear sector number into Cylinder-Head-Sector triplet */
     cylNum = sectNo / (maxHead * maxSect);
@@ -204,7 +204,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
         return;
     } else { /*If seek sucessful*/
         setSTATUS(NO_INTS);
-        busRegArea->devreg[diskNo].d_data0 = originBuff; /*Put starting address of DMA buffer into register v0*/
+        busRegArea->devreg[diskNo].d_data0 = (unsigned int) originBuff; /*Put starting address of DMA buffer into register v0*/
         unsigned int headField = headNum << LEFTSHIFT16;
         unsigned int sectorField = sectNo << LEFTSHIFT8;
         busRegArea->devreg[diskNo].d_command = headField | sectorField | READBLK; /*Issue READ command to read in correct disk sector into dma buffer*/
@@ -292,7 +292,7 @@ void flash_get(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
  * @ref
  * 5.3, 5.5.2 pandos and 5.4 pops
  **************************************************************************************************/
-int flashOperation(memaddr *logicalAddr, int flashNo, int blockNo, int operation, support_t *support_struct) {
+void flashOperation(memaddr *logicalAddr, int flashNo, int blockNo, int operation, support_t *support_struct) {
     /*Local Variables*/
     memaddr *dmaBuffer;                 /* Pointer to disk's DMA buffer in RAM */
     device_t *f_device;                 /* Pointer to target flash device*/

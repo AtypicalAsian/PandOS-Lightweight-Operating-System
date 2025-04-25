@@ -3,8 +3,8 @@
 #include "h/print.h"
 
 #define FLASH_UNIT     0
-#define BLOCK1         8    // Valid flash block
-#define BLOCK2         10   // Another valid flash block
+#define BLOCK1         8    /*Valid flash block*/
+#define BLOCK2         10   /*Another valid flash block*/
 
 void main() {
     /* Ref: 

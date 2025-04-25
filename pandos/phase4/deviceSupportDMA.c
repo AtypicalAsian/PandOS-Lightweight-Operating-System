@@ -33,7 +33,7 @@
 #include "/usr/include/umps3/umps/libumps.h"
 
 /**************************************************************************************************  
- * Writes data from given memory address to specific disk device (diskNo)
+ * Writes data from given memory address to specific disk device (diskNo) - SYS14
  * 
  * Steps:
  *  1. Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect
@@ -132,7 +132,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
 
 /**************************************************************************************************  
- * Reads data from sector in target disk device to uproc logical address space
+ * Reads data from sector in target disk device to uproc logical address space - SYS15
  * 
  * Steps:
  *  1. Extract disk geometry from device register DATA1 field: maxcyl, maxhead, maxsect
@@ -232,7 +232,7 @@ void disk_put(memaddr *logicalAddr, int diskNo, int sectNo, support_t *support_s
 
 /**************************************************************************************************  
  * Writes a 4KB block of data from the given user logical address to a specific block on a flash device
- * via DMA buffer
+ * via DMA buffer - SYS16
  * @param logicalAddr Pointer to 4KB data in uproc logical address space to be written to flash
  * @param flashNo     Flash device number to write to
  * @param blockNo     Flash block number to write to
@@ -248,6 +248,7 @@ void flash_put(memaddr *logicalAddr, int flashNo, int blockNo, support_t *suppor
 
 /**************************************************************************************************  
  * Reads data from 4kb block in target flash device into uproc's logical address space via DMA buffer
+ * - SYS17
  * 
  *  @param logicalAddr Pointer to 4KB buffer in uproc logical address space where flash data will be stored
  *  @param flashNo     Flash device number to read from

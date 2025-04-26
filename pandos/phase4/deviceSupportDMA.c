@@ -2,9 +2,9 @@
  * @file deviceSupportDMA.c  
  * 
  * This module provides support for block I/O operations, functionalities core to syscalls 14-17,
- * using DMA-capable devices, specifically disk and flash storage. It implements read and write 
+ * using DMA devices, specifically disk and flash storage. It implements read and write 
  * operations for 4KB blocks of data between user process address space and device-specific 
- * DMA buffers, while handling mutual exclusion through semaphores. 
+ * DMA buffers. 
  * 
  * Core functionalities include:
  *  - Disk read/write (disk_get, disk_put)

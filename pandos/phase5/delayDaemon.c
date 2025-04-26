@@ -25,6 +25,7 @@
 
 HIDDEN int delayDaemon_sema4; /*semaphore to provided mutual exclusion over the ADL*/
 HIDDEN delayd_PTR delaydFree_h; /*Ptr to head of free list of event descriptors*/
+HIDDEN delayd_PTR delayd_h; /*ptr to head of active delay list ADL*/
 
 
 /*allocate new node for the ADL*/
@@ -34,8 +35,9 @@ void alloc_descriptor(){
 
 
 /*return a node from the ADL to the free pool (of unsued descriptor nodes)*/
-void remove_descriptor(){
-    return;
+void remove_descriptor(delayd_PTR delayDescriptor){
+    delayDescriptor->d_next = delaydFree_h;
+    delaydFree_h = delayDescriptor;
 }
 
 /*Initialize Active Delay List*/

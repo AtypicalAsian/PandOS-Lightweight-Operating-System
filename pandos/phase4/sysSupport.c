@@ -25,6 +25,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
+#include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Support level device semaphores*/
@@ -448,6 +449,10 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
         
         case SYS17:
             flash_get((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
+            break;
+        
+        case SYS18:
+            delay_syscallHandler(currProc_support_struct);
             break;
 
         default:

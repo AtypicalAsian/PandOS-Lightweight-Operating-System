@@ -22,3 +22,36 @@
 #include "../h/deviceSupportDMA.h"
 #include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
+
+HIDDEN int delayDaemon_sema4; /*semaphore to support (...)*/
+HIDDEN delay_ptr delaydFree_h; /*Ptr to head of free list of event descriptors*/
+
+
+/*allocate new node for the ADL*/
+void alloc_descriptor(){
+    return;
+}
+
+
+/*return a node from the ADL to the free pool (of unsued descriptor nodes)*/
+void free_descriptor(){
+    return;
+}
+
+/*Initialize Active Delay List*/
+void initADL(){
+    return;
+}
+
+/*insert new descriptor into Active Delay List (ADL)*/
+int insertADL(){
+
+}
+void removeADL(){
+    return;
+}
+
+/*implements delay facility*/
+void delay_syscallHandler(support_t *currSuppStruct){
+    return;
+}

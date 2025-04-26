@@ -3,16 +3,19 @@
  * Declaration File for delayDaemon.c module
  * 
  ****************************************************************************/
-#include "../h/types.h"
+#ifndef DELAYDAEMON
+#define DELAYDAEMON
+
+ #include "../h/types.h"
 #include "../h/const.h"
-#include "../h/asl.h"
-#include "../h/pcb.h"
-#include "../h/initial.h"
-#include "../h/scheduler.h"
-#include "../h/exceptions.h"
-#include "../h/interrupts.h"
-#include "../h/initProc.h"
-#include "../h/vmSupport.h"
-#include "../h/sysSupport.h"
-#include "../h/deviceSupportDMA.h"
-#include "/usr/include/umps3/umps/libumps.h"
+
+void alloc_descriptor(); /*allocate new node for the ADL*/
+void free_descriptor(); /*return a node from the ADL to the free pool (of unsued descriptor nodes)*/
+void initADL(); /*initialize the Active Delay List (ADL)*/
+int insertADL(); /*insert new descriptor into Active Delay List (ADL)*/
+void removeADL(); 
+void delay_syscallHandler(support_t *currSuppStruct); /*implements delay facility*/
+
+
+
+#endif

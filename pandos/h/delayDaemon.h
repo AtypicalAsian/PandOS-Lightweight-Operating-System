@@ -14,8 +14,7 @@ void free_descriptor(); /*return a node from the ADL to the free pool (of unsued
 void initADL(); /*initialize the Active Delay List (ADL)*/
 int insertADL(); /*insert new descriptor into Active Delay List (ADL)*/
 void removeADL(); 
-void delay_syscallHandler(support_t *currSuppStruct); /*implements delay facility*/
-
+void delay_daemonProcess(support_t *currSuppStruct); /*implements delay facility*/
 
 
 #endif

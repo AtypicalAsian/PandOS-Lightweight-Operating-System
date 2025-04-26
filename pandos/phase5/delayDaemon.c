@@ -40,11 +40,17 @@ void free_descriptor(){
 
 /*Initialize Active Delay List*/
 void initADL(){
-    return;
+    /*Set up initial state*/
+    state_t base_state;
+    base_state.s_pc = (memaddr) delay_daemonProcess;
+    base_state.t9 = (memaddr) delay_daemonProcess;
+    base_state.s_sp = 0; /*CHANGE TO STARTING ADDRESS ?*/
+    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON;
 }
 
 /*insert new descriptor into Active Delay List (ADL)*/
 int insertADL(){
+    return;
 
 }
 void removeADL(){
@@ -52,6 +58,6 @@ void removeADL(){
 }
 
 /*implements delay facility*/
-void delay_syscallHandler(support_t *currSuppStruct){
+void delay_daemonProcess(support_t *currSuppStruct){
     return;
 }

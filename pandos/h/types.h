@@ -110,6 +110,7 @@ typedef struct support_t {
     pte_entry_t sup_privatePgTbl[32]; /* the user process's page table */
     int sup_stackTLB[500]; /* the stack area for the process' TLB exception handler */
     int sup_stackGen[500]; /* the stack area for the process' general exception handler */
+	int privateSema4; /*Phase 5 - synchronization semaphore used for SYS18 Delay*/
 } support_t;
 
 
@@ -145,11 +146,11 @@ pcb_t 		   *s_procQ;  /* tail ptr to process queue */
 } semd_t, *semd_PTR;
 
 
-typedef struct delay_t {
+typedef struct delayd_t {
 	cpu_t d_wakeTime;
 	struct delay_t *d_next;
 	support_t *d_supStruct;
-} delay_t, *delay_ptr;
+} delayd_t, *delayd_PTR;
 
 
 #define	s_at	s_reg[0]

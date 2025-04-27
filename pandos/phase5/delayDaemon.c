@@ -79,7 +79,7 @@ void delayCurrentProc(support_t *current_support) {
         SYSCALL(PASSEREN, (int) &delaySemaphore, 0, 0);
 
         if(insertDelayNode(current_support, sleepTime) == FALSE) {
-            terminate(NULL);
+            get_nuked(NULL);
         }
 
         setSTATUS(NO_INTS);
@@ -91,7 +91,7 @@ void delayCurrentProc(support_t *current_support) {
         setSTATUS(YES_INTS);
     }
     else if (sleepTime < 0) {
-        terminate(NULL);
+        get_nuked(NULL);
     }
 }
 

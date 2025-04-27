@@ -10,7 +10,7 @@
 #include "../h/const.h"
 
 void initADL(); /*initialize the Active Delay List (ADL)*/
-void sys18Handler(int sleepTime, support_t *support_struct); /*function to implement syscall 18*/
+void sys18Handler(support_t *support_struct); /*function to implement syscall 18*/
 void delayDaemon(support_t *currSuppStruct); /*code for delay daemon process*/
 
 delayd_PTR alloc_descriptor(); /*allocate new node for the ADL*/

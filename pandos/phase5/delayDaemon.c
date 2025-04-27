@@ -84,7 +84,7 @@ void initADL(){
     base_state.s_status = ALLOFF | IEPON | IMON | TEBITON;
     base_state.s_entryHI = (0 << SHIFT_ASID);
 
-    status = SYSCALL(SYS1,(int)&base_state,NULL,0);
+    status = SYSCALL(SYS1,(int)&base_state,(memaddr) NULL,0);
     if (status != OK){
         SYSCALL(SYS2,0,0,0);
     }

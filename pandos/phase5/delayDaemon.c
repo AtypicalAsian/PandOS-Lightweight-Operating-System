@@ -68,13 +68,13 @@ void return_to_ADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
  **************************************************************************************************/
 void initADL(){
 
-    static delayd_t delayDescriptors[MAXUPROCS+1]; /*add one more to use as dummy node for ADL*/
+    static delayd_t delayDescriptors[MAXPROC+1]; /*add one more to use as dummy node for ADL*/
     delayDaemon_sema4 = 1;
 
     /*Init Active Delay List (ADL)*/
     delaydFree_h = &delayDescriptors[0];
     int i;
-    for (i=1;i<MAXUPROCS;i++){
+    for (i=1;i<MAXPROC;i++){
         delayDescriptors[i-1].d_next = &delayDescriptors[i];
     }
     /*init dummy tail*/
@@ -141,7 +141,7 @@ int insertADL(int time_asleep, support_t *supStruct){
     STCK(currTime); /*get current time*/
 
     /*Set up new descriptor fields*/
-    newDescriptor->d_wakeTime = currTime + (time_asleep + 1000000);
+    newDescriptor->d_wakeTime = currTime + (time_asleep * 1000000);
     newDescriptor->d_supStruct = supStruct;
 
     /*Insert descriptor into correct position on ADL*/

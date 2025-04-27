@@ -452,7 +452,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
 
         default:
-        syslvl_prgmTrap_handler(currProc_support_struct);
+            syslvl_prgmTrap_handler(currProc_support_struct);
             break;
     }
     LDST(&(currProc_support_struct->sup_exceptState[GENERALEXCEPT]));

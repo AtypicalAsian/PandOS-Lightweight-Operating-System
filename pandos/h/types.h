@@ -148,7 +148,7 @@ pcb_t 		   *s_procQ;  /* tail ptr to process queue */
 
 typedef struct delayd_t {
 	cpu_t d_wakeTime;
-	struct delay_t *d_next;
+	struct delayd_t *d_next;
 	support_t *d_supStruct;
 } delayd_t, *delayd_PTR;
 

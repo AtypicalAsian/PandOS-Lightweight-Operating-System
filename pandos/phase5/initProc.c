@@ -29,6 +29,7 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
+#include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
 /* DECLARE VARIABLES & DATA STRUCTURES */
@@ -205,6 +206,7 @@ void test() {
 
     initSuppPool(); /*Initialize support structs free pool*/
     initSwapStructs(); /*Initialize swap pool table, swap pool semaphore and associated device semaphores - function in vmSupport.c*/
+    initADL();
  
     /*Set up initial proccessor state*/
     init_base_state(&base_state);

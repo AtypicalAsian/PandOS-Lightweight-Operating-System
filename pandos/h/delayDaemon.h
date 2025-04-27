@@ -6,16 +6,18 @@
 #ifndef DELAYDAEMON
 #define DELAYDAEMON
 
- #include "../h/types.h"
+#include "../h/types.h"
 #include "../h/const.h"
 
-void initADL(); /*initialize the Active Delay List (ADL)*/
-void sys18Handler(int sleepTime, support_t *support_struct); /*function to implement syscall 18*/
-void delayDaemon(support_t *currSuppStruct); /*code for delay daemon process*/
+extern int delaySemaphore;
+extern delayd_PTR delaydFree;
+extern delayd_PTR delaydFree_h;
 
-delayd_PTR alloc_descriptor(); /*allocate new node for the ADL*/
-void return_to_ADL(delayd_PTR delayDescriptor); /*return a node from the ADL to the free pool (of unsued descriptor nodes)*/
-int insertADL(); /*insert new descriptor into Active Delay List (ADL)*/
-delayd_PTR searchADL(int wakeTime);
+void initADL();
+void delayCurrentProc(support_t *current_support);
+int insertDelayNode(support_t *current_support, int sleepTime);
+void delayDaemon();
+delayd_PTR activateASL();
+void freeNode(delayd_PTR delayEvent);
 
 #endif

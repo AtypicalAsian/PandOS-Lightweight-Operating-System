@@ -72,17 +72,17 @@ void initADL(){
     delayDaemon_sema4 = 1;
 
     /*Init Active Delay List (ADL)*/
-    delaydFree_h = &delayDescriptors[0]; /*dummy node*/
+    delaydFree_h = &delayDescriptors[0];
     int i;
     for (i=1;i<MAXUPROCS;i++){
         delayDescriptors[i-1].d_next = &delayDescriptors[i];
     }
     /*init dummy tail*/
     delayDescriptors[MAXPROC - 1].d_next = NULL;
-    delaydFree_h = &delayDescriptors[MAXPROC];         
-    delayDescriptors->d_next = NULL;
-    delayDescriptors->d_supStruct = NULL;
-    delayDescriptors->d_wakeTime = 0xFFFFFFFF;  
+    delayd_h = &delayDescriptors[MAXPROC];         
+    delayd_h->d_next = NULL;
+    delayd_h->d_supStruct = NULL;
+    delayd_h->d_wakeTime = 0xFFFFFFFF;  
 
     /*Set up initial state for delay daemon*/
     memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
@@ -125,7 +125,6 @@ delayd_PTR searchADL(int wakeTime){
         prev = curr;
         curr = curr->d_next;
     }
-
     return prev;
 }
 
@@ -171,9 +170,9 @@ void delayDaemon(support_t *currSuppStruct){
         SYSCALL(SYS7,0,0,0); /*wait for 100ms to pass*/
         SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0); /*obtain mutual exclusion over the ADL*/
         STCK(curr_time); /*get current time when we finally wake up from Wait Clock syscall*/
-        while (delaydFree_h->d_wakeTime <= curr_time){
-            SYSCALL(SYS4,(int)&delaydFree_h->d_supStruct->privateSema4,0,0); /*Perform SYS4 on uproc private semaphore*/
-            return_to_ADL(delaydFree_h); /*Deallocate delay event descriptor node and return it to the free list*/
+        while (delayd_h->d_wakeTime <= curr_time){
+            SYSCALL(SYS4,(int)&delayd_h->d_supStruct->privateSema4,0,0); /*Perform SYS4 on uproc private semaphore*/
+            return_to_ADL(delayd_h); /*Deallocate delay event descriptor node and return it to the free list*/
         }
         /*Release mutual exclusion over the ADL*/
         SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);

@@ -139,7 +139,7 @@ int insertADL(int time_asleep, support_t *supStruct){
 
     newDescriptor = alloc_descriptor(); /*Get new descriptor from free list*/
     if (newDescriptor == NULL){return FALSE;}
-    STKC(currTime); /*get current time*/
+    STCK(currTime); /*get current time*/
 
     /*Set up new descriptor fields*/
     newDescriptor->d_wakeTime = currTime + (time_asleep + 1000000);
@@ -158,10 +158,6 @@ int insertADL(int time_asleep, support_t *supStruct){
         prev->d_next = newDescriptor;
     }
     return TRUE;
-}
-
-int removeADL(){
-    return;
 }
 
 /**************************************************************************************************  
@@ -208,7 +204,7 @@ void sys18Handler(int sleepTime, support_t *support_struct){
 
     /*Lock semaphore to obtain mutual exclusion over ADL*/
     SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
-    if (insertADL(sleepTime,currProc) == FALSE){
+    if (insertADL(sleepTime,support_struct) == FALSE){
         get_nuked(NULL);
     }
 

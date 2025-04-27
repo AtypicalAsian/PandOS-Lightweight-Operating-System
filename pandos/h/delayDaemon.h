@@ -16,7 +16,6 @@ void delayDaemon(support_t *currSuppStruct); /*code for delay daemon process*/
 delayd_PTR alloc_descriptor(); /*allocate new node for the ADL*/
 void return_to_ADL(delayd_PTR delayDescriptor); /*return a node from the ADL to the free pool (of unsued descriptor nodes)*/
 int insertADL(); /*insert new descriptor into Active Delay List (ADL)*/
-int removeADL(); /*remove descriptor from Active Delay List (ADL)*/
 delayd_PTR searchADL(int wakeTime);
 
 #endif

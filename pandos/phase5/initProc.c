@@ -148,6 +148,7 @@ void summon_process(int process_id, state_t *base_state){
     base_state_copy.s_entryHI = (process_id << SHIFT_ASID); /*Set unique ASID in state*/
         
     suppStruct->sup_asid = process_id; /*Set unique ASID in support structure*/
+    suppStruct->privateSema4 = 0; /*PHASE 5: SET UP PRIVATE SEMAPHORE*/
 
     /*Set Up General Exception Context*/
     suppStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) &sysSupportGenHandler; /*set to address of support level's gen exception handler*/

@@ -22,7 +22,7 @@
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
 #include "../h/delayDaemon.h"
-// #include "/usr/include/umps3/umps/libumps.h"
+#include "/usr/include/umps3/umps/libumps.h"
 
 HIDDEN int delayDaemon_sema4; /*semaphore to provided mutual exclusion over the ADL*/
 HIDDEN delayd_PTR delaydFree_h; /*Ptr to head of free list of event descriptors*/

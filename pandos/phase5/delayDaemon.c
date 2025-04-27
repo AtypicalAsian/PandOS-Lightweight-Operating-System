@@ -172,7 +172,7 @@ int insertADL(int time_asleep, support_t *supStruct){
  * Implements delay facility (delay daemon process)
  * 
  **************************************************************************************************/
-void delayDaemon(support_t *currSuppStruct){
+void delayDaemon(){
     cpu_t curr_time; /*store current time on TOD clock*/
 
     while (TRUE){ /*infite loop*/

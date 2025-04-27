@@ -12,6 +12,7 @@
     "vmsupport.h": "c",
     "interrupts.h": "c",
     "initproc.h": "c",
-    "devicesupportdma.h": "c"
+    "devicesupportdma.h": "c",
+    "delaydaemon.h": "c"
   }
 }

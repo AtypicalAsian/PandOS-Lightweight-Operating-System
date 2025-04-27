@@ -451,11 +451,11 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             flash_get((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         case SYS18:
-            delayCurrentProc(currProc_support_struct);
+            sys18Handler((int) a1_val, currProc_support_struct);
             break;
 
         default:
-        syslvl_prgmTrap_handler(currProc_support_struct);
+            syslvl_prgmTrap_handler(currProc_support_struct);
             break;
     }
     LDST(&(currProc_support_struct->sup_exceptState[GENERALEXCEPT]));

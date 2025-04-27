@@ -119,7 +119,7 @@ delayd_PTR searchADL(int wakeTime){
     /*Traverse ADL to find correct insert position*/
     while (curr != NULL && curr->d_wakeTime < wakeTime){
         /*Stop at tail dummy node*/
-        if (curr->d_wakeTime == 10000000){ /*Define LARGE value for dummy WAKETIME value*/
+        if (curr->d_wakeTime == 0xFFFFFFFF){ /*Define LARGE value for dummy WAKETIME value*/
             return prev;
         }
         prev = curr;

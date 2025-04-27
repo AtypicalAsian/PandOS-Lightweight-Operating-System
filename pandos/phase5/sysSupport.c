@@ -25,6 +25,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
+#include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Support level device semaphores*/

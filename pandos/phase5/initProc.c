@@ -29,6 +29,7 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
+#include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
 /* DECLARE VARIABLES & DATA STRUCTURES */

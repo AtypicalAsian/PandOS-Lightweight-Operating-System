@@ -23,41 +23,195 @@
 #include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
-HIDDEN int delayDaemon_sema4; /*semaphore to support (...)*/
-HIDDEN delay_ptr delaydFree_h; /*Ptr to head of free list of event descriptors*/
+HIDDEN int delayDaemon_sema4; /*semaphore to provided mutual exclusion over the ADL*/
+HIDDEN delayd_PTR delaydFree_h; /*Ptr to head of free list of event descriptors*/
+HIDDEN delayd_PTR delayd_h; /*ptr to head of active delay list ADL*/
 
 
-/*allocate new node for the ADL*/
-void alloc_descriptor(){
-    return;
+/**************************************************************************************************  
+ * Allocate new node for the ADL from free list
+ * 
+ * @ret:
+ *     - pointer to preceding event descriptor
+ **************************************************************************************************/
+delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
+    delayd_PTR newDescriptor; /*pointer to new descriptor to be allocated from free list*/
+    if (delaydFree_h != NULL){
+        newDescriptor = delaydFree_h; /*set to current head*/
+        delaydFree_h = delaydFree_h->d_next; /*move head to next node*/
+
+        newDescriptor->d_next = NULL;
+        newDescriptor->d_supStruct = NULL; /*do we have to init this to NULL?*/
+        newDescriptor->d_wakeTime = 0;
+        return newDescriptor;
+    }
+    return NULL;
+}
+
+/**************************************************************************************************  
+ * Return a node from the ADL to the free pool (of unsued descriptor nodes)
+ * 
+ **************************************************************************************************/
+void return_to_ADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
+    delayDescriptor->d_next = delaydFree_h;
+    delaydFree_h = delayDescriptor;
 }
 
 
-/*return a node from the ADL to the free pool (of unsued descriptor nodes)*/
-void free_descriptor(){
-    return;
-}
-
-/*Initialize Active Delay List*/
+/**************************************************************************************************  
+ * Initialize Active Delay List (ADL)
+ * Steps:
+ * 1. Add each element from the static array of delay event descriptor nodes to the free list and 
+ *    initialize the active list (zero, one or two dummy nodes)
+ * 2. Initialize and launch (SYS1) the Delay Daemon.
+ * 3. Set the Support Structure SYS1 parameter to be NULL
+ **************************************************************************************************/
 void initADL(){
-    /*Set up initial state*/
+
+    static delayd_t delayDescriptors[MAXUPROCS+1]; /*add one more to use as dummy node for ADL*/
+    delayDaemon_sema4 = 1;
+
+    /*Init Active Delay List (ADL)*/
+    delaydFree_h = &delayDescriptors[0]; /*dummy node*/
+    int i;
+    for (i=1;i<MAXUPROCS;i++){
+        delayDescriptors[i-1].d_next = &delayDescriptors[i];
+    }
+    /*init dummy tail*/
+    delayDescriptors[MAXPROC - 1].d_next = NULL;
+    delaydFree_h = &delayDescriptors[MAXPROC];         
+    delayDescriptors->d_next = NULL;
+    delayDescriptors->d_supStruct = NULL;
+    delayDescriptors->d_wakeTime = 0xFFFFFFFF;  
+
+    /*Set up initial state for delay daemon*/
+    memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
     state_t base_state;
-    base_state.s_pc = (memaddr) delay_daemonProcess;
-    base_state.t9 = (memaddr) delay_daemonProcess;
-    base_state.s_sp = 0; /*CHANGE TO STARTING ADDRESS ?*/
-    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON;
+    base_state.s_entryHI = (0 << SHIFT_ASID); /*set asid for delay daemon process (0)*/
+    base_state.s_pc = (memaddr) delayDaemon;
+    base_state.s_t9 = (memaddr) delayDaemon;
+    base_state.s_sp = topRAM; /*CHANGE TO STARTING ADDRESS ?*/
+    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON; /*kernel mode + interrupts enabled*/
+
+    int status;
+    status = SYSCALL(SYS1,(int) &base_state,NULL,0);
+
+    if (status != 0){
+        get_nuked(NULL);
+    }
+
 }
 
-/*insert new descriptor into Active Delay List (ADL)*/
-int insertADL(){
-    return;
 
-}
-void removeADL(){
-    return;
+/**************************************************************************************************  
+ * Helper method that searches the ADL for the event descriptor that directly precedes 
+ * where the new descriptor should belong (ADL sorted by wakeTime)
+ * 
+ * @ret:
+ *     - pointer to preceding event descriptor
+ **************************************************************************************************/
+delayd_PTR searchADL(int wakeTime){
+    if (delayd_h == NULL){return NULL;}
+
+    delayd_PTR prev = NULL;
+    delayd_PTR curr = delayd_h;
+
+    /*Traverse ADL to find correct insert position*/
+    while (curr != NULL && curr->d_wakeTime < wakeTime){
+        /*Stop at tail dummy node*/
+        if (curr->d_wakeTime == 10000000){ /*Define LARGE value for dummy WAKETIME value*/
+            return prev;
+        }
+        prev = curr;
+        curr = curr->d_next;
+    }
+
+    return prev;
 }
 
-/*implements delay facility*/
-void delay_daemonProcess(support_t *currSuppStruct){
+/**************************************************************************************************  
+ * Insert new descriptor into Active Delay List (ADL)
+ * 
+ **************************************************************************************************/
+int insertADL(int time_asleep, support_t *supStruct){
+    int currTime;
+    delayd_PTR newDescriptor;
+
+    newDescriptor = alloc_descriptor(); /*Get new descriptor from free list*/
+    if (newDescriptor == NULL){return FALSE;}
+    STCK(currTime); /*get current time*/
+
+    /*Set up new descriptor fields*/
+    newDescriptor->d_wakeTime = currTime + (time_asleep + 1000000);
+    newDescriptor->d_supStruct = supStruct;
+
+    /*Insert descriptor into correct position on ADL*/
+    delayd_PTR prev = searchADL(newDescriptor->d_wakeTime);
+
+    /*If insert position is at HEAD of ADL*/
+    if (prev == NULL){
+        newDescriptor->d_next = delayd_h;
+        delayd_h = newDescriptor;
+    }
+    else{
+        newDescriptor->d_next = prev->d_next;
+        prev->d_next = newDescriptor;
+    }
+    return TRUE;
+}
+
+/**************************************************************************************************  
+ * Implements delay facility (delay daemon process)
+ * 
+ **************************************************************************************************/
+void delayDaemon(support_t *currSuppStruct){
+    cpu_t curr_time; /*store current time on TOD clock*/
+
+    while (TRUE){ /*infite loop*/
+        SYSCALL(SYS7,0,0,0); /*wait for 100ms to pass*/
+        SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0); /*obtain mutual exclusion over the ADL*/
+        STCK(curr_time); /*get current time when we finally wake up from Wait Clock syscall*/
+        while (delaydFree_h->d_wakeTime <= curr_time){
+            SYSCALL(SYS4,(int)&delaydFree_h->d_supStruct->privateSema4,0,0); /*Perform SYS4 on uproc private semaphore*/
+            return_to_ADL(delaydFree_h); /*Deallocate delay event descriptor node and return it to the free list*/
+        }
+        /*Release mutual exclusion over the ADL*/
+        SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);
+    }
+}
+
+/**************************************************************************************************  
+ * Code for implementing syscall 18 - DELAY
+ * Steps:
+ * 1. Check the seconds parameter and terminate (SYS9) the U-proc if the wait time is negative
+ * 2. Obtain mutual exclusion over the ADL - SYS3/P on the ADL semaphore
+ * 3. Allocate a delay event descriptor node from the free list, populate it and insert it into 
+ *    its proper location on the active list. If this operation is unsuccessful, terminate (SYS9) 
+ *    the U-proc – after releasing mutual exclusion over the ADL.
+ * 4. Release mutual exclusion over the ADL - SYS4/V on the ADL semaphore AND execute a SYS3/P 
+ *    on the U-proc’s private semaphore atomically. This will block the executing U-proc.
+ * 5. Return control (LDST) to the U-proc at the instruction immediately following the SYS18. 
+ *    This step will not be executed until after the U-proc is awoken
+ * 
+ * @ref
+ * 
+ **************************************************************************************************/
+void sys18Handler(int sleepTime, support_t *support_struct){
+    /*Negative wait time -> terminate uproc with SYS9*/
+    if (sleepTime < 0){
+        get_nuked(NULL);
+    }
+
+    /*Lock semaphore to obtain mutual exclusion over ADL*/
+    SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
+    if (insertADL(sleepTime,support_struct) == FALSE){
+        get_nuked(NULL);
+    }
+
+    /*Perform SYS4 on ADL semaphore then SYS3 on uproc private semaphore atomically*/
+    setSTATUS(NO_INTS);
+    SYSCALL(SYS4,(int) &delayDaemon_sema4,0,0);
+    SYSCALL(SYS3,(int)&support_struct->privateSema4,0,0); 
+    setSTATUS(YES_INTS);
     return;
 }

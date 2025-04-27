@@ -452,7 +452,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             break;
         
         case SYS18:
-            delay_syscallHandler(currProc_support_struct);
+            sys18Handler(a1_val,currProc_support_struct);
             break;
 
         default:

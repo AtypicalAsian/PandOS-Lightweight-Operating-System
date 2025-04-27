@@ -212,7 +212,7 @@ void sys18Handler(support_t *support_struct){
         SYSCALL(PASSEREN, (int) &delayDaemon_sema4, 0, 0);
 
         /* Check if delay node inserted correctly */
-        if(insertDelayNode(support_struct, sleepTime) == FALSE) {
+        if(insertADL(sleepTime,support_struct) == FALSE) {
             get_nuked(NULL);
         }
         setSTATUS(NO_INTS);

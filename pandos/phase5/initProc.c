@@ -210,6 +210,7 @@ void test() {
  
     /*Set up initial proccessor state*/
     init_base_state(&base_state);
+    initADL(); /*PHASE 5 to initialize ADL*/
 
     /*create and launch 8 user processes*/
     /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/

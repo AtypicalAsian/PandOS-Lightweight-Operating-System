@@ -6,7 +6,7 @@
 #ifndef DELAYDAEMON
 #define DELAYDAEMON
 
- #include "../h/types.h"
+#include "../h/types.h"
 #include "../h/const.h"
 
 void initADL(); /*initialize the Active Delay List (ADL)*/

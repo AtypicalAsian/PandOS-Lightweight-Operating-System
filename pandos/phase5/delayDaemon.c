@@ -145,6 +145,10 @@ int insertADL(int time_asleep, support_t *supStruct){
     newDescriptor->d_supStruct = supStruct;
 
     /*Insert descriptor into correct position on ADL*/
+    /*if (newDescriptor->d_wakeTime < delayd_h->d_wakeTime){
+        newDescriptor->d_next = delayd_h;
+        delayd_h = newDescriptor;
+    }*/
     delayd_PTR prev = searchADL(newDescriptor->d_wakeTime);
 
     /*If insert position is at HEAD of ADL*/

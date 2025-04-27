@@ -98,7 +98,7 @@ void initADL(){
 
     /* Initialise the Active Delay List (ADL) with a dummy tail node */
     delayDescriptors[MAXPROC - 1].d_next = NULL;
-    delayd_h = &delayDescriptors[MAXPROC];         
+    delayd_h = &delayDescriptors[MAXPROC];
     delayd_h->d_next = NULL;
     delayd_h->d_supStruct = NULL;
     delayd_h->d_wakeTime = 0xFFFFFFFF;

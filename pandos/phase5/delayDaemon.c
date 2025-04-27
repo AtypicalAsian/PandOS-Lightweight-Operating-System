@@ -68,21 +68,21 @@ void return_to_ADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
  **************************************************************************************************/
 void initADL(){
 
-    static delayd_t delayDescriptors[MAXUPROCS+1]; /*add one more to use as dummy node for ADL*/
+    static delayd_t delayDescriptors[MAXPROC+1]; /*add one more to use as dummy node for ADL*/
     delayDaemon_sema4 = 1;
 
     /*Init Active Delay List (ADL)*/
-    delaydFree_h = &delayDescriptors[0]; /*dummy node*/
+    delaydFree_h = &delayDescriptors[0];
     int i;
-    for (i=1;i<MAXUPROCS;i++){
+    for (i=1;i<MAXPROC;i++){
         delayDescriptors[i-1].d_next = &delayDescriptors[i];
     }
     /*init dummy tail*/
     delayDescriptors[MAXPROC - 1].d_next = NULL;
-    delaydFree_h = &delayDescriptors[MAXPROC];         
-    delayDescriptors->d_next = NULL;
-    delayDescriptors->d_supStruct = NULL;
-    delayDescriptors->d_wakeTime = 0xFFFFFFFF;  
+    delayd_h = &delayDescriptors[MAXPROC];         
+    delayd_h->d_next = NULL;
+    delayd_h->d_supStruct = NULL;
+    delayd_h->d_wakeTime = 0xFFFFFFFF;  
 
     /*Set up initial state for delay daemon*/
     memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
@@ -119,13 +119,12 @@ delayd_PTR searchADL(int wakeTime){
     /*Traverse ADL to find correct insert position*/
     while (curr != NULL && curr->d_wakeTime < wakeTime){
         /*Stop at tail dummy node*/
-        if (curr->d_wakeTime == 10000000){ /*Define LARGE value for dummy WAKETIME value*/
+        if (curr->d_wakeTime == 0xFFFFFFFF){ /*Define LARGE value for dummy WAKETIME value*/
             return prev;
         }
         prev = curr;
         curr = curr->d_next;
     }
-
     return prev;
 }
 
@@ -142,10 +141,14 @@ int insertADL(int time_asleep, support_t *supStruct){
     STCK(currTime); /*get current time*/
 
     /*Set up new descriptor fields*/
-    newDescriptor->d_wakeTime = currTime + (time_asleep + 1000000);
+    newDescriptor->d_wakeTime = currTime + (time_asleep * 1000000);
     newDescriptor->d_supStruct = supStruct;
 
     /*Insert descriptor into correct position on ADL*/
+    /*if (newDescriptor->d_wakeTime < delayd_h->d_wakeTime){
+        newDescriptor->d_next = delayd_h;
+        delayd_h = newDescriptor;
+    }*/
     delayd_PTR prev = searchADL(newDescriptor->d_wakeTime);
 
     /*If insert position is at HEAD of ADL*/
@@ -171,9 +174,9 @@ void delayDaemon(support_t *currSuppStruct){
         SYSCALL(SYS7,0,0,0); /*wait for 100ms to pass*/
         SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0); /*obtain mutual exclusion over the ADL*/
         STCK(curr_time); /*get current time when we finally wake up from Wait Clock syscall*/
-        while (delaydFree_h->d_wakeTime <= curr_time){
-            SYSCALL(SYS4,(int)&delaydFree_h->d_supStruct->privateSema4,0,0); /*Perform SYS4 on uproc private semaphore*/
-            return_to_ADL(delaydFree_h); /*Deallocate delay event descriptor node and return it to the free list*/
+        while (delayd_h->d_wakeTime <= curr_time){
+            SYSCALL(SYS4,(int)&delayd_h->d_supStruct->privateSema4,0,0); /*Perform SYS4 on uproc private semaphore*/
+            return_to_ADL(delayd_h); /*Deallocate delay event descriptor node and return it to the free list*/
         }
         /*Release mutual exclusion over the ADL*/
         SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);

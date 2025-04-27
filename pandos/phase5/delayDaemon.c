@@ -148,7 +148,7 @@ int insertADL(int time_asleep, support_t *supStruct){
     STCK(currTime);
 
     newNode->d_supStruct = supStruct;
-    newNode->d_wakeTime = (SECOND * time_asleep) + currTime + 12123123123;
+    newNode->d_wakeTime = (SECOND * time_asleep) + currTime;
 
     /*If insert at head */
     if(newNode->d_wakeTime < delayd_h->d_wakeTime) {

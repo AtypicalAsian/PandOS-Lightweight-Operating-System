@@ -29,13 +29,14 @@
 #include "../h/interrupts.h"
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
+#include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
 /* DECLARE VARIABLES & DATA STRUCTURES */
 int deviceSema4s[DEVICE_TYPES * DEVPERINT]; /*array of semaphores, each for a (potentially) shareable peripheral I/O device. These semaphores will be used for mutual exclusion*/
 int masterSema4; /* A Support Level semaphore used to ensure that test() terminates gracefully */
 int freeSupIndex; /*Iterator to index into the free support pool*/
-support_t *free_support_pool[MAXUPROCS]; /*Array of pointers to free support structures*/
+support_t *free_support_pool[MAXUPROCS+1]; /*Array of pointers to free support structures*/
 support_t support_structs_pool[MAXUPROCS]; /*Array of support structure objects for user procs*/
 
 
@@ -147,6 +148,7 @@ void summon_process(int process_id, state_t *base_state){
     base_state_copy.s_entryHI = (process_id << SHIFT_ASID); /*Set unique ASID in state*/
         
     suppStruct->sup_asid = process_id; /*Set unique ASID in support structure*/
+    suppStruct->privateSema4 = 0; /*PHASE 5: SET UP PRIVATE SEMAPHORE*/
 
     /*Set Up General Exception Context*/
     suppStruct->sup_exceptContext[GENERALEXCEPT].c_pc = (memaddr) &sysSupportGenHandler; /*set to address of support level's gen exception handler*/
@@ -208,6 +210,7 @@ void test() {
  
     /*Set up initial proccessor state*/
     init_base_state(&base_state);
+    /*initADL();*/ /*PHASE 5 to initialize ADL*/
 
     /*create and launch 8 user processes*/
     /*note: asid (process_id) 0 is reserved for kernl daemons, so the (up to 8) u-procs get assigned asid values from 1-8 instead*/

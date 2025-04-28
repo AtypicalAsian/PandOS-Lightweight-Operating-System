@@ -3,6 +3,7 @@
  * 
  * 
  * @ref
+ * pandos
  * 
  * @authors  
  * Nicolas & Tran  
@@ -23,9 +24,9 @@
 #include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
-HIDDEN int delayDaemon_sema4; /*semaphore to provided mutual exclusion over the ADL*/
-HIDDEN delayd_PTR delaydFree_h; /*Ptr to head of free list of event descriptors*/
-HIDDEN delayd_PTR delayd_h; /*ptr to head of active delay list ADL*/
+int delayDaemon_sema4; /*semaphore to provided mutual exclusion over the ADL*/
+delayd_PTR delaydFree_h; /*Ptr to head of free list of event descriptors*/
+delayd_PTR delayd_h; /*ptr to head of active delay list ADL*/
 
 
 /**************************************************************************************************  
@@ -45,7 +46,9 @@ delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
         newDescriptor->d_wakeTime = 0;
         return newDescriptor;
     }
-    return NULL;
+    else{
+        return NULL;
+    }
 }
 
 /**************************************************************************************************  
@@ -67,39 +70,37 @@ void return_to_ADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
  * 3. Set the Support Structure SYS1 parameter to be NULL
  **************************************************************************************************/
 void initADL(){
-
     static delayd_t delayDescriptors[MAXPROC+1]; /*add one more to use as dummy node for ADL*/
-    delayDaemon_sema4 = 1;
+    state_t base_state;
+    memaddr ramTOP;
+    int status;
 
-    /*Init Active Delay List (ADL)*/
+    delayDaemon_sema4 = 1;
+    RAMTOP(ramTOP);
+    base_state.s_sp = ramTOP;
+    base_state.s_pc = (memaddr) delayDaemon;                      
+    base_state.s_t9 = (memaddr) delayDaemon;                
+    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON;
+    base_state.s_entryHI = (0 << SHIFT_ASID);
+
+    status = SYSCALL(SYS1,(int)&base_state,(memaddr) NULL,0);
+    if (status != OK){
+        SYSCALL(SYS2,0,0,0);
+    }
+
     delaydFree_h = &delayDescriptors[0];
+
     int i;
-    for (i=1;i<MAXPROC;i++){
+    for (i = 1; i < MAXPROC; i++) {
         delayDescriptors[i-1].d_next = &delayDescriptors[i];
     }
-    /*init dummy tail*/
+
+    /* Initialise the Active Delay List (ADL) with a dummy tail node */
     delayDescriptors[MAXPROC - 1].d_next = NULL;
-    delayd_h = &delayDescriptors[MAXPROC];         
+    delayd_h = &delayDescriptors[MAXPROC];
     delayd_h->d_next = NULL;
     delayd_h->d_supStruct = NULL;
-    delayd_h->d_wakeTime = 0xFFFFFFFF;  
-
-    /*Set up initial state for delay daemon*/
-    memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
-    state_t base_state;
-    base_state.s_entryHI = (0 << SHIFT_ASID); /*set asid for delay daemon process (0)*/
-    base_state.s_pc = (memaddr) delayDaemon;
-    base_state.s_t9 = (memaddr) delayDaemon;
-    base_state.s_sp = topRAM; /*CHANGE TO STARTING ADDRESS ?*/
-    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON; /*kernel mode + interrupts enabled*/
-
-    int status;
-    status = SYSCALL(SYS1,(int) &base_state,NULL,0);
-
-    if (status != 0){
-        get_nuked(NULL);
-    }
-
+    delayd_h->d_wakeTime = 0xFFFFFFFF;
 }
 
 
@@ -133,41 +134,44 @@ delayd_PTR searchADL(int wakeTime){
  * 
  **************************************************************************************************/
 int insertADL(int time_asleep, support_t *supStruct){
-    int currTime;
-    delayd_PTR newDescriptor;
+    delayd_PTR tempNode;
+    delayd_PTR newNode;
+    cpu_t currTime;
 
-    newDescriptor = alloc_descriptor(); /*Get new descriptor from free list*/
-    if (newDescriptor == NULL){return FALSE;}
-    STCK(currTime); /*get current time*/
+    newNode = alloc_descriptor();
 
-    /*Set up new descriptor fields*/
-    newDescriptor->d_wakeTime = currTime + (time_asleep * 1000000);
-    newDescriptor->d_supStruct = supStruct;
-
-    /*Insert descriptor into correct position on ADL*/
-    /*if (newDescriptor->d_wakeTime < delayd_h->d_wakeTime){
-        newDescriptor->d_next = delayd_h;
-        delayd_h = newDescriptor;
-    }*/
-    delayd_PTR prev = searchADL(newDescriptor->d_wakeTime);
-
-    /*If insert position is at HEAD of ADL*/
-    if (prev == NULL){
-        newDescriptor->d_next = delayd_h;
-        delayd_h = newDescriptor;
+    if (newNode == NULL) {
+        return FALSE;
     }
-    else{
-        newDescriptor->d_next = prev->d_next;
-        prev->d_next = newDescriptor;
+
+    STCK(currTime);
+
+    newNode->d_supStruct = supStruct;
+    newNode->d_wakeTime = (SECOND * time_asleep) + currTime;
+
+    /*If insert at head */
+    if(newNode->d_wakeTime < delayd_h->d_wakeTime) {
+        newNode->d_next = delayd_h;
+        delayd_h = newNode;
     }
-    return TRUE;
+    else {
+        tempNode = delayd_h;
+
+        while (tempNode->d_next->d_wakeTime < newNode->d_wakeTime) {
+            tempNode = tempNode->d_next;
+        }
+        newNode->d_next = tempNode->d_next;
+        tempNode->d_next = newNode;
+    }
+
+    return(TRUE);
 }
 
 /**************************************************************************************************  
  * Implements delay facility (delay daemon process)
  * 
  **************************************************************************************************/
-void delayDaemon(support_t *currSuppStruct){
+void delayDaemon(){
     cpu_t curr_time; /*store current time on TOD clock*/
 
     while (TRUE){ /*infite loop*/
@@ -199,22 +203,24 @@ void delayDaemon(support_t *currSuppStruct){
  * @ref
  * 
  **************************************************************************************************/
-void sys18Handler(int sleepTime, support_t *support_struct){
-    /*Negative wait time -> terminate uproc with SYS9*/
-    if (sleepTime < 0){
+void sys18Handler(support_t *support_struct){
+    int sleepTime;
+    sleepTime = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+
+    if (sleepTime > 0) {
+        SYSCALL(PASSEREN, (int) &delayDaemon_sema4, 0, 0);
+
+        /* Check if delay node inserted correctly */
+        if(insertADL(sleepTime,support_struct) == FALSE) {
+            get_nuked(NULL);
+        }
+        setSTATUS(NO_INTS);
+        SYSCALL(VERHOGEN, (int) &delayDaemon_sema4, 0, 0);
+        SYSCALL(PASSEREN, (int) &support_struct->privateSema4, 0, 0);
+        setSTATUS(YES_INTS);
+    }
+    else if (sleepTime < 0) {
         get_nuked(NULL);
     }
-
-    /*Lock semaphore to obtain mutual exclusion over ADL*/
-    SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
-    if (insertADL(sleepTime,support_struct) == FALSE){
-        get_nuked(NULL);
-    }
-
-    /*Perform SYS4 on ADL semaphore then SYS3 on uproc private semaphore atomically*/
-    setSTATUS(NO_INTS);
-    SYSCALL(SYS4,(int) &delayDaemon_sema4,0,0);
-    SYSCALL(SYS3,(int)&support_struct->privateSema4,0,0); 
-    setSTATUS(YES_INTS);
-    return;
 }
+

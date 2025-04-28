@@ -25,6 +25,7 @@
 #include "../h/vmSupport.h"
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
+#include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
 /*Support level device semaphores*/
@@ -398,7 +399,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
     /*----------------------------------------------------------*/
 
     /* Validate syscall number */
-    if (syscall_num_requested < SYS9 || syscall_num_requested > SYS18) { /*Will have to change for future phases*/
+    if (syscall_num_requested < SYS9 || syscall_num_requested > 18) { /*Will have to change for future phases*/
         /* Invalid syscall number, treat as Program Trap */
         syslvl_prgmTrap_handler(currProc_support_struct);
         return;
@@ -449,9 +450,12 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
         case SYS17:
             flash_get((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
             break;
+        case SYS18:
+            sys18Handler(currProc_support_struct);
+            break;
 
         default:
-        syslvl_prgmTrap_handler(currProc_support_struct);
+            syslvl_prgmTrap_handler(currProc_support_struct);
             break;
     }
     LDST(&(currProc_support_struct->sup_exceptState[GENERALEXCEPT]));

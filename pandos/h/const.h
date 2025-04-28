@@ -267,5 +267,6 @@
 #define LEFTSHIFT8 8
 #define LEFTSHIFT16 16
 
+#define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
 #endif
 

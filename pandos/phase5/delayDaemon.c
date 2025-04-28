@@ -70,14 +70,13 @@ void return_to_ADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
  * 3. Set the Support Structure SYS1 parameter to be NULL
  **************************************************************************************************/
 void initADL(){
-
     static delayd_t delayDescriptors[MAXPROC+1]; /*add one more to use as dummy node for ADL*/
     state_t base_state;
     memaddr ramTOP;
     int status;
 
     delayDaemon_sema4 = 1;
-    ramTOP = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
+    RAMTOP(ramTOP);
     base_state.s_sp = ramTOP;
     base_state.s_pc = (memaddr) delayDaemon;                      
     base_state.s_t9 = (memaddr) delayDaemon;                

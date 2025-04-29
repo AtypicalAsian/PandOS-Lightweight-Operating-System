@@ -163,8 +163,8 @@ void populate_passUpVec(){
 
  *****************************************************************************/
 void init_proc_state(pcb_PTR firstProc){
-	unsigned int ramBase;  /* Variable to store the base address of RAM */
-	unsigned int ramSize; /* Variable to store the total size of RAM */
+	/*unsigned int ramBase;*/  /* Variable to store the base address of RAM */
+	/*unsigned int ramSize;*/ /* Variable to store the total size of RAM */
 	/*ramBase = *((int *)RAMBASEADDR);*/ /* Read the RAM base address */
 	/*ramSize = *((int *)RAMBASESIZE);*/ /* Read the RAM size */
     memaddr topRAM;                         /* the address of the last RAM frame */

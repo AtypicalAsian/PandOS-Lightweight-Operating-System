@@ -271,5 +271,6 @@
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
 #define DEVREGADDR ((devregarea_t *)RAMBASEADDR)
 #define EXCSTATE ((state_t *) BIOSDATAPAGE)
+#define KUP(S) (((S) & 0x00000008) >> 3)
 #endif
 

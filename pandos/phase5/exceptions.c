@@ -65,7 +65,7 @@
  #include "../h/interrupts.h"
  #include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given semaphore (helper method) */
 int syscallNo; /*stores the syscall number (1-8)*/
@@ -162,28 +162,23 @@ void recursive_terminate(pcb_PTR proc){
  * 
  * @return None  
  *****************************************************************************/
-void createProcess(state_PTR stateSYS, support_t *suppStruct) {
+void createProcess(state_t *stateSYS, support_t *suppStruct) {
     pcb_PTR newProc;  /* Pointer to the new process' PCB */
+	unsigned int retValue = -1;
     newProc = allocPcb(); /* Allocate a new PCB from the free PCB list */
 
      /* If a new PCB was successfully allocated */
     if (newProc != NULL){
 		/*newProc->p_s = *stateSYS;*/
-        copyState(stateSYS, &(newProc->p_s));        /* Copy the given processor state to the new process */
-        newProc->p_supportStruct = suppStruct;       /* Assign the provided support structure */
-        newProc->p_time = 0;              			 /* Initialize CPU time usage to 0 */
-        newProc->p_semAdd = NULL;                    /* New process is not blocked on a semaphore */
-     
-        insertChild(currProc, newProc);              /* Insert the new process as a child of the current process */
-        insertProcQ(&ReadyQueue, newProc);           /* Add the new process to the Ready Queue for scheduling */
-
-        currProc->p_s.s_v0 = 0;                		 /* Indicate success (0) in the caller's v0 register */
-        procCnt++;                                   /* Increment the active process count */
+        procCnt++;
+		newProc->p_supportStruct = suppStruct;
+		newProc->p_s = *stateSYS;
+		insertChild(currProc, newProc);
+		insertProcQ(&ReadyQueue, newProc);
+		retValue = 0;
     }
     /* If no PCB was available (Free PCB Pool exhausted) */
-    else{
-        currProc->p_s.s_v0 = -1;         /* Indicate failure (assign -1) in v0 */
-    }
+	EXCSTATE->s_v0 = retValue;
 }
 
 
@@ -245,7 +240,10 @@ void passeren(int *sem){
     
     /*If semaphore value < 0, process is blocked on the ASL (transitions from running to blocked)*/
     if (*sem < 0) {
-        blockCurrProc(sem);
+        currProc->p_s = *EXCSTATE;
+		currProc->p_time += timePassed();
+		insertBlocked((int *) sem, currProc);
+		currProc = NULL;
         switchProcess();  /* Call the scheduler to run another process */
     }
 }
@@ -352,11 +350,8 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
  *  
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
-void getCPUTime(state_t *savedState){
-	cpu_t totalTime;
-    totalTime = currProc->p_time + get_elapsed_time();
-	savedState->s_v0 = totalTime;
-    currProc->p_s.s_v0 = totalTime;
+void getCPUTime(cpu_t *resultAddress){
+	*resultAddress = currProc->p_time + get_elapsed_time();
 }
 
 
@@ -392,8 +387,8 @@ void waitForClock() {
  *  
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
-void getSupportData(state_t *savedState) {
-	savedState->s_v0 = (int) currProc->p_supportStruct;
+void getSupportData(support_t **resultAddress) {
+	*resultAddress = currProc->p_supportStruct;
 }
 
 
@@ -424,9 +419,10 @@ void getSupportData(state_t *savedState) {
 HIDDEN void exceptionPassUpHandler(int exceptionCode) {
 	/*If current process has a support structure -> pass up exception to the exception handler */
 	if (currProc->p_supportStruct != NULL){
-		copyState(((state_t *) BIOSDATAPAGE),&(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
-		context_t *ctx = &(currProc->p_supportStruct->sup_exceptContext[exceptionCode]);
-		LDCXT(ctx->c_stackPtr, ctx->c_status, ctx->c_pc);
+		currProc->p_supportStruct->sup_exceptState[exceptionCode] = *EXCSTATE;
+		/* Load the appropriate exception handler context from the support structure and switch to it */
+		context_t *context = &(currProc->p_supportStruct->sup_exceptContext[exceptionCode]);
+		LDCXT(context->c_stackPtr, context->c_status, context->c_pc);
 	}
 	/* No user-level handler defined, so terminate the process */
 	else{
@@ -453,7 +449,7 @@ HIDDEN void exceptionPassUpHandler(int exceptionCode) {
  * @return None (This function does not return, as it either transfers control  
  *               to a user-defined handler or terminates the process).  
  *****************************************************************************/  
-void prgmTrapHandler() {
+HIDDEN void prgmTrapHandler() {
 	exceptionPassUpHandler(GENERALEXCEPT);
 }
 
@@ -477,7 +473,7 @@ void prgmTrapHandler() {
  * 
  * @return None  
  *****************************************************************************/ 
-void tlbTrapHanlder() {
+HIDDEN void tlbTrapHanlder() {
 	exceptionPassUpHandler(PGFAULTEXCEPT);
 }
 
@@ -506,80 +502,62 @@ void tlbTrapHanlder() {
  *  
  * @return None  
  *****************************************************************************/  
-void sysTrapHandler() {
-	/*Retrieve saved processor state (located at start of the BIOS Data Page) & extract the syscall number to find out which type of exception was raised*/
-	state_t *savedState = (state_t *)BIOSDATAPAGE;
-	syscallNo = savedState->s_a0;
-	unsigned int reg_a1 = savedState->s_a1;
-	unsigned int reg_a2 = savedState->s_a2;
-	unsigned int reg_a3 = savedState->s_a3;
+HIDDEN void sysTrapHandler(unsigned int KUp) {
+	volatile unsigned int sysId = EXCSTATE->s_a0;
 
-	/*Increment PC by 4 avoid infinite loops*/
-    savedState->s_pc = savedState->s_pc + WORDLEN;
+	volatile unsigned int arg1 = EXCSTATE->s_a1;
+	volatile unsigned int arg2 = EXCSTATE->s_a2;
+	volatile unsigned int arg3 = EXCSTATE->s_a3;
+	memaddr resultAddress = (memaddr) &(EXCSTATE->s_v0);
 
-	/*If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
-    if (((savedState->s_status) & USERPON) != ALLOFF){
-        savedState->s_cause = (savedState->s_cause) & 0xFFFFFF28; /* Set exception cause to Reserved Instruction */
-        prgmTrapHandler();  /* Handle it as a Program Trap */
-    }
+	if (sysId <= 8) {
 
-	/*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
-    if ((syscallNo < 1) || (syscallNo > 8)) {  
-        exceptionPassUpHandler(GENERALEXCEPT);  /* Invalid syscall, try pass up or die to see if we can handle it */
-    }
-	unsigned int kup_check = ((savedState->s_status) & 0x00000008) >> 3; /*KUp bit, which checks whether the process is in user or kernel mode*/
-	/*Phase 2 requires one to be in kernel mode*/
-
-	/*If we're in kernel mode -> safe to proceed*/
-	if (kup_check == 0) {
-		switch (syscallNo) {
-		case SYS1:
-			createProcess((state_t *) reg_a1, (support_t *) reg_a2);
-			break;
-		case SYS2:
-			terminateProcess();
-			break;
-		case SYS3:
-			passeren((int *) reg_a1);
-			break;
-		case SYS4:
-			verhogen((int *) reg_a1);
-			break;
-		case SYS5:
-			waitForIO(reg_a1, reg_a2, reg_a3);
-			break;
-		case SYS6:
-			getCPUTime(savedState);
-			break;
-		case SYS7:
-			waitForClock();
-			break;
-		case SYS8:
-			getSupportData(savedState);
-			break;
-		default:
-			terminateProcess();
-			break;
+		if (KUp == 0) {
+			/* Execute commands in kernal mode */
+			EXCSTATE->s_pc += WORDLEN;
+			switch (sysId) {
+			case CREATEPROCESS:
+				createProcess((state_t *) arg1, (support_t *) arg2);
+				break;
+			case TERMINATEPROCESS:
+				terminateProcess();
+				break;
+			case PASSEREN:
+				passeren((semaphore *) arg1);
+				break;
+			case VERHOGEN:
+				verhogen((semaphore *) arg1);
+				break;
+			case WAITIO:
+				waitForIO(arg1, arg2, arg3);
+				break;
+			case GETTIME:
+				getCPUTime((cpu_t *) resultAddress);
+				break;
+			case CLOCKWAIT:
+				waitForClock();
+				break;
+			case GETSUPPORTPTR:
+				getSupportData((support_t **) resultAddress);
+				break;
+			default:
+				terminateProcess();
+				break;
+			}
+			if (currProc == NULL)
+				switchProcess();
+			else
+				LDST(EXCSTATE);
 		}
-	
-    /* 
-     * After handling the system call, check if there is a current process.
-     * If no process is available (i.e., currProc is NULL), switch to the next available process.
-     * Otherwise, load the processor state from the saved state to resume execution.
-     */
-	if (currProc == NULL)
-		switchProcess();
-	else
-		LDST(savedState);
+		else {
+			/* Terminate if in user mode*/
+			EXCSTATE->s_cause &= ~GETEXECCODE;
+			EXCSTATE->s_cause |= EXCODESHIFT << CAUSESHIFT;
+			prgmTrapHandler();
+		}
 	}
 	else {
-	/* 
-     * If kup_check is not 0, the process is not in kernel mode
-     * which is an error condition since privileged system calls must be executed in kernel mode.
-     */
-		savedState->s_cause &= ~GETEXECCODE; /* Clear the current exception code bits from the cause field */
-		savedState->s_cause |= 10 << CAUSESHIFT; /* Set the new cause by shifting the exception code into place */
-		prgmTrapHandler(); /*Handle as program trap*/
+		exceptionPassUpHandler(GENERALEXCEPT);
 	}
 }
 
@@ -609,7 +587,7 @@ void sysTrapHandler() {
  * @return None  
  *****************************************************************************/
 void gen_exception_handler()
-{	
+{
 	state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
     int exception_code; /* Stores the extracted exception type */  
 
@@ -626,7 +604,8 @@ void gen_exception_handler()
     }  
     else if (exception_code == 8) {  
         /* Case 3: Exception Code 8 - System Calls */
-        sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
+		unsigned int KUp = KUP(EXCSTATE->s_status);
+        sysTrapHandler(KUp);  /* call the Nucleus' SYSCALL exception handler function */
     }
     /* Case 4: All Other Exceptions - Program Traps */
     prgmTrapHandler(); /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/

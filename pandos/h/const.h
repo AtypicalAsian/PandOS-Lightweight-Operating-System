@@ -269,5 +269,7 @@
 
 #define TICKCONVERT(T) (T) * (*((cpu_t *)TIMESCALEADDR))
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
+#define DEVREGADDR ((devregarea_t *)RAMBASEADDR)
+#define EXCSTATE ((state_t *) BIOSDATAPAGE)
 #endif
 

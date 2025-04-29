@@ -59,7 +59,7 @@
 #include "../h/interrupts.h"
 #include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 
 /**************** METHOD DECLARATIONS***************************/
@@ -94,6 +94,15 @@ int getInterruptLine(unsigned int interruptMap){
 	return -1;
 }
 
+void unblockLoad(int deviceType, int deviceInstance, unsigned int status) {
+	pcb_PTR unblockedProc;
+	unblockedProc = verhogen(&(deviceSemaphores[deviceType*8 + deviceInstance]));
+	if (unblockedProc != NULL) {
+		unblockedProc->p_s.s_v0 = status;
+		softBlockCnt--;
+	}
+}
+
 /**************************************************************************** 
  * nontimerInterruptHandler(int deviceType)
  * 
@@ -121,65 +130,35 @@ int getInterruptLine(unsigned int interruptMap){
  * @return None
  *****************************************************************************/
 void nontimerInterruptHandler(int deviceType){
-	devregarea_t *deviceRegisters = (devregarea_t *)RAMBASEADDR;  /*get pointer to devreg struct*/
-	int device_intMap = deviceRegisters->interrupt_dev[deviceType]; /*retrieve interrupt status bitmap for specific device type*/
-	unsigned int statusCode;
+	int instanceMap = DEVREGADDR->interrupt_dev[deviceType];
 
-	int mask = 1;  /*Start with the least significant bit*/
-	while (!(device_intMap & mask)) {
-		mask <<= 1;  /*Shift the mask one bit to the left*/
-	}
-	device_intMap = mask;  /*device_intMap contains only the lowest set bit*/
-	int deviceInstance = getInterruptLine(device_intMap);
+	instanceMap &= -instanceMap;
+	int deviceInstance = getInterruptLine(instanceMap);
+	unsigned int status;
 
-	/*Case 1: Interrupt device is not terminal devs*/
-	if (deviceType != 4){
-		int regIndex = deviceType * 8 + deviceInstance;
-		statusCode = deviceRegisters->devreg[regIndex].d_status; /*Save off the status code from the device’s device registers*/
-		deviceRegisters->devreg[regIndex].d_command = ACK; /*Acknowledge the interrupt*/
-		int semIndex = deviceType * 8 + deviceInstance;
-		pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*perform v op on semaphore*/
-		if (pcb_unblocked != NULL){
-			softBlockCnt--;
-			pcb_unblocked->p_s.s_v0 = statusCode; /*Place the stored off status code in the newly unblocked pcb’s v0 register*/
+	if (deviceType == (TERMINT-DISKINT)) {
+		device_t *termStatus = &(DEVREGADDR->devreg[deviceType*8 + deviceInstance]);
+
+		if ((termStatus->d_status & TERMSTATUSMASK) == RECVD_CHAR) {
+			status = termStatus->d_status;
+			DEVREGADDR->devreg[deviceType*8 + deviceInstance].d_command = ACK;
+			unblockLoad(deviceType, deviceInstance, status);
+		}
+		if ((termStatus->d_data0 & TERMSTATUSMASK) == TRANS_CHAR) {
+			status = termStatus->d_data0;
+			DEVREGADDR->devreg[deviceType*8 + deviceInstance].d_data1 = ACK;
+			unblockLoad(deviceType + 1, deviceInstance, status);
 		}
 	}
-	/*Case 2: Handle Terminal devices separately*/
-	else{
-		int regIndex = deviceType * 8 + deviceInstance;
-		device_t *tStat = &(deviceRegisters->devreg[regIndex]);
-		/*Terminal devices have 2 subdevices: transmission and reception*/
-		/*Case 1: If device is transmission*/
-        if ((tStat->d_data0 & 0x000000FF) == 5) {
-            statusCode = tStat->d_data0;  /*Retrieve the status*/
-            deviceRegisters->devreg[regIndex].d_data1 = ACK; /*ACK the interrupt*/
-            
-            /*For transmit interrupts, use the next device type slot (deviceType + 1)*/
-			/*Transmission device semaphores are 8 bits behind reception for terminal devices (plus 8 to index)*/
-			int semIndex = (deviceType + 1) * 8 + deviceInstance;
-			pcb_t *pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*do v op on device semaphore*/
-            if (pcb_unblocked != NULL) {
-				softBlockCnt--;
-                pcb_unblocked->p_s.s_v0 = statusCode;
-            }
-        }
-		/*Case 2: If device is reception*/
-		if ((tStat->d_status & 0x000000FF) == 5) {
-            statusCode = tStat->d_status;  /*Retrieve the status*/
-            deviceRegisters->devreg[regIndex].d_command = ACK; /*ACK the interrupt*/
-			int semIndex = deviceType * 8 + deviceInstance;
-            pcb_PTR pcb_unblocked = verhogen(&(deviceSemaphores[semIndex])); /*do v op on device semaphore*/
-            if (pcb_unblocked != NULL) {
-				softBlockCnt--;
-                pcb_unblocked->p_s.s_v0 = statusCode;                   
-            }
-        }
+	else {
+		status = DEVREGADDR->devreg[deviceType*8 + deviceInstance].d_status;
+		DEVREGADDR->devreg[deviceType*8 + deviceInstance].d_command = ACK;
+		unblockLoad(deviceType, deviceInstance, status);
 	}
-	state_PTR savedState = (state_t *) BIOSDATAPAGE;
-	if (currProc != NULL){
-		LDST(savedState);
-	}
-	switchProcess();
+	if (currProc == NULL)
+		switchProcess();
+	else
+		LDST(EXCSTATE);
 }
 
 /**************************************************************************** 

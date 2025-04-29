@@ -59,7 +59,7 @@
 #include "../h/interrupts.h"
 #include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 
 /**************** METHOD DECLARATIONS***************************/
@@ -280,17 +280,21 @@ void interruptsHandler() {
 	int interrupt = (causeReg & 0x0000FE00); /*Mask out the bits corresponding to the pending interrupts*/
 	interrupt &= -interrupt; /*Isolate the lowest set bit (highest priority interrupt)*/
 
-	/* Check if the interrupt came from the Process Local Timer (PLT) (Line 1) */
-    if (((savedState->s_cause) & LINE1MASK) != ALLOFF){
-        pltInterruptHandler();  /* Call method to handle the Process Local Timer (PLT) interrupt */
-    }
-
-    /* Check if the interrupt came from the System-Wide Interval Timer (Line 2) */
-    if (((savedState->s_cause) & LINE2MASK) != ALLOFF){
-        systemIntervalInterruptHandler(); /* Call method to the System Interval Timer interrupt */
-    }
-	
-	int nonTimerDeviceType = getInterruptLine(interrupt >> 8) - OFFSET; /*subtract offset since interrupts start at 3-7*/
-    /*Handle non-timer interrupts*/
-    nontimerInterruptHandler(nonTimerDeviceType);  /* Call method to the handle non-timer interrupts */
+	switch (interrupt) {
+		case LOCALTIMERINT:
+			pltInterrupt();
+			break;
+		case TIMERINTERRUPT:
+			systemIntervalInterruptHandler();
+			break;
+		case DISKINTERRUPT:
+		case FLASHINTERRUPT:
+		case NETWINTERRUPT:
+		case PRINTINTERRUPT:
+		case TERMINTERRUPT:
+			nontimerInterruptHandler(getInterruptLine(interrupt >> IPSHIFT) - DISKINT);
+			break;
+		default:
+			break;
+	}
 }

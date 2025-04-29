@@ -282,7 +282,7 @@ void interruptsHandler() {
 
 	switch (interrupt) {
 		case LOCALTIMERINT:
-			pltInterrupt();
+			pltInterruptHandler();
 			break;
 		case TIMERINTERRUPT:
 			systemIntervalInterruptHandler();

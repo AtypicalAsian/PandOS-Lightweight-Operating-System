@@ -267,6 +267,7 @@
 #define LEFTSHIFT8 8
 #define LEFTSHIFT16 16
 
+#define TICKCONVERT(T) (T) * (*((cpu_t *)TIMESCALEADDR))
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
 #endif
 

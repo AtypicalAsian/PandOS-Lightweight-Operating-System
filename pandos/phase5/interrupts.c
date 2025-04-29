@@ -86,20 +86,12 @@ void interruptsHandler();
  * @return int - The interrupt line number, or -1 if no interrupt is pending.  
  *****************************************************************************/
 int getInterruptLine(unsigned int interruptMap){
-    if (interruptMap == 0) {
-        PANIC();
-        return -1;
-    }
-
-	/*isolate lowest set bit in the bitmap*/
-    unsigned int isolated = interruptMap & (-interruptMap);
-    int i;
-    for (i = 0; i < 32; i++) {
-        if (isolated == (1u << i)) {
-            return i;
-        }
-    }
-    return -1;
+    int k;
+	for (k=0; k<32;k++){
+		if (interruptMap & (1<<k)) {return k;}
+	}
+	PANIC();
+	return -1;
 }
 
 /**************************************************************************** 
@@ -214,15 +206,12 @@ void pltInterruptHandler() {
 	state_t *savedState = (state_t *) BIOSDATAPAGE;
 
 	/*If there is a running process when the interrupt was generated*/
-	if (currProc != NULL){
-		setTIMER(TIMER_RESET_CONST); /*Reset the timer*/
-		currProc->p_s = *savedState; /*Saves the current process state (from the BIOS Data Page)*/
-		currProc->p_time = currProc->p_time + get_elapsed_time(); /*Updates the CPU time used by the current process*/
-		insertProcQ(&ReadyQueue, currProc); /* Move the current process back to the Ready Queue since it used up its time slice */
-		currProc = NULL; /* Clear the current process pointer switch to the next process */
-		switchProcess();  /* Call the scheduler to select and run the next process */
-	}
-	PANIC();
+	setTIMER(TICKCONVERT(0xFFFFFFFFUL));  /*Reset the timer*/
+	current_proc->p_s = *savedState; /*Saves the current process state (from the BIOS Data Page)*/
+	current_proc->p_time += timePassed(); /*Updates the CPU time used by the current process*/
+	insertProcQ(&ReadyQueue, currProc);  /* Move the current process back to the Ready Queue since it used up its time slice */
+	currProc = NULL; /* Clear the current process pointer switch to the next process */
+	switchProcess(); /* Call the scheduler to select and run the next process */
 }
 
 /**************************************************************************** 

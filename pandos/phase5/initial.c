@@ -220,7 +220,12 @@ int main() {
 	/*Declare variables*/
     pcb_PTR first_proc; /* a pointer to the first process in the ready queue to be created so that the scheduler can begin execution */
 
-	/*Initialize device semaphores (array declared as extern so values are zero-initialized)*/
+	passupvector_t *proc0_passup_vec;                                       /*Pointer to Processor 0 Pass-Up Vector */
+    proc0_passup_vec = (passupvector_t *) PASSUPVECTOR;                     /*Init processor 0 pass up vector pointer*/
+    proc0_passup_vec->tlb_refill_handler = (memaddr) &uTLB_RefillHandler;     /*Initialize address of the nucleus TLB-refill event handler*/
+    proc0_passup_vec->tlb_refill_stackPtr = TOPSTKPAGE;                      /*Set stack pointer for the nucleus TLB-refill event handler to the top of the Nucleus stack page */
+    proc0_passup_vec->exception_handler = (memaddr) &gen_exception_handler;  /*Set the Nucleus exception handler address to the address of function that is to be the entry point for exception (and interrupt) handling*/
+    proc0_passup_vec->exception_stackPtr = TOPSTKPAGE;                      /*Set the Stack pointer for the Nucleus exception handler to the top of the Nucleus stack page*/
 
     /*Initialize variables*/
     ReadyQueue = mkEmptyProcQ();  /*Initialize the Ready Queue*/
@@ -232,24 +237,23 @@ int main() {
 	initPcbs(); /*Set up the Process Control Block (PCB) free list (pool of avaible pcbs)*/
 	initASL(); /*Set up the Active Semaphore List (ASL)*/
 
-	/*Initialize passUp vector fields*/
-    populate_passUpVec();
+
+    /*populate_passUpVec();*/
 
 	/*Load the system-wide Interval Timer with 100 milliseconds*/
 	LDIT(INITTIMER); /*Set interval timer to 100ms*/
 
 	/*Create and Launch the First Process*/
 	first_proc = allocPcb(); /*allocate a PCB from the PCB free list for the first process*/
-
-	if (first_proc != NULL){
-		procCnt++; /*increment process count*/
-		init_proc_state(first_proc); /* Initialize the process state for the new process (stack, PC, t9, status) */
-		insertProcQ(&ReadyQueue, first_proc); /* Insert the new process into the ready queue */
-		switchProcess();  /* Invoke the scheduler */
-		return 1;
-	}
-	/*If no PCB is available, the system calls PANIC() to halt execution*/
-	PANIC();
-	return (0);
+	procCnt++;
+	first_proc->p_s.s_status = IEPON | TEBITON | IMON;
+	first_proc->p_s.s_pc = (memaddr) &test;   /*Set PC to test()*/ 
+    first_proc->p_s.s_t9 = (memaddr) &test;   /*Set t9 register to test()*/
+	memaddr topRAM;
+	RAMTOP(topRAM);
+	first_proc->p_s.s_sp = topRAM; /*Set stack ptr to ram TOP*/
+	insertProcQ(&ReadyQueue, first_proc); /*insert new proc into ready queue to be scheduled*/
+	switchProcess(); /*call scheduler*/
+	return 1;
 }
 

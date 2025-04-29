@@ -59,7 +59,7 @@
 #include "../h/interrupts.h"
 #include "../h/initial.h"
 
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 
 /**************** METHOD DECLARATIONS***************************/
@@ -238,23 +238,23 @@ void pltInterruptHandler() {
  *****************************************************************************/
 
 void systemIntervalInterruptHandler() {
-	pcb_PTR unblockedProc = NULL; /*pointer to a process being unblocked*/
+	pcb_t *unblockedProc = NULL; /*pointer to a process being unblocked*/
 	LDIT(INITTIMER);       /* Load the Interval Timer with 100ms to maintain periodic interrupts */
-
-	/* Unblock all processes waiting on the pseudo-clock semaphore */
-	while (headBlocked(&semIntTimer) != NULL){
-		unblockedProc = removeBlocked(&semIntTimer); /* Remove a blocked process */
+	while ((unblockedProc = removeBlocked(&semIntTimer)) != NULL){ /* Unblock all processes waiting on the pseudo-clock semaphore */
 		insertProcQ(&ReadyQueue, unblockedProc); /* Move it to the Ready Queue */
-		softBlockCnt--; /* Decrease the count of soft-blocked processes */
 	}
-	semIntTimer = 0; /* Reset the pseudo-clock semaphore to 0 */
+	softBlockCnt += semIntTimer;
+	semIntTimer = 0;
+
 	state_t *savedState = (state_t *) BIOSDATAPAGE;
 
 	/* If there is a currently running process, resume execution */
 	if (currProc != NULL){
 		LDST(savedState);
 	}
-	switchProcess(); /*If no curr process to return to -> call scheduler to run next job*/
+	else{
+		switchProcess(); /*If no curr process to return to -> call scheduler to run next job*/
+	}
 }
 
 

@@ -174,6 +174,7 @@ void createProcess(state_t *stateSYS, support_t *suppStruct) {
 		newProc->p_s = *stateSYS;
         newProc->p_supportStruct = suppStruct;       /* Assign the provided support structure */
         newProc->p_semAdd = NULL;                    /* New process is not blocked on a semaphore */
+		newProc->p_time = 0;              			 /* Initialize CPU time usage to 0 */
      
         insertChild(currProc, newProc);              /* Insert the new process as a child of the current process */
         insertProcQ(&ReadyQueue, newProc);           /* Add the new process to the Ready Queue for scheduling */

@@ -627,8 +627,7 @@ void gen_exception_handler()
     }  
     else if (exception_code == 8) {  
         /* Case 3: Exception Code 8 - System Calls */
-		unsigned int KUp = KUP(EXCSTATE->s_status);
-        sysTrapHandler(KUp);  /* call the Nucleus' SYSCALL exception handler function */
+        sysTrapHandler();  /* call the Nucleus' SYSCALL exception handler function */
     }
     /* Case 4: All Other Exceptions - Program Traps */
     prgmTrapHandler(); /* calling the Nucleus' Program Trap exception handler function because the exception code is not 0-3 or 8*/

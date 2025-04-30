@@ -416,7 +416,7 @@ void getSupportData(support_t **resultAddress) {
  * @return None (This function either transfers control to the user-level handler  
  *               or terminates the process and schedules another one).  
  *****************************************************************************/
-HIDDEN void exceptionPassUpHandler(int exceptionCode) {
+void exceptionPassUpHandler(int exceptionCode) {
 	/*If current process has a support structure -> pass up exception to the exception handler */
 	if (currProc->p_supportStruct != NULL){
 		currProc->p_supportStruct->sup_exceptState[exceptionCode] = *EXCSTATE;
@@ -449,7 +449,7 @@ HIDDEN void exceptionPassUpHandler(int exceptionCode) {
  * @return None (This function does not return, as it either transfers control  
  *               to a user-defined handler or terminates the process).  
  *****************************************************************************/  
-HIDDEN void prgmTrapHandler() {
+void prgmTrapHandler() {
 	exceptionPassUpHandler(GENERALEXCEPT);
 }
 
@@ -473,7 +473,7 @@ HIDDEN void prgmTrapHandler() {
  * 
  * @return None  
  *****************************************************************************/ 
-HIDDEN void tlbTrapHanlder() {
+void tlbTrapHanlder() {
 	exceptionPassUpHandler(PGFAULTEXCEPT);
 }
 
@@ -502,7 +502,7 @@ HIDDEN void tlbTrapHanlder() {
  *  
  * @return None  
  *****************************************************************************/  
-HIDDEN void sysTrapHandler(unsigned int KUp) {
+void sysTrapHandler(unsigned int KUp) {
 	volatile unsigned int sysId = EXCSTATE->s_a0;
 
 	volatile unsigned int arg1 = EXCSTATE->s_a1;

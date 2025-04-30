@@ -354,8 +354,11 @@ void waitForIO(int lineNum, int deviceNum, int readBool) {
  *  
  * @return None (CPU time is stored in v0).  
  *****************************************************************************/
-void getCPUTime(cpu_t *resultAddress){
-	*resultAddress = currProc->p_time + get_elapsed_time();
+void getCPUTime(state_t *savedState){
+	cpu_t totalTime;
+    totalTime = currProc->p_time + get_elapsed_time();
+	savedState->s_v0 = totalTime;
+    currProc->p_s.s_v0 = totalTime;
 }
 
 

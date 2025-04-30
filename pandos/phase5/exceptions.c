@@ -163,22 +163,27 @@ void recursive_terminate(pcb_PTR proc){
  * @return None  
  *****************************************************************************/
 void createProcess(state_t *stateSYS, support_t *suppStruct) {
-    pcb_PTR newProc;  /* Pointer to the new process' PCB */
-	unsigned int retValue = -1;
+	pcb_PTR newProc;  /* Pointer to the new process' PCB */
     newProc = allocPcb(); /* Allocate a new PCB from the free PCB list */
 
      /* If a new PCB was successfully allocated */
     if (newProc != NULL){
 		/*newProc->p_s = *stateSYS;*/
-        procCnt++;
-		newProc->p_supportStruct = suppStruct;
-		newProc->p_s = *stateSYS;
-		insertChild(currProc, newProc);
-		insertProcQ(&ReadyQueue, newProc);
-		retValue = 0;
+        copyState(stateSYS, &(newProc->p_s));        /* Copy the given processor state to the new process */
+        newProc->p_supportStruct = suppStruct;       /* Assign the provided support structure */
+        newProc->p_time = 0;              			 /* Initialize CPU time usage to 0 */
+        newProc->p_semAdd = NULL;                    /* New process is not blocked on a semaphore */
+     
+        insertChild(currProc, newProc);              /* Insert the new process as a child of the current process */
+        insertProcQ(&ReadyQueue, newProc);           /* Add the new process to the Ready Queue for scheduling */
+
+        currProc->p_s.s_v0 = 0;                		 /* Indicate success (0) in the caller's v0 register */
+        procCnt++;                                   /* Increment the active process count */
     }
     /* If no PCB was available (Free PCB Pool exhausted) */
-	EXCSTATE->s_v0 = retValue;
+    else{
+        currProc->p_s.s_v0 = -1;         /* Indicate failure (assign -1) in v0 */
+    }
 }
 
 

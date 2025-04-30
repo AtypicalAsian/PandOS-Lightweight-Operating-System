@@ -510,6 +510,7 @@ void tlbTrapHanlder() {
  * @return None  
  *****************************************************************************/  
 void sysTrapHandler(unsigned int KUp) {
+	state_t *savedState = (state_t *)BIOSDATAPAGE;
 	volatile unsigned int sysId = EXCSTATE->s_a0;
 
 	volatile unsigned int arg1 = EXCSTATE->s_a1;
@@ -539,7 +540,7 @@ void sysTrapHandler(unsigned int KUp) {
 				waitForIO(arg1, arg2, arg3);
 				break;
 			case GETTIME:
-				getCPUTime((cpu_t *) resultAddress);
+				getCPUTime(savedState);
 				break;
 			case CLOCKWAIT:
 				waitForClock();

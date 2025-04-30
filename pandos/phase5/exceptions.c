@@ -168,8 +168,7 @@ void createProcess(state_t *stateSYS, support_t *suppStruct) {
 
      /* If a new PCB was successfully allocated */
     if (newProc != NULL){
-		/*newProc->p_s = *stateSYS;*/
-        copyState(stateSYS, &(newProc->p_s));        /* Copy the given processor state to the new process */
+		newProc->p_s = *stateSYS;
         newProc->p_supportStruct = suppStruct;       /* Assign the provided support structure */
         newProc->p_time = 0;              			 /* Initialize CPU time usage to 0 */
         newProc->p_semAdd = NULL;                    /* New process is not blocked on a semaphore */

@@ -267,10 +267,7 @@
 #define LEFTSHIFT8 8
 #define LEFTSHIFT16 16
 
-#define TICKCONVERT(T) (T) * (*((cpu_t *)TIMESCALEADDR))
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
-#define DEVREGADDR ((devregarea_t *)RAMBASEADDR)
 #define EXCSTATE ((state_t *) BIOSDATAPAGE)
-#define KUP(S) (((S) & 0x00000008) >> 3)
 #endif
 

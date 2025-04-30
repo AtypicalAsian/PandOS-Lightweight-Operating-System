@@ -71,6 +71,8 @@ HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given s
 int syscallNo; /*stores the syscall number (1-8)*/
 HIDDEN void recursive_terminate(pcb_PTR proc);
 
+#define EXCSTATE ((state_t *) BIOSDATAPAGE)
+
 
 
 /**************** HELPER METHODS ***************************/
@@ -165,6 +167,7 @@ void recursive_terminate(pcb_PTR proc){
 void createProcess(state_t *stateSYS, support_t *suppStruct) {
 	pcb_PTR newProc;  /* Pointer to the new process' PCB */
     newProc = allocPcb(); /* Allocate a new PCB from the free PCB list */
+	state_t *savedState = (state_t *) BIOSDATAPAGE;
 
      /* If a new PCB was successfully allocated */
     if (newProc != NULL){
@@ -175,12 +178,12 @@ void createProcess(state_t *stateSYS, support_t *suppStruct) {
         insertChild(currProc, newProc);              /* Insert the new process as a child of the current process */
         insertProcQ(&ReadyQueue, newProc);           /* Add the new process to the Ready Queue for scheduling */
 
-        currProc->p_s.s_v0 = 0;                		 /* Indicate success (0) in the caller's v0 register */
+        savedState->s_v0 = 0;                		 /* Indicate success (0) in the caller's v0 register */
         procCnt++;                                   /* Increment the active process count */
     }
     /* If no PCB was available (Free PCB Pool exhausted) */
     else{
-        currProc->p_s.s_v0 = -1;         /* Indicate failure (assign -1) in v0 */
+        savedState->s_v0 = -1;         /* Indicate failure (assign -1) in v0 */
     }
 }
 

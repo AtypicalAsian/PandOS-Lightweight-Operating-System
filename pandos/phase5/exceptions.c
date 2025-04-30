@@ -394,8 +394,8 @@ void waitForClock() {
  *  
  * @return None (Support structure pointer is stored in `v0`).  
  *****************************************************************************/
-void getSupportData(support_t **resultAddress) {
-	*resultAddress = currProc->p_supportStruct;
+void getSupportData(state_t *savedState) {
+	savedState->s_v0 = (int) currProc->p_supportStruct;
 }
 
 
@@ -426,10 +426,9 @@ void getSupportData(support_t **resultAddress) {
 void exceptionPassUpHandler(int exceptionCode) {
 	/*If current process has a support structure -> pass up exception to the exception handler */
 	if (currProc->p_supportStruct != NULL){
-		currProc->p_supportStruct->sup_exceptState[exceptionCode] = *EXCSTATE;
-		/* Load the appropriate exception handler context from the support structure and switch to it */
-		context_t *context = &(currProc->p_supportStruct->sup_exceptContext[exceptionCode]);
-		LDCXT(context->c_stackPtr, context->c_status, context->c_pc);
+		copyState(((state_t *) BIOSDATAPAGE),&(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
+		context_t *ctx = &(currProc->p_supportStruct->sup_exceptContext[exceptionCode]);
+		LDCXT(ctx->c_stackPtr, ctx->c_status, ctx->c_pc);
 	}
 	/* No user-level handler defined, so terminate the process */
 	else{
@@ -546,7 +545,7 @@ void sysTrapHandler(unsigned int KUp) {
 				waitForClock();
 				break;
 			case GETSUPPORTPTR:
-				getSupportData((support_t **) resultAddress);
+				getSupportData(savedState);
 				break;
 			default:
 				terminateProcess();

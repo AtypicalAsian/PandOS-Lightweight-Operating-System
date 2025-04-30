@@ -508,66 +508,82 @@ void tlbTrapHanlder() {
  *  
  * @return None  
  *****************************************************************************/  
-void sysTrapHandler(unsigned int KUp) {
+void sysTrapHandler() {
+	/*Retrieve saved processor state (located at start of the BIOS Data Page) & extract the syscall number to find out which type of exception was raised*/
 	state_t *savedState = (state_t *)BIOSDATAPAGE;
-	volatile unsigned int sysId = EXCSTATE->s_a0;
+	syscallNo = savedState->s_a0;
+	unsigned int reg_a1 = savedState->s_a1;
+	unsigned int reg_a2 = savedState->s_a2;
+	unsigned int reg_a3 = savedState->s_a3;
 
-	volatile unsigned int arg1 = EXCSTATE->s_a1;
-	volatile unsigned int arg2 = EXCSTATE->s_a2;
-	volatile unsigned int arg3 = EXCSTATE->s_a3;
-	memaddr resultAddress = (memaddr) &(EXCSTATE->s_v0);
+	/*Increment PC by 4 avoid infinite loops*/
+    savedState->s_pc = savedState->s_pc + WORDLEN;
 
-	if (sysId <= 8) {
+	/*If request to syscalls 1-8 is made in user-mode will trigger program trap exception response*/
+    if (((savedState->s_status) & USERPON) != ALLOFF){
+        savedState->s_cause = (savedState->s_cause) & 0xFFFFFF28; /* Set exception cause to Reserved Instruction */
+        prgmTrapHandler();  /* Handle it as a Program Trap */
+    }
 
-		if (KUp == 0) {
-			/* Execute commands in kernal mode */
-			EXCSTATE->s_pc += WORDLEN;
-			switch (sysId) {
-			case CREATEPROCESS:
-				createProcess((state_t *) arg1, (support_t *) arg2);
-				break;
-			case TERMINATEPROCESS:
-				terminateProcess();
-				break;
-			case PASSEREN:
-				passeren((semaphore *) arg1);
-				break;
-			case VERHOGEN:
-				verhogen((semaphore *) arg1);
-				break;
-			case WAITIO:
-				waitForIO(arg1, arg2, arg3);
-				break;
-			case GETTIME:
-				getCPUTime(savedState);
-				break;
-			case CLOCKWAIT:
-				waitForClock();
-				break;
-			case GETSUPPORTPTR:
-				getSupportData(savedState);
-				break;
-			default:
-				terminateProcess();
-				break;
-			}
-			if (currProc == NULL)
-				switchProcess();
-			else
-				LDST(EXCSTATE);
+	/*Validate syscall number (must be between SYS1NUM and SYS8NUM) */
+    if ((syscallNo < 1) || (syscallNo > 8)) {  
+        exceptionPassUpHandler(GENERALEXCEPT);  /* Invalid syscall, try pass up or die to see if we can handle it */
+    }
+	unsigned int kup_check = ((savedState->s_status) & 0x00000008) >> 3; /*KUp bit, which checks whether the process is in user or kernel mode*/
+	/*Phase 2 requires one to be in kernel mode*/
+
+	/*If we're in kernel mode -> safe to proceed*/
+	if (kup_check == 0) {
+		switch (syscallNo) {
+		case SYS1:
+			createProcess((state_t *) reg_a1, (support_t *) reg_a2);
+			break;
+		case SYS2:
+			terminateProcess();
+			break;
+		case SYS3:
+			passeren((int *) reg_a1);
+			break;
+		case SYS4:
+			verhogen((int *) reg_a1);
+			break;
+		case SYS5:
+			waitForIO(reg_a1, reg_a2, reg_a3);
+			break;
+		case SYS6:
+			getCPUTime(savedState);
+			break;
+		case SYS7:
+			waitForClock();
+			break;
+		case SYS8:
+			getSupportData(savedState);
+			break;
+		default:
+			terminateProcess();
+			break;
 		}
-		else {
-			/* Terminate if in user mode*/
-			EXCSTATE->s_cause &= ~GETEXECCODE;
-			EXCSTATE->s_cause |= EXCODESHIFT << CAUSESHIFT;
-			prgmTrapHandler();
-		}
+	
+    /* 
+     * After handling the system call, check if there is a current process.
+     * If no process is available (i.e., currProc is NULL), switch to the next available process.
+     * Otherwise, load the processor state from the saved state to resume execution.
+     */
+	if (currProc == NULL)
+		switchProcess();
+	else
+		LDST(savedState);
 	}
 	else {
-		exceptionPassUpHandler(GENERALEXCEPT);
+	/* 
+     * If kup_check is not 0, the process is not in kernel mode
+     * which is an error condition since privileged system calls must be executed in kernel mode.
+     */
+		savedState->s_cause &= ~GETEXECCODE; /* Clear the current exception code bits from the cause field */
+		savedState->s_cause |= 10 << CAUSESHIFT; /* Set the new cause by shifting the exception code into place */
+		prgmTrapHandler(); /*Handle as program trap*/
 	}
 }
-
 /****************************************************************************  
  * gen_exception_handler()  
  *  

@@ -8,7 +8,7 @@
  * 
  ****************************************************************************/
 
-void sysTrapHandler(unsigned int KUp); /*Syscall Handler*/
+void sysTrapHandler(); /*Syscall Handler*/
 void tlbTrapHanlder(); /*TLB Trap Handler*/
 void prgmTrapHandler(); /*Program Trap Handler*/
 void gen_exception_handler(); /*General Exception Handler*/

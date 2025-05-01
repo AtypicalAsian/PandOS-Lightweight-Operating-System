@@ -196,9 +196,7 @@ void delayDaemon(){
  * @ref
  * 
  **************************************************************************************************/
-void sys18Handler(int sleep_time, support_t *support_struct){
-    int sleepTime;
-    sleepTime = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
+void sys18Handler(int sleepTime, support_t *support_struct){
 
     if (sleepTime > 0) {
         SYSCALL(PASSEREN, (int) &delayDaemon_sema4, 0, 0);

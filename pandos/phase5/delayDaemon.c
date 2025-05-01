@@ -197,8 +197,8 @@ void delayDaemon(){
  * 
  **************************************************************************************************/
 void sys18Handler(int sleepTime, support_t *support_struct){
-
-    if (sleepTime < 0){
+    if (sleepTime == 0) return;
+    else if (sleepTime < 0){
         get_nuked(NULL);
     }
     else{

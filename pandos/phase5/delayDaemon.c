@@ -201,16 +201,18 @@ void sys18Handler(int sleepTime, support_t *support_struct){
     if (sleepTime < 0){
         get_nuked(NULL);
     }
-    /*Lock semaphore to obtain mutual exclusion over ADL*/
-    SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
-    if (insertADL(sleepTime,support_struct) == FALSE){
-        get_nuked(NULL);
-    }
+    else{
+        /*Lock semaphore to obtain mutual exclusion over ADL*/
+        SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
+        if (insertADL(sleepTime,support_struct) == FALSE){
+            get_nuked(NULL);
+        }
 
-    /*Perform SYS4 on ADL semaphore then SYS3 on uproc private semaphore atomically*/
-    setSTATUS(NO_INTS);
-    SYSCALL(SYS4,(int) &delayDaemon_sema4,0,0);
-    SYSCALL(SYS3,(int)&support_struct->privateSema4,0,0); 
-    setSTATUS(YES_INTS);
+        /*Perform SYS4 on ADL semaphore then SYS3 on uproc private semaphore atomically*/
+        setSTATUS(NO_INTS);
+        SYSCALL(SYS4,(int) &delayDaemon_sema4,0,0);
+        SYSCALL(SYS3,(int)&support_struct->privateSema4,0,0); 
+        setSTATUS(YES_INTS);
+    }
 }
 

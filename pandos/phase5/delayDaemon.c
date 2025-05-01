@@ -74,7 +74,7 @@ void initADL(){
     /*Init Active Delay List (ADL)*/
     delaydFree_h = &delayDescriptors[0];
     int i;
-    for (i=1;i<MAXUPROCS;i++){
+    for (i=1;i<MAXPROC;i++){
         delayDescriptors[i-1].d_next = &delayDescriptors[i];
     }
     /*init dummy tail*/
@@ -85,7 +85,7 @@ void initADL(){
     delayd_h->d_wakeTime = 0xFFFFFFFF;  
 
     /*Set up initial state for delay daemon*/
-    memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
+    memaddr topRAM = (*((int *)RAMBASEADDR) + *((int *)RAMBASESIZE));
     state_t base_state;
     base_state.s_entryHI = (0 << SHIFT_ASID); /*set asid for delay daemon process (0)*/
     base_state.s_pc = (memaddr) delayDaemon;
@@ -141,7 +141,7 @@ int insertADL(int time_asleep, support_t *supStruct){
     STCK(currTime); /*get current time*/
 
     /*Set up new descriptor fields*/
-    newDescriptor->d_wakeTime = currTime + (time_asleep + 1000000);
+    newDescriptor->d_wakeTime = currTime + (time_asleep * 1000000);
     newDescriptor->d_supStruct = supStruct;
 
     /*Insert descriptor into correct position on ADL*/
@@ -212,6 +212,5 @@ void sys18Handler(int sleepTime, support_t *support_struct){
     SYSCALL(SYS4,(int) &delayDaemon_sema4,0,0);
     SYSCALL(SYS3,(int)&support_struct->privateSema4,0,0); 
     setSTATUS(YES_INTS);
-    return;
 }
 

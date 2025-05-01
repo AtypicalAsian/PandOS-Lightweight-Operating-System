@@ -204,14 +204,15 @@ void delayDaemon(support_t *currSuppStruct){
  * 
  **************************************************************************************************/
 void sys18Handler(int sleepTime, support_t *support_struct){
+    int sleep_time = support_struct->sup_exceptState[GENERALEXCEPT].s_a2;
     /*Negative wait time -> terminate uproc with SYS9*/
-    if (sleepTime < 0){
+    if (sleep_time < 0){
         get_nuked(NULL);
     }
 
     /*Lock semaphore to obtain mutual exclusion over ADL*/
     SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
-    if (insertADL(sleepTime,support_struct) == FALSE){
+    if (insertADL(sleep_time,support_struct) == FALSE){
         get_nuked(NULL);
     }
 

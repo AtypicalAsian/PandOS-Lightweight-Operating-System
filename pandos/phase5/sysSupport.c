@@ -451,7 +451,7 @@ void syscall_excp_handler(support_t *currProc_support_struct,int syscall_num_req
             flash_get((memaddr *)a1_val,a2_val,a3_val,currProc_support_struct);
             break;
         case SYS18:
-            sys18Handler(a1_val,currProc_support_struct);
+            sys18Handler(a2_val,currProc_support_struct);
             break;
 
         default:

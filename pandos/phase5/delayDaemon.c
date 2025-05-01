@@ -21,7 +21,7 @@
 #include "../h/sysSupport.h"
 #include "../h/deviceSupportDMA.h"
 #include "../h/delayDaemon.h"
-#include "/usr/include/umps3/umps/libumps.h"
+// #include "/usr/include/umps3/umps/libumps.h"
 
 int delayDaemon_sema4; /*semaphore to provided mutual exclusion over the ADL*/
 delayd_PTR delaydFree_h; /*Ptr to head of free list of event descriptors*/
@@ -132,30 +132,39 @@ delayd_PTR searchADL(int wakeTime){
  * 
  **************************************************************************************************/
 int insertADL(int time_asleep, support_t *supStruct){
-    int currTime;
-    delayd_PTR newDescriptor;
+    delayd_PTR tempNode;
+    delayd_PTR newNode;
+    cpu_t currentTime;
+    newNode = alloc_descriptor();
 
-    newDescriptor = alloc_descriptor(); /*Get new descriptor from free list*/
-    if (newDescriptor == NULL){return FALSE;}
-    STCK(currTime); /*get current time*/
-
-    /*Set up new descriptor fields*/
-    newDescriptor->d_wakeTime = currTime + (time_asleep * 1000000);
-    newDescriptor->d_supStruct = supStruct;
-
-    /*Insert descriptor into correct position on ADL*/
-    delayd_PTR prev = searchADL(newDescriptor->d_wakeTime);
-
-    /*If insert position is at HEAD of ADL*/
-    if (prev == NULL){
-        newDescriptor->d_next = delayd_h;
-        delayd_h = newDescriptor;
+    if (newNode == NULL) {
+        return FALSE;
     }
-    else{
-        newDescriptor->d_next = prev->d_next;
-        prev->d_next = newDescriptor;
+
+    /* Get the current time */
+    STCK(currentTime);
+
+    newNode->d_supStruct = supStruct;
+    newNode->d_wakeTime = (1000000 * time_asleep) + currentTime;
+
+    /* Insert the new node into the ADL in ascending order of wake-up time */
+    if(newNode->d_wakeTime < delaydFree_h->d_wakeTime) {
+        newNode->d_next = delaydFree_h;
+        delaydFree_h = newNode;
     }
-    return TRUE;
+    else {
+        /* Traverse the ADL to find the correct position */
+        tempNode = delaydFree_h;
+
+        while (tempNode->d_next->d_wakeTime < newNode->d_wakeTime) {
+            tempNode = tempNode->d_next;
+        }
+
+        newNode->d_next = tempNode->d_next;
+        tempNode->d_next = newNode;
+    }
+
+    return(TRUE);
 }
 
 /**************************************************************************************************  

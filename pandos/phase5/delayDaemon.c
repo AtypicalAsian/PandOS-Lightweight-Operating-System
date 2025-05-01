@@ -94,7 +94,7 @@ void initADL(){
     base_state.s_status = ALLOFF | IEPON | IMON | TEBITON; /*kernel mode + interrupts enabled*/
 
     int status;
-    status = SYSCALL(SYS1,(int) &base_state,NULL,0);
+    status = SYSCALL(SYS1,(int) &base_state,(int) NULL,0);
 
     if (status != 0){
         get_nuked(NULL);
@@ -132,37 +132,32 @@ delayd_PTR searchADL(int wakeTime){
  * 
  **************************************************************************************************/
 int insertADL(int time_asleep, support_t *supStruct){
-    delayd_PTR tempNode;
-    delayd_PTR newNode;
-    cpu_t currTime;
+    int currTime;
+    delayd_PTR newDescriptor;
 
-    newNode = alloc_descriptor();
-
-    if (newNode == NULL) {
+    newDescriptor = alloc_descriptor(); /*Get new descriptor from free list*/
+    if (newDescriptor == NULL){
         return FALSE;
     }
+    STCK(currTime); /*get current time*/
 
-    STCK(currTime);
+    /*Set up new descriptor fields*/
+    newDescriptor->d_wakeTime = currTime + (time_asleep * 1000000);
+    newDescriptor->d_supStruct = supStruct;
 
-    newNode->d_supStruct = supStruct;
-    newNode->d_wakeTime = (SECOND * time_asleep) + currTime;
+    /*Insert descriptor into correct position on ADL*/
+    delayd_PTR prev = searchADL(newDescriptor->d_wakeTime);
 
-    /*If insert at head */
-    if(newNode->d_wakeTime < delayd_h->d_wakeTime) {
-        newNode->d_next = delayd_h;
-        delayd_h = newNode;
+    /*If insert position is at HEAD of ADL*/
+    if (prev == NULL){
+        newDescriptor->d_next = delayd_h;
+        delayd_h = newDescriptor;
     }
-    else {
-        tempNode = delayd_h;
-
-        while (tempNode->d_next->d_wakeTime < newNode->d_wakeTime) {
-            tempNode = tempNode->d_next;
-        }
-        newNode->d_next = tempNode->d_next;
-        tempNode->d_next = newNode;
+    else{
+        newDescriptor->d_next = prev->d_next;
+        prev->d_next = newDescriptor;
     }
-
-    return(TRUE);
+    return TRUE;
 }
 
 /**************************************************************************************************  

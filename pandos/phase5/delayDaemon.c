@@ -94,7 +94,7 @@ void initADL(){
     base_state.s_status = ALLOFF | IEPON | IMON | TEBITON; /*kernel mode + interrupts enabled*/
 
     int status;
-    status = SYSCALL(SYS1,(int) &base_state,NULL,0);
+    status = SYSCALL(SYS1,(int) &base_state,(int) NULL,0);
 
     if (status != 0){
         get_nuked(NULL);

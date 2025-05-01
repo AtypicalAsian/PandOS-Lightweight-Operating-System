@@ -99,7 +99,6 @@ void initADL(){
     if (status != 0){
         get_nuked(NULL);
     }
-
 }
 
 

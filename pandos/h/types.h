@@ -152,6 +152,7 @@ typedef struct delayd_t {
 	support_t *d_supStruct;
 } delayd_t, *delayd_PTR;
 
+typedef int semaphore;
 
 #define	s_at	s_reg[0]
 #define	s_v0	s_reg[1]

@@ -71,6 +71,8 @@ HIDDEN void blockCurrProc(int *sem); /* Block the current process on the given s
 int syscallNo; /*stores the syscall number (1-8)*/
 HIDDEN void recursive_terminate(pcb_PTR proc);
 
+#define EXCSTATE ((state_t *) BIOSDATAPAGE)
+
 
 
 /**************** HELPER METHODS ***************************/
@@ -162,27 +164,27 @@ void recursive_terminate(pcb_PTR proc){
  * 
  * @return None  
  *****************************************************************************/
-void createProcess(state_PTR stateSYS, support_t *suppStruct) {
-    pcb_PTR newProc;  /* Pointer to the new process' PCB */
+void createProcess(state_t *stateSYS, support_t *suppStruct) {
+	pcb_PTR newProc;  /* Pointer to the new process' PCB */
     newProc = allocPcb(); /* Allocate a new PCB from the free PCB list */
+	state_t *savedState = (state_t *) BIOSDATAPAGE;
 
      /* If a new PCB was successfully allocated */
     if (newProc != NULL){
-		/*newProc->p_s = *stateSYS;*/
-        copyState(stateSYS, &(newProc->p_s));        /* Copy the given processor state to the new process */
+		newProc->p_s = *stateSYS;
         newProc->p_supportStruct = suppStruct;       /* Assign the provided support structure */
-        newProc->p_time = 0;              			 /* Initialize CPU time usage to 0 */
         newProc->p_semAdd = NULL;                    /* New process is not blocked on a semaphore */
+		newProc->p_time = 0;              			 /* Initialize CPU time usage to 0 */
      
         insertChild(currProc, newProc);              /* Insert the new process as a child of the current process */
         insertProcQ(&ReadyQueue, newProc);           /* Add the new process to the Ready Queue for scheduling */
 
-        currProc->p_s.s_v0 = 0;                		 /* Indicate success (0) in the caller's v0 register */
+        savedState->s_v0 = 0;                		 /* Indicate success (0) in the caller's v0 register */
         procCnt++;                                   /* Increment the active process count */
     }
     /* If no PCB was available (Free PCB Pool exhausted) */
     else{
-        currProc->p_s.s_v0 = -1;         /* Indicate failure (assign -1) in v0 */
+        savedState->s_v0 = -1;         /* Indicate failure (assign -1) in v0 */
     }
 }
 
@@ -421,7 +423,7 @@ void getSupportData(state_t *savedState) {
  * @return None (This function either transfers control to the user-level handler  
  *               or terminates the process and schedules another one).  
  *****************************************************************************/
-HIDDEN void exceptionPassUpHandler(int exceptionCode) {
+void exceptionPassUpHandler(int exceptionCode) {
 	/*If current process has a support structure -> pass up exception to the exception handler */
 	if (currProc->p_supportStruct != NULL){
 		copyState(((state_t *) BIOSDATAPAGE),&(currProc->p_supportStruct->sup_exceptState[exceptionCode]));
@@ -582,7 +584,6 @@ void sysTrapHandler() {
 		prgmTrapHandler(); /*Handle as program trap*/
 	}
 }
-
 /****************************************************************************  
  * gen_exception_handler()  
  *  
@@ -609,7 +610,7 @@ void sysTrapHandler() {
  * @return None  
  *****************************************************************************/
 void gen_exception_handler()
-{	
+{
 	state_t *saved_state; /* Pointer to the saved processor state at time of exception */  
     int exception_code; /* Stores the extracted exception type */  
 

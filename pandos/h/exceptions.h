@@ -14,7 +14,7 @@ void prgmTrapHandler(); /*Program Trap Handler*/
 void gen_exception_handler(); /*General Exception Handler*/
 
 /*SYSCALLS METHOD HANDLER*/
-void createProcess(state_PTR stateSYS, support_t *suppStruct); /*SYS1*/
+void createProcess(state_t *stateSYS, support_t *suppStruct); /*SYS1*/
 void terminateProcess(); /*SYS2*/
 void passeren(int *sem); /*SYS3*/
 pcb_PTR verhogen(int *sem); /*SYS4*/

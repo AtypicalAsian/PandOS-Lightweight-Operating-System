@@ -268,5 +268,6 @@
 #define LEFTSHIFT16 16
 
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
+#define EXCSTATE ((state_t *) BIOSDATAPAGE)
 #endif
 

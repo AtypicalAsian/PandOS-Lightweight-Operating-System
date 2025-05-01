@@ -165,11 +165,10 @@ void populate_passUpVec(){
 void init_proc_state(pcb_PTR firstProc){
 	unsigned int ramBase;  /* Variable to store the base address of RAM */
 	unsigned int ramSize; /* Variable to store the total size of RAM */
-	/*ramBase = *((int *)RAMBASEADDR);*/ /* Read the RAM base address */
-	/*ramSize = *((int *)RAMBASESIZE);*/ /* Read the RAM size */
+	ramBase = *((int *)RAMBASEADDR); /* Read the RAM base address */
+	ramSize = *((int *)RAMBASESIZE); /* Read the RAM size */
     memaddr topRAM;                         /* the address of the last RAM frame */
-	/*topRAM = ramBase + ramSize;*/ /* Calculate top of RAM by adding the base address and the total RAM size */
-	RAMTOP(topRAM);
+	topRAM = ramBase + ramSize; /* Calculate top of RAM by adding the base address and the total RAM size */
 
     /*Initialize the process state*/
     firstProc->p_s.s_sp = topRAM;           /*Stack pointer set to top of RAM*/
@@ -252,4 +251,3 @@ int main() {
 	PANIC();
 	return (0);
 }
-

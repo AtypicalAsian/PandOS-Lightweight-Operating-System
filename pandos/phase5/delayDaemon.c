@@ -46,9 +46,7 @@ delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
         newDescriptor->d_wakeTime = 0;
         return newDescriptor;
     }
-    else{
-        return NULL;
-    }
+    return NULL;
 }
 
 /**************************************************************************************************  
@@ -70,37 +68,37 @@ void return_to_ADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
  * 3. Set the Support Structure SYS1 parameter to be NULL
  **************************************************************************************************/
 void initADL(){
-    static delayd_t delayDescriptors[MAXPROC+1]; /*add one more to use as dummy node for ADL*/
-    state_t base_state;
-    memaddr ramTOP;
-    int status;
-
+    static delayd_t delayDescriptors[MAXUPROCS+1]; /*add one more to use as dummy node for ADL*/
     delayDaemon_sema4 = 1;
-    RAMTOP(ramTOP);
-    base_state.s_sp = ramTOP;
-    base_state.s_pc = (memaddr) delayDaemon;                      
-    base_state.s_t9 = (memaddr) delayDaemon;                
-    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON;
-    base_state.s_entryHI = (0 << SHIFT_ASID);
 
-    status = SYSCALL(SYS1,(int)&base_state,(memaddr) NULL,0);
-    if (status != OK){
-        SYSCALL(SYS2,0,0,0);
-    }
-
+    /*Init Active Delay List (ADL)*/
     delaydFree_h = &delayDescriptors[0];
-
     int i;
-    for (i = 1; i < MAXPROC; i++) {
+    for (i=1;i<MAXUPROCS;i++){
         delayDescriptors[i-1].d_next = &delayDescriptors[i];
     }
-
-    /* Initialise the Active Delay List (ADL) with a dummy tail node */
+    /*init dummy tail*/
     delayDescriptors[MAXPROC - 1].d_next = NULL;
-    delayd_h = &delayDescriptors[MAXPROC];
+    delayd_h = &delayDescriptors[MAXPROC];         
     delayd_h->d_next = NULL;
     delayd_h->d_supStruct = NULL;
-    delayd_h->d_wakeTime = 0xFFFFFFFF;
+    delayd_h->d_wakeTime = 0xFFFFFFFF;  
+
+    /*Set up initial state for delay daemon*/
+    memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
+    state_t base_state;
+    base_state.s_entryHI = (0 << SHIFT_ASID); /*set asid for delay daemon process (0)*/
+    base_state.s_pc = (memaddr) delayDaemon;
+    base_state.s_t9 = (memaddr) delayDaemon;
+    base_state.s_sp = topRAM; /*CHANGE TO STARTING ADDRESS ?*/
+    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON; /*kernel mode + interrupts enabled*/
+
+    int status;
+    status = SYSCALL(SYS1,(int) &base_state,NULL,0);
+
+    if (status != 0){
+        get_nuked(NULL);
+    }
 }
 
 

@@ -51,10 +51,9 @@ delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
 }
 
 /**************************************************************************************************  
- * Return a node from the ADL to the free pool (of unsued descriptor nodes)
- * 
+ * Remove a node from the ADL and return it to the free pool
  **************************************************************************************************/
-void return_to_ADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
+void removeADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
     delayDescriptor->d_next = delaydFree_h;
     delaydFree_h = delayDescriptor;
 }
@@ -110,7 +109,7 @@ void initADL(){
  * @ret:
  *     - pointer to preceding event descriptor
  **************************************************************************************************/
-delayd_PTR searchADL(int wakeTime){
+delayd_PTR find_insert_position(int wakeTime){
     delayd_PTR prev = delayd_h;
     delayd_PTR curr = delayd_h->d_next;
 

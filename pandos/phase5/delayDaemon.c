@@ -73,7 +73,8 @@ void initADL(){
     delayDaemon_sema4 = 1;
 
     delaydFree_h = &delayDescriptors[2];
-    for (int i = 3; i < MAXUPROCS + 2; i++){
+    int i;
+    for (i = 3; i < MAXUPROCS + 2; i++){
         delayDescriptors[i - 1].d_next = &delayDescriptors[i];
     }
     delayDescriptors[MAXUPROCS + 1].d_next = NULL;

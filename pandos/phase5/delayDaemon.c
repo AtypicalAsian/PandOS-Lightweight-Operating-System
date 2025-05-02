@@ -136,7 +136,7 @@ int insertADL(int time_asleep, support_t *supStruct){
     newDescriptor->d_wakeTime = currTime + (time_asleep * 1000000);
     newDescriptor->d_supStruct = supStruct;
 
-    delayd_PTR prev = searchADL(newDescriptor->d_wakeTime);
+    delayd_PTR prev = find_insert_position(newDescriptor->d_wakeTime);
     newDescriptor->d_next = prev->d_next;
     prev->d_next = newDescriptor;
 
@@ -159,7 +159,7 @@ void delayDaemon(){
         while (curr != delayd_tail && curr->d_wakeTime <= curr_time){
             SYSCALL(SYS4,(int)&curr->d_supStruct->privateSema4,0,0);
             delayd_h->d_next = curr->d_next;
-            return_to_ADL(curr);
+            removeADL(curr);
             curr = delayd_h->d_next;
         }
 

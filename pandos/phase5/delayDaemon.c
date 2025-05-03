@@ -39,8 +39,12 @@ delayd_PTR delayd_tail; /*dummy tail ptr*/
 /**************************************************************************************************  
  * Allocate new node for the ADL from free list
  * 
+ * @param: None
  * @ret:
  *     - pointer to preceding event descriptor
+ * 
+ * @ref:
+ * pandos
  **************************************************************************************************/
 delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
     delayd_PTR newDescriptor; /*pointer to new descriptor to be allocated from free list*/
@@ -58,6 +62,12 @@ delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
 
 /**************************************************************************************************  
  * Remove a node from the ADL and return it to the free pool
+ * 
+ * @param: pointer to descriptor node to be removed from the ADL
+ * @return: None
+ * 
+ * @ref:
+ * pandos
  **************************************************************************************************/
 void removeADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
     delayDescriptor->d_next = delaydFree_h;
@@ -72,6 +82,12 @@ void removeADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
  *    initialize the active list (zero, one or two dummy nodes)
  * 2. Initialize and launch (SYS1) the Delay Daemon.
  * 3. Set the Support Structure SYS1 parameter to be NULL
+ * 
+ * @param: None
+ * @return: None
+ * 
+ * @ref:
+ * pandos
  **************************************************************************************************/
 void initADL(){
     static delayd_t delayDescriptors[MAXUPROCS + 2]; /*+2 for dummy head and tail*/
@@ -112,8 +128,12 @@ void initADL(){
  * Helper method that searches the ADL for the event descriptor that directly precedes 
  * where the new descriptor should belong (ADL sorted by wakeTime)
  * 
+ * @param: time the process being searched for needs to be awakened from its sleep
  * @ret:
  *     - pointer to preceding event descriptor
+ * 
+ * @ref:
+ * pandos
  **************************************************************************************************/
 delayd_PTR find_insert_position(int wakeTime){
     delayd_PTR prev = delayd_h;
@@ -129,6 +149,11 @@ delayd_PTR find_insert_position(int wakeTime){
 /**************************************************************************************************  
  * Insert new descriptor into Active Delay List (ADL)
  * 
+ * @param:
+ * @return: TRUE if insertion was successful, FALSE otherwise
+ * 
+ * @ref:
+ * pandos
  **************************************************************************************************/
 int insertADL(int time_asleep, support_t *supStruct){
     int currTime;
@@ -152,6 +177,11 @@ int insertADL(int time_asleep, support_t *supStruct){
 /**************************************************************************************************  
  * Implements delay facility (delay daemon process)
  * 
+ * @param: None
+ * @return: None
+ * 
+ * @ref:
+ * pandos
  **************************************************************************************************/
 void delayDaemon(){
     cpu_t curr_time;
@@ -186,8 +216,11 @@ void delayDaemon(){
  * 5. Return control (LDST) to the U-proc at the instruction immediately following the SYS18. 
  *    This step will not be executed until after the U-proc is awoken
  * 
- * @ref
+ * @param:
+ * @return:
  * 
+ * @ref
+ * pandos
  **************************************************************************************************/
 void sys18Handler(int sleepTime, support_t *support_struct){
     if (sleepTime == 0) return;

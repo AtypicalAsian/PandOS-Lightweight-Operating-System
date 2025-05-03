@@ -1,6 +1,12 @@
 /**************************************************************************************************  
  * @file delayDaemon.c  
  * 
+ * This module implements a kernel-level delay mechanism using a singly linked list of event descriptors.
+ * Key components include:
+ *   - A statically allocated pool of delay descriptor nodes managed via a free list.
+ *   - An Active Delay List (ADL) using dummy head and tail nodes to maintain sorted order by wakeTime.
+ *   - A delay daemon process that wakes up delayed user processes after the appropriate time interval.
+ *   - Support for SYS18 (DELAY) system call, which blocks user processes for a specified duration.
  * 
  * @ref
  * pandos

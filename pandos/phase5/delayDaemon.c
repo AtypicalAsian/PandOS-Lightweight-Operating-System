@@ -187,9 +187,9 @@ int insertADL(int time_asleep, support_t *supStruct){
 void removeADL(int currTime){
     delayd_PTR currNode = delayd_h->d_next; /*get head of ADL*/
     while ((currNode->d_wakeTime <= currTime) && (currNode != delayd_tail)){
-        if (currNode->d_wakeTime < 0){
+        /*if (currNode->d_wakeTime < 0){
             get_nuked(NULL);
-        }
+        }*/
         SYSCALL(SYS4,(int)&currNode->d_supStruct->privateSema4,0,0);
         delayd_h->d_next = currNode->d_next;
         free_descriptor(currNode);

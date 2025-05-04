@@ -185,15 +185,16 @@ int insertADL(int time_asleep, support_t *supStruct){
  * pandos
  **************************************************************************************************/
 void removeADL(int currTime){
-    delayd_PTR currNode = delayd_h->d_next; /*get head of ADL*/
-    while ((currNode != delayd_tail) && (currNode->d_wakeTime <= currTime) ){
-        /*if (currNode->d_wakeTime < 0){
-            get_nuked(NULL);
-        }*/
-        SYSCALL(SYS4,(int)&currNode->d_supStruct->privateSema4,0,0);
-        delayd_h->d_next = currNode->d_next;
-        free_descriptor(currNode);
-        currNode = delayd_h->d_next;
+    delayd_PTR prev = delayd_h; /*dummy head*/
+    delayd_PTR curr = delayd_h->d_next; /*actual head*/
+
+    while (curr != delayd_tail && curr->d_wakeTime <= currTime) {
+        SYSCALL(SYS4, (int)&curr->d_supStruct->privateSema4, 0, 0);
+
+        prev->d_next = curr->d_next;
+        free_descriptor(curr);
+
+        curr = prev->d_next; /*advance to next node*/
     }
 }
 
@@ -213,7 +214,6 @@ void delayDaemon(){
         SYSCALL(SYS7,0,0,0);
         SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
         STCK(curr_time);
-        delayd_PTR curr = delayd_h->d_next;
         removeADL(curr_time);
         SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);
     }

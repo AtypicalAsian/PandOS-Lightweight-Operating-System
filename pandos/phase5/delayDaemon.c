@@ -61,7 +61,7 @@ delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
 }
 
 /**************************************************************************************************  
- * Remove a node from the ADL and return it to the free pool
+ * deallocate the current descriptor node and return it to the free list
  * 
  * @param: pointer to descriptor node to be removed from the ADL
  * @return: None
@@ -69,7 +69,7 @@ delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
  * @ref:
  * pandos
  **************************************************************************************************/
-void removeADL(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
+void free_descriptor(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
     delayDescriptor->d_next = delaydFree_h;
     delaydFree_h = delayDescriptor;
 }
@@ -195,7 +195,7 @@ void delayDaemon(){
         while (curr != delayd_tail && curr->d_wakeTime <= curr_time){
             SYSCALL(SYS4,(int)&curr->d_supStruct->privateSema4,0,0);
             delayd_h->d_next = curr->d_next;
-            removeADL(curr);
+            free_descriptor(curr);
             curr = delayd_h->d_next;
         }
 

@@ -174,6 +174,29 @@ int insertADL(int time_asleep, support_t *supStruct){
     return TRUE;
 }
 
+
+/**************************************************************************************************  
+ * Remove descriptor nodes that are to be woken up from the ADL and subsequently free them
+ * 
+ * @param:
+ * @return:
+ * 
+ * @ref:
+ * pandos
+ **************************************************************************************************/
+void removeADL(int currTime){
+    delayd_PTR currNode = delayd_h->d_next; /*get head of ADL*/
+    while ((currNode->d_wakeTime <= currTime) && (currNode != delayd_tail)){
+        if (currNode->d_wakeTime < 0){
+            get_nuked(NULL);
+        }
+        SYSCALL(SYS4,(int)&currNode->d_supStruct->privateSema4,0,0);
+        delayd_h->d_next = currNode->d_next;
+        free_descriptor(currNode);
+        currNode = delayd_h->d_next;
+    }
+}
+
 /**************************************************************************************************  
  * Implements delay facility (delay daemon process)
  * 
@@ -190,15 +213,7 @@ void delayDaemon(){
         SYSCALL(SYS7,0,0,0);
         SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
         STCK(curr_time);
-
-        delayd_PTR curr = delayd_h->d_next;
-        while (curr != delayd_tail && curr->d_wakeTime <= curr_time){
-            SYSCALL(SYS4,(int)&curr->d_supStruct->privateSema4,0,0);
-            delayd_h->d_next = curr->d_next;
-            free_descriptor(curr);
-            curr = delayd_h->d_next;
-        }
-
+        removeADL(curr_time);
         SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);
     }
 }

@@ -75,6 +75,7 @@ void free_descriptor(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
     delaydFree_h = delayDescriptor;
 }
 
+/*initialize the free list of event descriptor nodes*/
 void initFreeList(){
     delaydFree_h = &delayDescriptors[2];
     int i;
@@ -84,6 +85,8 @@ void initFreeList(){
     delayDescriptors[MAXUPROCS + 1].d_next = NULL;
 }
 
+
+/*Set up initial state for the daemon process*/
 state_t daemon_setUp(){
     memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
     state_t base_state;

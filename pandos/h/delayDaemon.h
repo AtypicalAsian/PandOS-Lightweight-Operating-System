@@ -13,6 +13,8 @@ extern int delayDaemon_sema4;
 extern delayd_PTR delayd_h;
 extern delayd_PTR delaydFree_h;
 
+void initFreeList(); /*Initalize the free list of event descriptor nodes*/
+state_t daemon_setUp(); /*Set up initial state for the daemon process*/
 void initADL(); /*initialize the Active Delay List (ADL)*/
 void sys18Handler(int sleep_time, support_t *support_struct); /*function to implement syscall 18*/
 void delayDaemon(); /*code for delay daemon process*/

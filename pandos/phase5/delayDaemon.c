@@ -212,7 +212,7 @@ void removeADL(){
  * pandos
  **************************************************************************************************/
 void delayDaemon(){
-    /*cpu_t curr_time;*/
+    cpu_t curr_time;
 
     while (TRUE){
         SYSCALL(SYS7,0,0,0);

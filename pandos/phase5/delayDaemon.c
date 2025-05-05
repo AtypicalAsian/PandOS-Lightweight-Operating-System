@@ -216,7 +216,7 @@ void delayDaemon(){
 
     while (TRUE){
         SYSCALL(SYS7,0,0,0);
-        /*SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
+        SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
         STCK(curr_time);
         delayd_PTR curr = delayd_h->d_next;
         while (curr != delayd_tail && curr->d_wakeTime <= curr_time){
@@ -225,8 +225,8 @@ void delayDaemon(){
             free_descriptor(curr);
             curr = delayd_h->d_next;
         }
-        SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);*/
-        removeADL();
+        SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);
+        /*removeADL();*/
     }
 }
 

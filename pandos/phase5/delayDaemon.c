@@ -34,6 +34,7 @@ int delayDaemon_sema4; /*semaphore to provided mutual exclusion over the ADL*/
 delayd_PTR delaydFree_h; /*Ptr to head of free list of event descriptors*/
 delayd_PTR delayd_h; /*dummy head ptr*/
 delayd_PTR delayd_tail; /*dummy tail ptr*/
+static delayd_t delayDescriptors[MAXUPROCS + 2]; /*+2 for dummy head and tail*/
 
 
 /**************************************************************************************************  
@@ -74,6 +75,26 @@ void free_descriptor(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
     delaydFree_h = delayDescriptor;
 }
 
+void initFreeList(){
+    delaydFree_h = &delayDescriptors[2];
+    int i;
+    for (i = 3; i < MAXUPROCS + 2; i++){
+        delayDescriptors[i - 1].d_next = &delayDescriptors[i];
+    }
+    delayDescriptors[MAXUPROCS + 1].d_next = NULL;
+}
+
+state_t daemon_setUp(){
+    memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
+    state_t base_state;
+    base_state.s_entryHI = (0 << SHIFT_ASID);
+    base_state.s_pc = (memaddr) delayDaemon;
+    base_state.s_t9 = (memaddr) delayDaemon;
+    base_state.s_sp = topRAM;
+    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON;
+    return base_state;
+}
+
 
 /**************************************************************************************************  
  * Initialize Active Delay List (ADL)
@@ -90,16 +111,12 @@ void free_descriptor(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
  * pandos
  **************************************************************************************************/
 void initADL(){
-    static delayd_t delayDescriptors[MAXUPROCS + 2]; /*+2 for dummy head and tail*/
     delayDaemon_sema4 = 1;
 
-    delaydFree_h = &delayDescriptors[2];
-    int i;
-    for (i = 3; i < MAXUPROCS + 2; i++){
-        delayDescriptors[i - 1].d_next = &delayDescriptors[i];
-    }
-    delayDescriptors[MAXUPROCS + 1].d_next = NULL;
+    /*Initialize Free List*/
+    initFreeList();
 
+    /*Initialize ADL*/
     delayd_h = &delayDescriptors[0];
     delayd_tail = &delayDescriptors[1];
     delayd_h->d_next = delayd_tail;
@@ -111,15 +128,10 @@ void initADL(){
     delayd_h->d_wakeTime = 0;
     delayd_tail->d_wakeTime = 0xFFFFFFFF;
 
-    memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
-    state_t base_state;
-    base_state.s_entryHI = (0 << SHIFT_ASID);
-    base_state.s_pc = (memaddr) delayDaemon;
-    base_state.s_t9 = (memaddr) delayDaemon;
-    base_state.s_sp = topRAM;
-    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON;
-
-    int status = SYSCALL(SYS1, (int)&base_state, (int)NULL, 0);
+    /*initialize base state for daemon and launch the daemon*/
+    state_t daemon_initState;
+    daemon_initState = daemon_setUp();
+    int status = SYSCALL(SYS1, (int)&daemon_initState, (int)NULL, 0); /*launch delay daemon process*/
     if (status != 0) get_nuked(NULL);
 }
 
@@ -214,16 +226,15 @@ void delayDaemon(){
         SYSCALL(SYS7,0,0,0);
         SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
         STCK(curr_time);
-        /*delayd_PTR curr = delayd_h->d_next;
+        delayd_PTR curr = delayd_h->d_next;
         while (curr != delayd_tail && curr->d_wakeTime <= curr_time){
             SYSCALL(SYS4,(int)&curr->d_supStruct->privateSema4,0,0);
             delayd_h->d_next = curr->d_next;
             free_descriptor(curr);
             curr = delayd_h->d_next;
-        }*/
-        removeADL(curr_time);
+        }
+        /*removeADL(curr_time);*/
         SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);
-        /*removeADL();*/
     }
 }
 

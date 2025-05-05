@@ -21,6 +21,6 @@ delayd_PTR alloc_descriptor(); /*allocate new node for the ADL*/
 void free_descriptor(delayd_PTR delayDescriptor); /*remove a node from the ADL and return it to the free pool (of unsued descriptor nodes)*/
 int insertADL(int time_asleep, support_t *supStruct); /*insert new descriptor into Active Delay List (ADL)*/
 delayd_PTR find_insert_position(int wakeTime); /*helper method to find insert position for ADL*/
-void removeADL(int currTime); /*remove all procs that need to be woken up at currTime from ADL*/
+void removeADL(cpu_t currTime); /*remove all procs that need to be woken up at currTime from ADL*/
 
 #endif

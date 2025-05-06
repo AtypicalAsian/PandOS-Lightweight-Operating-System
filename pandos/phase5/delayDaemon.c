@@ -1,15 +1,24 @@
 /**************************************************************************************************  
  * @file delayDaemon.c  
  * 
- * This module implements a kernel-level delay mechanism using a singly linked list of event descriptors.
- * Key components include:
- *   - A statically allocated pool of delay descriptor nodes managed via a free list.
- *   - An Active Delay List (ADL) using dummy head and tail nodes to maintain sorted order by wakeTime.
- *   - A delay daemon process that wakes up delayed user processes after the appropriate time interval.
- *   - Support for SYS18 (DELAY) system call, which blocks user processes for a specified duration.
+ * This module implements a kernel-level delay facility.
+ * It allows user-level processes (U-procs) to suspend their execution for a specified
+ * number of seconds via the SYS18 system call. The core components of this module include:
+ * 
+ *      - A statically allocated pool of delay descriptor nodes, maintained through a free list.
+ *      - An Active Delay List (ADL), implemented as a singly linked list with dummy head and tail 
+ *        nodes, sorted in ascending order by wakeTime for efficient insertion and traversal.
+ *      - A delay daemon process that periodically (every 100ms) checks the ADL, wakes up 
+ *        processes whose delay period has expired by performing SYS4 on their private semaphores, and 
+ *        returns the corresponding descriptors to the free list.
+ *      - Support for SYS18, which inserts sleeping U-procs into the ADL and blocks 
+ *        them using atomic operations on semaphores.
+ * 
+ * @note
+ * The ADL is protected by its own semaphore to ensure mutual exclusion during concurrent access.
  * 
  * @ref
- * pandos
+ * pandos Chapter 6
  * 
  * @authors  
  * Nicolas & Tran  
@@ -30,74 +39,110 @@
 #include "../h/delayDaemon.h"
 #include "/usr/include/umps3/umps/libumps.h"
 
-int delayDaemon_sema4; /*semaphore to provided mutual exclusion over the ADL*/
-delayd_PTR delaydFree_h; /*Ptr to head of free list of event descriptors*/
-delayd_PTR delayd_h; /*dummy head ptr*/
-delayd_PTR delayd_tail; /*dummy tail ptr*/
-static delayd_t delayDescriptors[MAXUPROCS + 2]; /*+2 for dummy head and tail*/
+int delayDaemon_sema4; /*semaphore to provide mutual exclusion over the ADL*/
+delayd_PTR delaydFree_h; /*Head pointer of the free list of delay descriptor nodes*/
+delayd_PTR delayd_h; /*Pointer to the dummy head node of the Active Delay List (ADL)*/
+delayd_PTR delayd_tail; /*Pointer to the dummy tail node of the ADL*/
+static delayd_t delayDescriptors[MAXUPROCS + 2]; /*Static pool of delay descriptors (+2 for dummy head and tail)*/
 
 
 /**************************************************************************************************  
- * Allocate new node for the ADL from free list
+ * @brief Allocates a delay event descriptor from the free list
+ * 
+ * This function manages a statically allocated pool of delay descriptors using a singly linked
+ * free list. It returns a node from the head of the free list and initializes the node's fields
  * 
  * @param: None
- * @ret:
- *     - pointer to preceding event descriptor
+ * @return 
+ *    - Pointer to a newly allocated delay descriptor, or
+ *    - NULL if no free descriptors are available.
  * 
- * @ref:
- * pandos
+ * @ref 
+ *    - PANDOS Section 6.3.4 & asl.c
  **************************************************************************************************/
 delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
     delayd_PTR newDescriptor; /*pointer to new descriptor to be allocated from free list*/
     if (delaydFree_h != NULL){
-        newDescriptor = delaydFree_h; /*set to current head*/
+        newDescriptor = delaydFree_h; /*take the descriptor at the head of the free list*/
         delaydFree_h = delaydFree_h->d_next; /*move head to next node*/
 
+        /*Initialize descriptor node fields*/
         newDescriptor->d_next = NULL;
-        newDescriptor->d_supStruct = NULL; /*do we have to init this to NULL?*/
+        newDescriptor->d_supStruct = NULL; /*reset to ensure no stale support structure*/
         newDescriptor->d_wakeTime = 0;
         return newDescriptor;
     }
-    return NULL;
+    return NULL; /*in case we run out of free descriptor nodes*/
 }
 
 /**************************************************************************************************  
- * deallocate the current descriptor node and return it to the free list
+ * @brief Deallocates a delay descriptor node and returns it to the free list.
  * 
- * @param: pointer to descriptor node to be removed from the ADL
- * @return: None
+ * This function reclaims a delay event descriptor that is no longer in use (after a delayed process 
+ * has been awakened). It inserts the node back at the head of the free list for reuse.
  * 
- * @ref:
- * pandos
+ * @param delayDescriptor 
+ *    - Pointer to the delay descriptor to be returned to the free list.
+ * 
+ * @return None
+ * 
+ * @ref 
+ *    - PANDOS Section 6.3.4 & asl.c
  **************************************************************************************************/
-void free_descriptor(delayd_PTR delayDescriptor){ /*similar logic to ASL*/
+void free_descriptor(delayd_PTR delayDescriptor){
+    /*Insert the descriptor node at the front of the free list*/
     delayDescriptor->d_next = delaydFree_h;
     delaydFree_h = delayDescriptor;
 }
 
-/*initialize the free list of event descriptor nodes*/
+
+/**************************************************************************************************
+ * @brief Initializes the free list of delay event descriptor nodes.
+ *
+ * This function sets up the free list used by the Active Delay List (ADL) by linking together
+ * the statically allocated pool of delay descriptor nodes.
+ *
+ * @param None
+ * @return None
+ *
+ * @ref
+ *    - PANDOS Section 6.3.3 & 6.3.4
+ **************************************************************************************************/
 void initFreeList(){
     delaydFree_h = &delayDescriptors[2];
     int i;
-    for (i = 3; i < MAXUPROCS + 2; i++){
+    for (i = 3; i < MAXUPROCS + 2; i++){ /*Link each node in the free list to the next*/
         delayDescriptors[i - 1].d_next = &delayDescriptors[i];
     }
-    delayDescriptors[MAXUPROCS + 1].d_next = NULL;
+    delayDescriptors[MAXUPROCS + 1].d_next = NULL; /*mark end of free list*/
 }
 
 
-/*Set up initial state for the daemon process*/
+/**************************************************************************************************
+ * @brief Set up the initial processor state for launching the delay daemon.
+ *
+ * This function sets up a state_t structure for the delay daemon with:
+ * - s_pc and s_t9 pointing to the delayDaemon function [Sec 6.3.2].
+ * - s_sp set to the top of RAM [Sec 4.10].
+ * - s_status enabling kernel mode and all interrupts.
+ * - s_entryHI ASID set to 0 for the kernel.
+ *
+ * @param: None
+ * @return state_t: Initialized processor state for SYS1.
+ *
+ * @ref
+ * PANDOS Sections 4.10, 6.3.2, 6.3.3
+ **************************************************************************************************/
 state_t daemon_setUp(){
     memaddr topRAM = *((int *)RAMBASEADDR) + *((int *)RAMBASESIZE);
     state_t base_state;
-    base_state.s_entryHI = (0 << SHIFT_ASID);
-    base_state.s_pc = (memaddr) delayDaemon;
-    base_state.s_t9 = (memaddr) delayDaemon;
-    base_state.s_sp = topRAM;
-    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON;
-    return base_state;
+    base_state.s_entryHI = (DAEMONID << SHIFT_ASID); /*set entryHI ASID to 0*/
+    base_state.s_pc = (memaddr) delayDaemon; /*PC point to delayDaemon function*/
+    base_state.s_t9 = (memaddr) delayDaemon; /*Set t9 everytime we set PC*/
+    base_state.s_sp = topRAM; /*set stack pointer to top of RAM*/
+    base_state.s_status = ALLOFF | IEPON | IMON | TEBITON; /*kernel mode + interrupts enabled*/
+    return base_state; 
 }
-
 
 /**************************************************************************************************  
  * Initialize Active Delay List (ADL)
@@ -140,21 +185,24 @@ void initADL(){
 
 
 /**************************************************************************************************  
- * Helper method that searches the ADL for the event descriptor that directly precedes 
- * where the new descriptor should belong (ADL sorted by wakeTime)
+ * Finds the appropriate insert position in the Active Delay List (ADL) for a new node.
  * 
- * @param: time the process being searched for needs to be awakened from its sleep
- * @ret:
- *     - pointer to preceding event descriptor
+ * The ADL is sorted in ascending order of wakeTime, and this function returns the pointer to 
+ * the node that should precede the to-be-inserted descriptor
+ * 
+ * @param wakeTime: The time at which the new event descriptor is set to wake.
+ * @return: Pointer to the descriptor node that will precede the new one.
+ *          If the new descriptor has the earliest wakeTime, this will return the dummy head node.
  * 
  * @ref:
- * pandos
+ * pandos 6.3.4
  **************************************************************************************************/
 delayd_PTR find_insert_position(int wakeTime){
     delayd_PTR prev = delayd_h;
     delayd_PTR curr = delayd_h->d_next;
 
-    while (curr != delayd_tail && curr->d_wakeTime < wakeTime){
+    /*Traverse ADL until we find a node with wakeTime greater than or equal to the new one*/
+    while (curr != delayd_tail && curr->d_wakeTime <= wakeTime){
         prev = curr;
         curr = curr->d_next;
     }

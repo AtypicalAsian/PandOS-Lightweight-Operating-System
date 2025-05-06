@@ -269,5 +269,6 @@
 
 #define RAMTOP(T) ((T) = ((*((int *)RAMBASEADDR)) + (*((int *)RAMBASESIZE))))
 #define EXCSTATE ((state_t *) BIOSDATAPAGE)
+#define DAEMONID 0
 #endif
 

@@ -145,42 +145,41 @@ state_t daemon_setUp(){
 }
 
 /**************************************************************************************************  
- * Initialize Active Delay List (ADL)
+ * This function initialize Active Delay List (ADL) and is called inside of test() in initProc.c
  * Steps:
- * 1. Add each element from the static array of delay event descriptor nodes to the free list and 
- *    initialize the active list (zero, one or two dummy nodes)
- * 2. Initialize and launch (SYS1) the Delay Daemon.
- * 3. Set the Support Structure SYS1 parameter to be NULL
+ * 1. Initializes the delay descriptor free list used to manage available nodes.
+ * 2. Creates an empty singly linked Active Delay List with dummy head and tail nodes.
+ * 3. Sets up and launches the Delay Daemon process (via SYS1)
  * 
  * @param: None
  * @return: None
  * 
  * @ref:
- * pandos
+ * pandos 6.3.3
  **************************************************************************************************/
 void initADL(){
-    delayDaemon_sema4 = 1;
+    delayDaemon_sema4 = 1; /*initialize ADL semaphore*/
 
     /*Initialize Free List*/
     initFreeList();
 
-    /*Initialize ADL*/
-    delayd_h = &delayDescriptors[0];
-    delayd_tail = &delayDescriptors[1];
+    /*Initialize empty ADL*/
+    delayd_h = &delayDescriptors[0]; /*dummy head*/
+    delayd_tail = &delayDescriptors[1]; /*dummy tail*/
     delayd_h->d_next = delayd_tail;
     delayd_tail->d_next = NULL;
 
     delayd_h->d_supStruct = NULL;
     delayd_tail->d_supStruct = NULL;
 
-    delayd_h->d_wakeTime = 0;
-    delayd_tail->d_wakeTime = 0xFFFFFFFF;
+    delayd_h->d_wakeTime = 0; /*set dummy head wakeTime*/
+    delayd_tail->d_wakeTime = LARGETIME; /*Dummy tail wakeTime marks the logical end*/
 
-    /*initialize base state for daemon and launch the daemon*/
+    /* Set up initial state for the Delay Daemon and launch it via SYS1*/
     state_t daemon_initState;
-    daemon_initState = daemon_setUp();
+    daemon_initState = daemon_setUp(); /*Populate fields for delay daemon base state (PC, SP, etc.)*/
     int status = SYSCALL(SYS1, (int)&daemon_initState, (int)NULL, 0); /*launch delay daemon process*/
-    if (status != 0) get_nuked(NULL);
+    if (status != 0) get_nuked(NULL); /*terminate if SYS1 fails*/
 }
 
 
@@ -240,13 +239,15 @@ int insertADL(int time_asleep, support_t *supStruct){
 
 
 /**************************************************************************************************  
- * Remove descriptor nodes that are to be woken up from the ADL and subsequently free them
+ * Scans the Active Delay List (ADL) and removes all delay event descriptors whose wake-up time 
+ * has passed. For each such descriptor, the associated user process is unblocked by performing 
+ * a SYS4 on its private semaphore. The descriptor is then returned to the free list.
  * 
- * @param:
- * @return:
+ * @param currTime: the current time (in microseconds) retrieved from the TOD clock.
+ * @return: None
  * 
  * @ref:
- * pandos
+ * pandos 6.2.2, 6.3.4
  **************************************************************************************************/
 void removeADL(cpu_t currTime){
     delayd_PTR prev = delayd_h; /*dummy head*/
@@ -263,21 +264,26 @@ void removeADL(cpu_t currTime){
 }
 
 /**************************************************************************************************  
- * Implements delay facility (delay daemon process)
+ * This function implements the delay daemon - an OS created process that periodically wakes up 
+ * user processes whose sleep time has expired. The daemon blocks until a 100ms clock interrupt 
+ * occurs, then checks the Active Delay List (ADL) for any descriptors ready to wake and signals 
+ * their private semaphores.
+ * 
+ * @note: Freed descriptors are returned to the free list.
  * 
  * @param: None
  * @return: None
  * 
  * @ref:
- * pandos
+ * pandos 6.2.2, 6.3.2
  **************************************************************************************************/
 void delayDaemon(){
-    cpu_t curr_time;
+    cpu_t curr_time; /* Stores current time from TOD clock */
 
-    while (TRUE){
-        SYSCALL(SYS7,0,0,0);
-        SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
-        STCK(curr_time);
+    while (TRUE){ /*inifinite loop*/
+        SYSCALL(SYS7,0,0,0); /* Wait for 100ms clock tick */
+        SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0); /*Acquire mutex on ADL (lock ADL)*/
+        STCK(curr_time); /* Get current time from TOD clock */
         delayd_PTR curr = delayd_h->d_next;
         while (curr != delayd_tail && curr->d_wakeTime <= curr_time){
             SYSCALL(SYS4,(int)&curr->d_supStruct->privateSema4,0,0);
@@ -286,43 +292,52 @@ void delayDaemon(){
             curr = delayd_h->d_next;
         }
         /*removeADL(curr_time);*/
-        SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0);
+        SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0); /*Release mutex on ADL (unlock ADL)*/
     }
 }
 
 /**************************************************************************************************  
- * Code for implementing syscall 18 - DELAY
+ * This function implements syscall 18 - DELAY. The syscall will block the requesting process for
+ * a specified number of seconds until the delay period expires at which the process will be 
+ * woken up from its "sleep"
+ * 
  * Steps:
- * 1. Check the seconds parameter and terminate (SYS9) the U-proc if the wait time is negative
- * 2. Obtain mutual exclusion over the ADL - SYS3/P on the ADL semaphore
- * 3. Allocate a delay event descriptor node from the free list, populate it and insert it into 
- *    its proper location on the active list. If this operation is unsuccessful, terminate (SYS9) 
- *    the U-proc – after releasing mutual exclusion over the ADL.
- * 4. Release mutual exclusion over the ADL - SYS4/V on the ADL semaphore AND execute a SYS3/P 
- *    on the U-proc’s private semaphore atomically. This will block the executing U-proc.
- * 5. Return control (LDST) to the U-proc at the instruction immediately following the SYS18. 
- *    This step will not be executed until after the U-proc is awoken
+ * 1. If the requested sleepTime is zero, return immediately (no delay).
+ * 2. If the requested sleepTime is negative, the U-proc is terminated via SYS9.
+ * 3. Otherwise:
+ *    a. Acquire mutual exclusion over the Active Delay List (ADL) using SYS3 (P).
+ *    b. Attempt to allocate and insert a descriptor node into the ADL.
+ *       - If allocation fails, release the semaphore and terminate the process.
+ *    c. Atomically release the ADL semaphore (SYS4/V) and perform a P (SYS3) on the 
+ *       U-proc's private semaphore to block the process until it is woken by the daemon.
  * 
- * @param:
- * @return:
+ * @note: It is important that we perform the SYS4 on the ADL semaphore before putting the 
+ *        user process to sleep via a SYS3 to make sure that the uproc does not go to sleep
+ *        holding the semaphore lock.
+ *        If the user process is blocked before releasing the ADL semaphore, the delay daemon 
+ *        would be unable to access the ADL, causing a deadlock in the system.
  * 
- * @ref
- * pandos
+ * @param: sleepTime – number of seconds to delay
+ *         support_struct – pointer to U-proc’s support structure
+ * @return: None
+ * 
+ * @ref:
+ * pandos 6.1, 6.2, 6.3.1
  **************************************************************************************************/
 void sys18Handler(int sleepTime, support_t *support_struct){
-    if (sleepTime == 0) return;
-    else if (sleepTime < 0){
+    if (sleepTime == 0) return; 
+    else if (sleepTime < 0){ /*invalid delay request -> terminate*/
         get_nuked(NULL);
     }
     else{
-        SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0);
-        if (insertADL(sleepTime,support_struct) == FALSE){
+        SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0); /*Acquire mutex on the ADL (lock ADL)*/
+        if (insertADL(sleepTime,support_struct) == FALSE){ /*Attempt to insert a new descriptor node onto ADL*/
             get_nuked(NULL);
         }
-        setSTATUS(NO_INTS);
-        SYSCALL(SYS4,(int) &delayDaemon_sema4,0,0);
-        SYSCALL(SYS3,(int)&support_struct->privateSema4,0,0); 
-        setSTATUS(YES_INTS);
+        setSTATUS(NO_INTS); /*Disable interrupts*/
+        SYSCALL(SYS4,(int) &delayDaemon_sema4,0,0); /*Release mutex on the ADL (unlock ADL)*/
+        SYSCALL(SYS3,(int)&support_struct->privateSema4,0,0); /*Block uproc on private semaphore (go to sleep)*/
+        setSTATUS(YES_INTS); /*Re-enable interrupts*/
     }
 }
 

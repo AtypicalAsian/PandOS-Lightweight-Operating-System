@@ -239,31 +239,6 @@ int insertADL(int time_asleep, support_t *supStruct){
 
 
 /**************************************************************************************************  
- * Scans the Active Delay List (ADL) and removes all delay event descriptors whose wake-up time 
- * has passed. For each such descriptor, the associated user process is unblocked by performing 
- * a SYS4 on its private semaphore. The descriptor is then returned to the free list.
- * 
- * @param currTime: the current time (in microseconds) retrieved from the TOD clock.
- * @return: None
- * 
- * @ref:
- * pandos 6.2.2, 6.3.4
- **************************************************************************************************/
-void removeADL(cpu_t currTime){
-    delayd_PTR prev = delayd_h; /*dummy head*/
-    delayd_PTR curr = delayd_h->d_next; /*actual head*/
-
-    while (curr != delayd_tail && curr->d_wakeTime <= currTime) {
-        if (curr->d_supStruct != NULL){
-            SYSCALL(SYS4, (int)&curr->d_supStruct->privateSema4, 0, 0);
-        }
-        prev->d_next = curr->d_next;
-        free_descriptor(curr);
-        curr = prev->d_next; /*advance to next node*/
-    }
-}
-
-/**************************************************************************************************  
  * This function implements the delay daemon - an OS created process that periodically wakes up 
  * user processes whose sleep time has expired. The daemon blocks until a 100ms clock interrupt 
  * occurs, then checks the Active Delay List (ADL) for any descriptors ready to wake and signals 
@@ -284,14 +259,15 @@ void delayDaemon(){
         SYSCALL(SYS7,0,0,0); /* Wait for 100ms clock tick */
         SYSCALL(SYS3,(int) &delayDaemon_sema4,0,0); /*Acquire mutex on ADL (lock ADL)*/
         STCK(curr_time); /* Get current time from TOD clock */
+
+        /*Traverse ADL and wake up all processes whose wakeTime has expired */
         delayd_PTR curr = delayd_h->d_next;
         while (curr != delayd_tail && curr->d_wakeTime <= curr_time){
-            SYSCALL(SYS4,(int)&curr->d_supStruct->privateSema4,0,0);
-            delayd_h->d_next = curr->d_next;
-            free_descriptor(curr);
-            curr = delayd_h->d_next;
+            SYSCALL(SYS4,(int)&curr->d_supStruct->privateSema4,0,0);  /* Unblock the sleeping process */
+            delayd_h->d_next = curr->d_next; /* Remove current descriptor from ADL */
+            free_descriptor(curr);  /* Return descriptor to the free list */
+            curr = delayd_h->d_next; /* Move to next descriptor in ADL */
         }
-        /*removeADL(curr_time);*/
         SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0); /*Release mutex on ADL (unlock ADL)*/
     }
 }

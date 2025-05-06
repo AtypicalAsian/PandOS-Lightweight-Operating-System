@@ -58,7 +58,7 @@ static delayd_t delayDescriptors[MAXUPROCS + 2]; /*Static pool of delay descript
  *    - NULL if no free descriptors are available.
  * 
  * @ref 
- *    - PANDOS Section 6.3.4 & asl.c
+ *    - PANDOS Section 6.2.2, 6.3.4 & asl.c
  **************************************************************************************************/
 delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
     delayd_PTR newDescriptor; /*pointer to new descriptor to be allocated from free list*/
@@ -87,7 +87,7 @@ delayd_PTR alloc_descriptor(){ /*similar logic to ASL*/
  * @return None
  * 
  * @ref 
- *    - PANDOS Section 6.3.4 & asl.c
+ *    - PANDOS Section 6.2.2, 6.3.4 & asl.c
  **************************************************************************************************/
 void free_descriptor(delayd_PTR delayDescriptor){
     /*Insert the descriptor node at the front of the free list*/
@@ -106,7 +106,7 @@ void free_descriptor(delayd_PTR delayDescriptor){
  * @return None
  *
  * @ref
- *    - PANDOS Section 6.3.3 & 6.3.4
+ *    - PANDOS Section 6.2.2, 6.3.3 & 6.3.4
  **************************************************************************************************/
 void initFreeList(){
     delaydFree_h = &delayDescriptors[2];
@@ -195,7 +195,7 @@ void initADL(){
  *          If the new descriptor has the earliest wakeTime, this will return the dummy head node.
  * 
  * @ref:
- * pandos 6.3.4
+ * pandos 6.2.2, 6.3.4
  **************************************************************************************************/
 delayd_PTR find_insert_position(int wakeTime){
     delayd_PTR prev = delayd_h;
@@ -209,28 +209,29 @@ delayd_PTR find_insert_position(int wakeTime){
     return prev;
 }
 
-/**************************************************************************************************  
- * Insert new descriptor into Active Delay List (ADL)
+/**********************************************************************************************************************************************  
+ * Inserts a new delay descriptor into the Active Delay List (ADL) in sorted order by wakeTime.
  * 
- * @param:
- * @return: TRUE if insertion was successful, FALSE otherwise
+ * @param time_asleep: Delay duration in seconds.
+ * @param supStruct: Pointer to the support structure of the calling user process.
+ * @return TRUE if insertion was successful, FALSE if no free descriptor is available.
  * 
  * @ref:
- * pandos
- **************************************************************************************************/
+ * pandos 6.2.2, 6.3.4
+ **********************************************************************************************************************************************/
 int insertADL(int time_asleep, support_t *supStruct){
     int currTime;
     delayd_PTR newDescriptor;
 
-    newDescriptor = alloc_descriptor();
+    newDescriptor = alloc_descriptor(); /*Allocate a descriptor node from the free list*/
     if (newDescriptor == NULL){
         return FALSE;
     }
-    STCK(currTime);
-    newDescriptor->d_wakeTime = currTime + (time_asleep * 1000000);
+    STCK(currTime); /*Get current time from TOD clock*/
+    newDescriptor->d_wakeTime = currTime + SECONDS(time_asleep); /*Set waketime for new descriptor node*/
     newDescriptor->d_supStruct = supStruct;
 
-    delayd_PTR prev = find_insert_position(newDescriptor->d_wakeTime);
+    delayd_PTR prev = find_insert_position(newDescriptor->d_wakeTime); /*Find correct position in ADL to insert new descriptor node*/
     newDescriptor->d_next = prev->d_next;
     prev->d_next = newDescriptor;
 

@@ -237,16 +237,6 @@ int insertADL(int time_asleep, support_t *supStruct){
     return TRUE;
 }
 
-void removeADL(delayd_PTR *currPtr, cpu_t currTime){
-    while ((*currPtr) != delayd_tail && (*currPtr)->d_wakeTime <= currTime) {
-        delayd_PTR expired = *currPtr;
-        if (expired->d_supStruct != NULL){
-            SYSCALL(SYS4, (int)&expired->d_supStruct->privateSema4, 0, 0); /* Wake up uproc */
-        }
-        *currPtr = expired->d_next; /* Skip over expired descriptor */
-        free_descriptor(expired); /* Return descriptor to free list */
-    }
-}
 
 /**************************************************************************************************  
  * This function implements the delay daemon - an OS created process that periodically wakes up 
@@ -271,8 +261,13 @@ void delayDaemon(){
         STCK(curr_time); /* Get current time from TOD clock */
 
         /*Traverse ADL and wake up all processes whose wakeTime has expired */
-        delayd_PTR *curr = &delayd_h->d_next;
-        removeADL(curr,curr_time);
+        delayd_PTR curr = delayd_h->d_next;
+        while (curr != delayd_tail && curr->d_wakeTime <= curr_time){
+            SYSCALL(SYS4,(int)&curr->d_supStruct->privateSema4,0,0);  /* Unblock the sleeping process */
+            delayd_h->d_next = curr->d_next; /* Remove current descriptor from ADL */
+            free_descriptor(curr);  /* Return descriptor to the free list */
+            curr = delayd_h->d_next; /* Move to next descriptor in ADL */
+        }
         SYSCALL(SYS4,(int)&delayDaemon_sema4,0,0); /*Release mutex on ADL (unlock ADL)*/
     }
 }

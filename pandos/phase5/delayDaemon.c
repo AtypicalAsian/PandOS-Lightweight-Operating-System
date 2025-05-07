@@ -22,7 +22,6 @@
  * 
  * @authors  
  * Nicolas & Tran  
- * View version history and changes: https://github.com/AtypicalAsian/CS372-OS-Project
  **************************************************************************************************/
 #include "../h/types.h"
 #include "../h/const.h"

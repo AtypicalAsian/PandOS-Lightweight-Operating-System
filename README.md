@@ -2,7 +2,7 @@
 
 ## Overview
 
-**PandOS** is an operating system designed to run on the uMPS3 emulator, which is based on MIPS architecture. This project is implemented in phases to progressively build a deeper understanding of operating system concepts such as process management, memory management, and system-level functionalities.
+[PandOS](https://dl.acm.org/doi/10.1145/3430665.3456331) is an operating system designed to run on the uMPS3 emulator, which is based on MIPS architecture. This project is implemented in phases to progressively build a deeper understanding of operating system concepts such as process management, memory management, and system-level functionalities.
 
 This repository currently contains the implementation for **Phase 1: The Queues Manager**.
 
